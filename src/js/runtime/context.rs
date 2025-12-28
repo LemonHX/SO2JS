@@ -15,7 +15,6 @@ use crate::runtime::intrinsics::rust_runtime::RustRuntimeFunctionId;
 use crate::{
     common::{
         options::Options,
-        serialized_heap::SerializedHeap,
         wtf_8::{Wtf8Str, Wtf8String},
     },
     eval_err, handle_scope,
@@ -32,7 +31,7 @@ use super::{
     },
     collections::{BsHashMap, BsHashMapField},
     error::BsResult,
-    gc::{Heap, HeapRootsDeserializer, HeapVisitor},
+    gc::{Heap, HeapVisitor},
     heap_item_descriptor::{BaseDescriptors, HeapItemKind},
     interned_strings::InternedStrings,
     intrinsics::{intrinsics::Intrinsic, rust_runtime::RustRuntimeFunctionRegistry},
@@ -170,12 +169,7 @@ impl Context {
         cx.rust_runtime_functions.cx_ptr = cx.ptr.as_ptr();
         cx.heap.info().set_context(cx);
         cx.vm = Some(Box::new(VM::new(cx)));
-
-        if let Some(serialized_heap) = options.serialized_heap {
-            cx.init_heap_from_serialized(serialized_heap);
-        } else {
-            cx.init_heap_allocated_context_fields()?;
-        }
+        cx.init_heap_allocated_context_fields()?;
 
         // Stop using deterministic PRNG
         cx.rand = StdRng::from_rng(&mut rand::rng());
@@ -217,21 +211,6 @@ impl Context {
         cx.heap.mark_current_semispace_as_permanent();
 
         Ok(())
-    }
-
-    /// Initialize this context from a serialized heap.
-    ///
-    /// Deserializes heap including fixing up heap roots for all heap allocated fields in the
-    /// context.
-    fn init_heap_from_serialized(&mut self, serialized: &SerializedHeap) {
-        let mut cx = *self;
-
-        // Initialize all uninitialized fields
-        cx.base_descriptors = BaseDescriptors::uninit();
-
-        // Deserialize the heap roots
-        HeapRootsDeserializer::deserialize(cx, serialized);
-        self.heap.init_from_serialized(cx, serialized);
     }
 
     pub fn from_ptr(ptr: NonNull<ContextCell>) -> Context {

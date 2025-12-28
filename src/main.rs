@@ -4,13 +4,6 @@ use std::rc::Rc;
 
 use parking_lot::{Mutex, MutexGuard};
 
-use clap::Parser;
-
-use super::{
-    constants::DEFAULT_HEAP_SIZE,
-    serialized_heap::{get_default_serialized_heap, SerializedHeap},
-};
-
 /// Raw command line arguments.
 #[derive(Parser)]
 #[command(about)]
@@ -59,56 +52,6 @@ pub struct Args {
     pub files: Vec<String>,
 }
 
-/// Options passed throughout the program.
-pub struct Options {
-    /// Whether Annex B extensions are enabled
-    pub annex_b: bool,
-
-    /// Print each AST to the console
-    pub print_ast: bool,
-
-    /// Print the bytecode to the console
-    pub print_bytecode: bool,
-
-    /// Print the bytecode for all RegExps to the console
-    pub print_regexp_bytecode: bool,
-
-    /// Buffer to write all dumped output into instead of stdout
-    pub dump_buffer: Option<Mutex<String>>,
-
-    /// The heap size to use in bytes.
-    pub heap_size: usize,
-
-    /// Whether to use colors when printing to the terminal
-    pub no_color: bool,
-
-    /// Print statistics about the parse phase
-    pub parse_stats: bool,
-
-    /// Create the heap from this SerializedHeap if set, otherwise create heap from scratch.
-    pub serialized_heap: Option<&'static SerializedHeap<'static>>,
-}
-
-impl Options {
-    /// Create a new options struct from command line arguments.
-    pub fn new_from_args(args: &Args) -> Self {
-        OptionsBuilder::new_from_args(args).build()
-    }
-
-    pub fn dump_buffer(&self) -> Option<MutexGuard<'_, String>> {
-        self.dump_buffer
-            .as_ref()
-            .map(|buffer| buffer.lock().unwrap())
-    }
-}
-
-impl Default for Options {
-    /// Create a new options struct with default values.
-    fn default() -> Self {
-        OptionsBuilder::new().build()
-    }
-}
-
 pub struct OptionsBuilder(Options);
 
 impl OptionsBuilder {
@@ -121,9 +64,7 @@ impl OptionsBuilder {
             print_regexp_bytecode: false,
             dump_buffer: None,
             heap_size: DEFAULT_HEAP_SIZE,
-            no_color: false,
             parse_stats: false,
-            serialized_heap: get_default_serialized_heap(),
         })
     }
 
@@ -135,7 +76,6 @@ impl OptionsBuilder {
             .print_bytecode(args.print_bytecode)
             .print_regexp_bytecode(args.print_regexp_bytecode)
             .heap_size(args.heap_size.unwrap_or(DEFAULT_HEAP_SIZE))
-            .no_color(args.no_color)
             .parse_stats(args.parse_stats)
     }
 
@@ -174,27 +114,14 @@ impl OptionsBuilder {
         self
     }
 
-    pub fn no_color(mut self, no_color: bool) -> Self {
-        self.0.no_color = no_color;
-        self
-    }
-
     pub fn parse_stats(mut self, parse_stats: bool) -> Self {
         self.0.parse_stats = parse_stats;
-        self
-    }
-
-    pub fn serialized_heap(
-        mut self,
-        serialized_heap: Option<&'static SerializedHeap<'static>>,
-    ) -> Self {
-        self.0.serialized_heap = serialized_heap;
         self
     }
 }
 
 use brimstone_core::{
-    common::options::{Args, Options},
+    common::{constants::DEFAULT_HEAP_SIZE, options::Options, wtf_8::Wtf8String},
     parser::source::Source,
     runtime::{
         alloc_error::AllocResult, gc_object::GcObject, test_262_object::Test262Object, BsResult,
@@ -204,13 +131,13 @@ use brimstone_core::{
 
 pub fn print_error_message_and_exit(message: &str) -> ! {
     eprintln!("{message}");
-    core::process::exit(1);
+    std::process::exit(1);
 }
 
 fn create_context(args: &Args) -> AllocResult<Context> {
-    let options = Rc::new(Options::new_from_args(args));
-
-    let cx = ContextBuilder::new().set_options(options).build()?;
+    let cx = ContextBuilder::new()
+        .set_options(Rc::new(Options::default()))
+        .build()?;
 
     if args.expose_gc {
         GcObject::install(cx, cx.initial_realm())?;
@@ -231,7 +158,9 @@ fn create_context(args: &Args) -> AllocResult<Context> {
 
 fn evaluate(mut cx: Context, args: &Args) -> BsResult<()> {
     for file in &args.files {
-        let source = Rc::new(Source::new_from_file(file)?);
+        let file_contents = std::fs::read_to_string(file).unwrap();
+        let source =
+            Rc::new(Source::new_for_string(file, Wtf8String::from_string(file_contents)).unwrap());
 
         if args.module {
             cx.evaluate_module(source)?;
@@ -254,9 +183,6 @@ fn unwrap_error_or_exit<T>(cx: Context, result: BsResult<T>) -> T {
 
 /// Wrapper to pretty print errors
 fn main() {
-    // Global initialization
-    brimstone_serialized_heap::init();
-
     let args = Args::parse();
     let cx = create_context(&args).expect("Failed to create initial Context");
 

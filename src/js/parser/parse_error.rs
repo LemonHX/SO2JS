@@ -22,6 +22,7 @@ use super::{
 
 #[derive(Debug)]
 pub enum ParseError {
+    UNKNOWN,
     // Io(io::Error),
     #[allow(clippy::box_collection)]
     UnknownToken(Box<String>),
@@ -185,6 +186,7 @@ impl ParseError {
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            ParseError::UNKNOWN => write!(f, "Unknown parse error"),
             // ParseError::Io(io_error) => {
             //     f.write_str("Error: ")?;
             //     io_error.fmt(f)

@@ -100,7 +100,6 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "brimstone_core",
- "brimstone_serialized_heap",
  "clap",
  "criterion",
  "once_cell",
@@ -145,7 +144,6 @@ name = "brimstone_fuzz"
 version = "0.1.0"
 dependencies = [
  "brimstone_core",
- "brimstone_serialized_heap",
 ]
 
 [[package]]
@@ -172,7 +170,6 @@ name = "brimstone_integration_test_harness"
 version = "0.1.0"
 dependencies = [
  "brimstone_core",
- "brimstone_serialized_heap",
  "clap",
  "regex",
  "serde",
@@ -190,18 +187,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "brimstone_serialized_heap"
-version = "0.1.0"
-dependencies = [
- "brimstone_core",
-]
-
-[[package]]
 name = "brimstone_tests"
 version = "0.1.0"
 dependencies = [
  "brimstone_core",
- "brimstone_serialized_heap",
 ]
 
 [[package]]

@@ -1,15 +1,11 @@
 use core::{alloc::Layout, mem::size_of, ops::Range, ptr::NonNull};
 
 use crate::{
-    common::{constants::MAX_HEAP_SIZE, serialized_heap::SerializedHeap},
+    common::constants::MAX_HEAP_SIZE,
     runtime::{alloc_error::AllocResult, gc::garbage_collector::GarbageCollector, Context},
 };
 
-use super::{
-    handle::HandleContext,
-    heap_serializer::{calculate_extra_offset, HeapSpaceDeserializer},
-    GcType, HeapPtr, HeapVisitor,
-};
+use super::{handle::HandleContext, GcType, HeapPtr, HeapVisitor};
 
 #[cfg(feature = "alloc_error")]
 use crate::runtime::alloc_error::AllocError;
@@ -93,56 +89,6 @@ impl Heap {
                 gc_stress_test: false,
             }
         }
-    }
-
-    /// Initialize an uninitialized heap with a serialized heap. This will copy the serialized heap
-    /// over and fix all pointers within the new heap.
-    ///
-    /// Pointers were encoded as offsets and can be restored by adding to the new heap base pointer.
-    pub fn init_from_serialized(&mut self, cx: Context, serialized: &SerializedHeap) {
-        // Size of the `HeapInfo` struct can be different from the serialized heap, e.g. due to
-        // feature flags. We must apply an additional offset to account for this.
-        let extra_offset = calculate_extra_offset(serialized);
-        let new_permanent_start_offset = extra_offset + serialized.permanent_space.start_offset;
-        let new_current_start_offset = extra_offset + serialized.current_space.start_offset;
-
-        // Ensure actual heap has enough room for the serialized heap
-        let permanent_size = serialized.permanent_space.bytes.len();
-        let semispace_size = (self.heap_size() - new_current_start_offset) / 2;
-        if serialized.current_space.bytes.len() > semispace_size {
-            panic!("Serialized heap is larger than the actual heap");
-        }
-
-        // Find bounds of permanent space
-        self.permanent_start = unsafe { self.heap_start.add(new_permanent_start_offset) };
-        self.permanent_end = unsafe { self.permanent_start.add(permanent_size) };
-
-        // Copy permanent semispace into the actual heap
-        self.permanent_heap_mut()
-            .copy_from_slice(serialized.permanent_space.bytes);
-
-        // Rewrite offsets in the permanent space to pointers in the new heap
-        HeapSpaceDeserializer::deserialize(cx, self.permanent_heap_mut(), extra_offset);
-
-        // Find bounds of used part of current semispace
-        self.start = unsafe { self.heap_start.add(new_current_start_offset) };
-        self.current = unsafe { self.start.add(serialized.current_space.bytes.len()) };
-
-        // Copy used portion of current semispace into the actual heap
-        self.current_used_heap_mut()
-            .copy_from_slice(serialized.current_space.bytes);
-
-        // Rewrite offsets in the current semispace to pointers in the new heap
-        HeapSpaceDeserializer::deserialize(cx, self.current_used_heap_mut(), extra_offset);
-
-        // Write the end of the current semispace
-        self.end = unsafe { self.start.add(semispace_size) };
-
-        // Write the bounds of the next semispace, making sure it is aligned
-        self.next_heap_start = align_pointer_up(self.end, HEAP_ITEM_ALIGNMENT);
-        self.next_heap_end = unsafe { self.next_heap_start.add(semispace_size) };
-
-        self.debug_assert_heap_well_formed();
     }
 
     /// Create a new heap for a resizing GC, provided the old heap and the new heap size.

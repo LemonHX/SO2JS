@@ -4,7 +4,6 @@ members = [
   "src/brimstone_icu_collections",
   "src/brimstone_macros",
   "src/js",
-  "src/brimstone_serialized_heap",
   "tests",
   "tests/fuzz",
   "tests/harness",
@@ -22,7 +21,6 @@ brimstone = { path = "src" }
 brimstone_core = { path = "src/js" }
 brimstone_icu_collections = { path = "src/brimstone_icu_collections" }
 brimstone_macros = { path = "src/brimstone_macros" }
-brimstone_serialized_heap = { path = "src/brimstone_serialized_heap" }
 
 
 # External Crates

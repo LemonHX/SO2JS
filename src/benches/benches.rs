@@ -1,11 +1,12 @@
 use std::{
+    path::Path,
     rc::Rc,
     time::{Duration, Instant},
 };
 
 use bitflags::bitflags;
 use brimstone_core::{
-    common::{options::OptionsBuilder, serialized_heap::get_default_serialized_heap},
+    common::{options::OptionsBuilder, wtf_8::Wtf8String},
     parser::{
         analyze::{analyze, AnalyzedProgramResult},
         parse_module, parse_script,
@@ -71,8 +72,16 @@ fn setup_step(file: &str, flags: TestFlags) -> (Context, ParseContext) {
         .set_options(Rc::new(options))
         .build()
         .unwrap();
-    let source = Rc::new(Source::new_from_file(&format!("benches/{file}")).unwrap());
-    let pcx = ParseContext::new(source);
+    let file = Path::new(&format!("benches/{file}"))
+        .canonicalize()
+        .unwrap();
+    let file_content_string = std::fs::read_to_string(&file).unwrap();
+    let source = Source::new_for_string(
+        file.to_str().unwrap(),
+        Wtf8String::from_string(file_content_string),
+    )
+    .unwrap();
+    let pcx = ParseContext::new(Rc::new(source));
     (cx, pcx)
 }
 
@@ -191,20 +200,14 @@ fn bench_program_all_steps(c: &mut Criterion, file: &str, flags: TestFlags) {
     );
 }
 
-fn init() {
-    brimstone_serialized_heap::init();
-}
-
 /// Benchmark context creation.
 fn context_benches(c: &mut Criterion) {
-    init();
-
     isolated_test(
         c,
         "context creation",
         || {},
         |_| {
-            let options = OptionsBuilder::new().serialized_heap(None).build();
+            let options = OptionsBuilder::new().build();
             let cx = ContextBuilder::new()
                 .set_options(Rc::new(options))
                 .build()
@@ -219,10 +222,7 @@ fn context_benches(c: &mut Criterion) {
         "context deserialization",
         || {},
         |_| {
-            let serialized_heap = get_default_serialized_heap().unwrap();
-            let options = OptionsBuilder::new()
-                .serialized_heap(Some(serialized_heap))
-                .build();
+            let options = OptionsBuilder::new().build();
             let cx = ContextBuilder::new()
                 .set_options(Rc::new(options))
                 .build()
@@ -234,8 +234,6 @@ fn context_benches(c: &mut Criterion) {
 }
 
 pub fn program_benches(c: &mut Criterion) {
-    init();
-
     bench_program_all_steps(c, "empty.js", TestFlags::empty());
     bench_program_parser(c, "fixtures/acorn.js", TestFlags::empty());
     bench_program_parser(c, "fixtures/react.js", TestFlags::empty());

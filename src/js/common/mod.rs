@@ -7,7 +7,6 @@ pub mod macros;
 pub mod math;
 pub mod memory;
 pub mod options;
-pub mod serialized_heap;
 pub mod string;
 pub mod string_iterators;
 pub mod time;

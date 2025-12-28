@@ -271,7 +271,7 @@ fn run_single_test(
             // the test.
             Err(err) => {
                 // Do not count IO errors as negative tests results
-                let is_parse_error = !matches!(err.error, parser::ParseError::Io(_));
+                let is_parse_error = !matches!(err.error, parser::ParseError::UNKNOWN);
 
                 let duration = start_timestamp.elapsed().unwrap();
 
@@ -345,7 +345,8 @@ fn new_harness_parse_context(file_path: &str) -> parser::ParseResult<ParseContex
     let file_contents = match cached_file {
         Some(cached_file) => cached_file,
         None => {
-            let file_contents = Source::read_file_to_wtf8_string(file_path)?;
+            let file_contents = fs::read_to_string(file_path).unwrap();
+            let file_contents = Wtf8String::from_string(file_contents);
 
             HARNESS_FILE_CACHE
                 .write()
@@ -367,7 +368,11 @@ fn new_parse_context(
     force_strict_mode: bool,
 ) -> parser::ParseResult<ParseContext> {
     let full_path = Path::new(suite_root).join(file);
-    let mut source = Source::new_from_file(full_path.to_str().unwrap())?;
+    let file_contents = fs::read_to_string(full_path.to_str().unwrap()).unwrap();
+    let mut source = Source::new_for_string(
+        full_path.to_str().unwrap(),
+        Wtf8String::from_string(file_contents),
+    )?;
 
     // Manually insert use strict directive when forcing strict mode
     if force_strict_mode {

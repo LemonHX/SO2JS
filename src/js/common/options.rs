@@ -1,10 +1,7 @@
 use alloc::string::String;
 use parking_lot::{Mutex, MutexGuard};
 
-use super::{
-    constants::DEFAULT_HEAP_SIZE,
-    serialized_heap::{get_default_serialized_heap, SerializedHeap},
-};
+use super::constants::DEFAULT_HEAP_SIZE;
 
 /// Options passed throughout the program.
 pub struct Options {
@@ -28,9 +25,6 @@ pub struct Options {
 
     /// Whether to use colors when printing to the terminal
     pub parse_stats: bool,
-
-    /// Create the heap from this SerializedHeap if set, otherwise create heap from scratch.
-    pub serialized_heap: Option<&'static SerializedHeap<'static>>,
 }
 
 impl Options {
@@ -64,7 +58,6 @@ impl OptionsBuilder {
             dump_buffer: None,
             heap_size: DEFAULT_HEAP_SIZE,
             parse_stats: false,
-            serialized_heap: get_default_serialized_heap(),
         })
     }
 
@@ -105,14 +98,6 @@ impl OptionsBuilder {
 
     pub fn parse_stats(mut self, parse_stats: bool) -> Self {
         self.0.parse_stats = parse_stats;
-        self
-    }
-
-    pub fn serialized_heap(
-        mut self,
-        serialized_heap: Option<&'static SerializedHeap<'static>>,
-    ) -> Self {
-        self.0.serialized_heap = serialized_heap;
         self
     }
 }
