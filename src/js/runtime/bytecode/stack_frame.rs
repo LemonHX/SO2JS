@@ -47,7 +47,9 @@ impl StackFrame {
     /// Create a new stack frame centered around a frame pointer.
     #[inline]
     pub fn for_fp(fp: *mut StackSlotValue) -> Self {
-        Self { fp: fp.cast_const() }
+        Self {
+            fp: fp.cast_const(),
+        }
     }
 
     /// Return the previous stack frame, or None if this is the first frame on the stack.
@@ -91,7 +93,7 @@ impl StackFrame {
             let last_arg_ptr = self.fp.add(FIRST_ARGUMENT_SLOT_INDEX).add(num_args);
 
             let stack_frame_size = last_arg_ptr.offset_from(last_register_ptr) as usize;
-            std::slice::from_raw_parts(last_register_ptr, stack_frame_size)
+            core::slice::from_raw_parts(last_register_ptr, stack_frame_size)
         }
     }
 
@@ -221,7 +223,7 @@ impl StackFrame {
         unsafe {
             let argc = self.argc();
             let first_arg_ptr = self.fp.add(FIRST_ARGUMENT_SLOT_INDEX) as *const Value;
-            std::slice::from_raw_parts(first_arg_ptr, argc)
+            core::slice::from_raw_parts(first_arg_ptr, argc)
         }
     }
 
@@ -236,7 +238,7 @@ impl StackFrame {
             let num_args_with_receiver = num_parameters.max(self.argc()) + 1;
 
             let receiver_ptr = self.fp.add(RECEIVER_SLOT_INDEX) as *mut Value;
-            std::slice::from_raw_parts_mut(receiver_ptr, num_args_with_receiver)
+            core::slice::from_raw_parts_mut(receiver_ptr, num_args_with_receiver)
         }
     }
 
@@ -247,14 +249,16 @@ impl StackFrame {
         unsafe {
             let num_registers = self.closure().function_ptr().num_registers() as usize;
             let last_register_ptr = self.fp.sub(num_registers) as *mut Value;
-            std::slice::from_raw_parts_mut(last_register_ptr, num_registers)
+            core::slice::from_raw_parts_mut(last_register_ptr, num_registers)
         }
     }
 
     /// Iterate upwards through stack frames, starting at this stack frame.
     #[inline]
     pub fn iter(&self) -> StackFrameIter {
-        StackFrameIter { current_frame: Some(*self) }
+        StackFrameIter {
+            current_frame: Some(*self),
+        }
     }
 
     /// Visit all pointers in the stack frame, potentially updating them.
@@ -303,7 +307,7 @@ pub type StackSlotValue = usize;
 const STACK_SIZE: usize = 4 * 1024 * 1024;
 
 /// Total number of stack slots that fit in the stack.
-pub const NUM_STACK_SLOTS: usize = STACK_SIZE / std::mem::size_of::<StackSlotValue>();
+pub const NUM_STACK_SLOTS: usize = STACK_SIZE / core::mem::size_of::<StackSlotValue>();
 
 const RETURN_ADDRESS_SLOT_INDEX: usize = 1;
 

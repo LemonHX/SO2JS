@@ -76,7 +76,11 @@ pub fn get_iterator(
 
     let next_method = get(cx, iterator, cx.names.next())?;
 
-    let iterator_record = Iterator { iterator, next_method, is_done: false };
+    let iterator_record = Iterator {
+        iterator,
+        next_method,
+        is_done: false,
+    };
 
     Ok(iterator_record)
 }
@@ -84,7 +88,11 @@ pub fn get_iterator(
 /// GetIteratorDirect (https://tc39.es/ecma262/#sec-getiteratordirect)
 pub fn get_iterator_direct(cx: Context, object: Handle<ObjectValue>) -> EvalResult<Iterator> {
     let next_method = get(cx, object, cx.names.next())?;
-    Ok(Iterator { iterator: object, next_method, is_done: false })
+    Ok(Iterator {
+        iterator: object,
+        next_method,
+        is_done: false,
+    })
 }
 
 /// GetIteratorFlattenable (https://tc39.es/ecma262/#sec-getiteratorflattenable)
@@ -229,10 +237,20 @@ pub fn create_iter_result_object(
 ) -> AllocResult<Handle<Value>> {
     let object = ordinary_object_create(cx)?;
 
-    must_a!(create_data_property_or_throw(cx, object, cx.names.value(), value));
+    must_a!(create_data_property_or_throw(
+        cx,
+        object,
+        cx.names.value(),
+        value
+    ));
 
     let is_done_value = cx.bool(is_done);
-    must_a!(create_data_property_or_throw(cx, object, cx.names.done(), is_done_value));
+    must_a!(create_data_property_or_throw(
+        cx,
+        object,
+        cx.names.done(),
+        is_done_value
+    ));
 
     Ok(object.as_value())
 }
@@ -297,5 +315,9 @@ fn create_async_from_sync_iterator(cx: Context, sync_iterator: Iterator) -> Allo
     let async_iterator = AsyncFromSyncIterator::new(cx, sync_iterator)?.into();
     let next_method = must_a!(get(cx, async_iterator, cx.names.next()));
 
-    Ok(Iterator { iterator: async_iterator, next_method, is_done: false })
+    Ok(Iterator {
+        iterator: async_iterator,
+        next_method,
+        is_done: false,
+    })
 }

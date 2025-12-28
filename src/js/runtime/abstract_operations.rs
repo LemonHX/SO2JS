@@ -1,4 +1,7 @@
-use std::collections::HashSet;
+use alloc::vec;
+use alloc::vec::Vec;
+use alloc::format;
+use hashbrown::HashSet;
 
 use crate::{
     must, must_a,
@@ -521,7 +524,9 @@ pub fn copy_data_properties(
             match desc {
                 Some(desc) if desc.is_enumerable() => {
                     let prop_value = get(cx, from, next_key)?;
-                    must!(create_data_property_or_throw(cx, target, next_key, prop_value));
+                    must!(create_data_property_or_throw(
+                        cx, target, next_key, prop_value
+                    ));
                 }
                 _ => {}
             }
@@ -664,7 +669,10 @@ pub fn group_by(
                 key
             };
 
-            groups.push(Group { key, items: vec![item] });
+            groups.push(Group {
+                key,
+                items: vec![item],
+            });
         }
 
         k += 1;

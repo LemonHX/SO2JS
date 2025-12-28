@@ -1,8 +1,8 @@
-use std::cell::RefCell;
-use std::fs::File;
-use std::io::{BufReader, Read};
-
 use crate::common::wtf_8::Wtf8String;
+use alloc::borrow::ToOwned;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::cell::RefCell;
 
 use super::loc::calculate_line_offsets;
 use super::parse_error::ParseResult;
@@ -27,21 +27,23 @@ impl Source {
         }
     }
 
-    pub fn new_from_file(file_path: &str) -> ParseResult<Source> {
-        let wtf8_contents = Self::read_file_to_wtf8_string(file_path)?;
+    // pub fn new_from_file(file_path: &str) -> ParseResult<Source> {
+    //     let wtf8_contents = Self::read_file_to_wtf8_string(file_path)?;
 
-        // Guarantee that source size is within allowed range
-        if is_source_too_large(wtf8_contents.len()) {
-            return Err(LocalizedParseError::new_without_loc(ParseError::SourceTooLarge(true)));
-        }
+    //     // Guarantee that source size is within allowed range
+    //     if is_source_too_large(wtf8_contents.len()) {
+    //         return Err(LocalizedParseError::new_without_loc(ParseError::SourceTooLarge(true)));
+    //     }
 
-        Ok(Source::new(file_path.to_owned(), None, wtf8_contents))
-    }
+    //     Ok(Source::new(file_path.to_owned(), None, wtf8_contents))
+    // }
 
     pub fn new_for_eval(file_path: String, contents: Wtf8String) -> ParseResult<Source> {
         // Guarantee that source size is within allowed range
         if is_source_too_large(contents.len()) {
-            return Err(LocalizedParseError::new_without_loc(ParseError::SourceTooLarge(false)));
+            return Err(LocalizedParseError::new_without_loc(
+                ParseError::SourceTooLarge(false),
+            ));
         }
 
         Ok(Self::new(file_path, Some("<eval>".to_owned()), contents))
@@ -50,22 +52,24 @@ impl Source {
     pub fn new_for_string(file_path: &str, contents: Wtf8String) -> ParseResult<Source> {
         // Guarantee that source size is within allowed range
         if is_source_too_large(contents.len()) {
-            return Err(LocalizedParseError::new_without_loc(ParseError::SourceTooLarge(false)));
+            return Err(LocalizedParseError::new_without_loc(
+                ParseError::SourceTooLarge(false),
+            ));
         }
 
         Ok(Self::new(file_path.to_owned(), None, contents))
     }
 
-    pub fn read_file_to_wtf8_string(file_path: &str) -> ParseResult<Wtf8String> {
-        // Read file to string
-        let file = File::open(file_path)?;
-        let mut reader = BufReader::new(file);
+    // pub fn read_file_to_wtf8_string(file_path: &str) -> ParseResult<Wtf8String> {
+    //     // Read file to string
+    //     let file = File::open(file_path)?;
+    //     let mut reader = BufReader::new(file);
 
-        let mut contents = String::new();
-        reader.read_to_string(&mut contents)?;
+    //     let mut contents = String::new();
+    //     reader.read_to_string(&mut contents)?;
 
-        Ok(Wtf8String::from_string(contents))
-    }
+    //     Ok(Wtf8String::from_string(contents))
+    // }
 
     pub fn line_offsets(&self) -> &[u32] {
         unsafe {

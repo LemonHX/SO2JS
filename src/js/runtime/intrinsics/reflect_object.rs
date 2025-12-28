@@ -20,13 +20,28 @@ pub struct ReflectObject;
 
 impl ReflectObject {
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         object.intrinsic_func(cx, cx.names.apply(), Self::apply, 3, realm)?;
         object.intrinsic_func(cx, cx.names.construct(), Self::construct, 2, realm)?;
-        object.intrinsic_func(cx, cx.names.define_property(), Self::define_property, 3, realm)?;
-        object.intrinsic_func(cx, cx.names.delete_property(), Self::delete_property, 2, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.define_property(),
+            Self::define_property,
+            3,
+            realm,
+        )?;
+        object.intrinsic_func(
+            cx,
+            cx.names.delete_property(),
+            Self::delete_property,
+            2,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.get(), Self::get, 2, realm)?;
         object.intrinsic_func(
             cx,
@@ -35,7 +50,13 @@ impl ReflectObject {
             2,
             realm,
         )?;
-        object.intrinsic_func(cx, cx.names.get_prototype_of(), Self::get_prototype_of, 1, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.get_prototype_of(),
+            Self::get_prototype_of,
+            1,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.has(), Self::has, 2, realm)?;
         object.intrinsic_func(cx, cx.names.is_extensible(), Self::is_extensible, 1, realm)?;
         object.intrinsic_func(cx, cx.names.own_keys(), Self::own_keys, 1, realm)?;
@@ -47,7 +68,13 @@ impl ReflectObject {
             realm,
         )?;
         object.intrinsic_func(cx, cx.names.set_(), Self::set, 3, realm)?;
-        object.intrinsic_func(cx, cx.names.set_prototype_of(), Self::set_prototype_of, 2, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.set_prototype_of(),
+            Self::set_prototype_of,
+            2,
+            realm,
+        )?;
 
         // Reflect [ @@toStringTag ] (https://tc39.es/ecma262/#sec-reflect-%symbol.tostringtag%)
         let to_string_tag_key = cx.well_known_symbols.to_string_tag();

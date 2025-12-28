@@ -10,8 +10,11 @@ pub struct WeakRefPrototype;
 impl WeakRefPrototype {
     /// Properties of the WeakRef Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-weak-ref-prototype-object)
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         // Constructor property is added once WeakRefConstructor has been created
         object.intrinsic_func(cx, cx.names.deref(), Self::deref, 0, realm)?;

@@ -1,4 +1,4 @@
-use std::mem::size_of;
+use core::mem::size_of;
 
 use num_bigint::{BigInt, Sign};
 use num_traits::FromPrimitive;

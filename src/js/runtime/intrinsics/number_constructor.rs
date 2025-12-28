@@ -1,4 +1,4 @@
-use std::mem::size_of;
+use core::mem::size_of;
 
 use num_traits::ToPrimitive;
 
@@ -135,7 +135,13 @@ impl NumberConstructor {
         func.intrinsic_func(cx, cx.names.is_finite(), Self::is_finite, 1, realm)?;
         func.intrinsic_func(cx, cx.names.is_integer(), Self::is_integer, 1, realm)?;
         func.intrinsic_func(cx, cx.names.is_nan(), Self::is_nan, 1, realm)?;
-        func.intrinsic_func(cx, cx.names.is_safe_integer(), Self::is_safe_integer, 1, realm)?;
+        func.intrinsic_func(
+            cx,
+            cx.names.is_safe_integer(),
+            Self::is_safe_integer,
+            1,
+            realm,
+        )?;
 
         let parse_float = realm.get_intrinsic(Intrinsic::ParseFloat);
         func.intrinsic_data_prop(cx, cx.names.parse_float(), parse_float.into())?;

@@ -1,10 +1,3 @@
-use crate::{
-    field_offset,
-    parser::{loc::calculate_line_offsets, source::Source},
-    runtime::{alloc_error::AllocResult, heap_item_descriptor::HeapItemKind},
-    set_uninit,
-};
-
 use super::{
     collections::{BsArray, InlineArray},
     gc::{HeapItem, HeapVisitor},
@@ -12,6 +5,14 @@ use super::{
     string_value::FlatString,
     Context, Handle, HeapPtr,
 };
+use crate::{
+    field_offset,
+    parser::{loc::calculate_line_offsets, source::Source},
+    runtime::{alloc_error::AllocResult, heap_item_descriptor::HeapItemKind},
+    set_uninit,
+};
+use alloc::string::String;
+use alloc::string::ToString;
 
 #[repr(C)]
 pub struct SourceFile {
@@ -41,7 +42,10 @@ impl SourceFile {
         let size = Self::calculate_size_in_bytes(source.contents.len());
         let mut scope = cx.alloc_uninit_with_size::<SourceFile>(size)?;
 
-        set_uninit!(scope.descriptor, cx.base_descriptors.get(HeapItemKind::SourceFile));
+        set_uninit!(
+            scope.descriptor,
+            cx.base_descriptors.get(HeapItemKind::SourceFile)
+        );
         set_uninit!(scope.line_offsets, None);
         set_uninit!(scope.path, *path);
         set_uninit!(scope.display_name, display_name.map(|n| *n));

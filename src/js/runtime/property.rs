@@ -87,11 +87,17 @@ impl Property {
             flags |= PropertyFlags::IS_CONFIGURABLE;
         }
 
-        Property { value: accessor_value, flags }
+        Property {
+            value: accessor_value,
+            flags,
+        }
     }
 
     pub fn private_field(value: Handle<Value>) -> Property {
-        Property { value, flags: PropertyFlags::IS_PRIVATE_FIELD }
+        Property {
+            value,
+            flags: PropertyFlags::IS_PRIVATE_FIELD,
+        }
     }
 
     pub fn private_method(method: Handle<ObjectValue>) -> Property {
@@ -185,7 +191,10 @@ impl Property {
     }
 
     pub fn to_heap(&self) -> HeapProperty {
-        HeapProperty { value: *self.value, flags: self.flags }
+        HeapProperty {
+            value: *self.value,
+            flags: self.flags,
+        }
     }
 
     pub fn from_heap(cx: Context, heap_property: &HeapProperty) -> Property {

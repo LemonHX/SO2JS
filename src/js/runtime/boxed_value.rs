@@ -20,7 +20,10 @@ impl BoxedValue {
     pub fn new(cx: Context, value: Handle<Value>) -> AllocResult<HeapPtr<BoxedValue>> {
         let mut scope = cx.alloc_uninit::<BoxedValue>()?;
 
-        set_uninit!(scope.descriptor, cx.base_descriptors.get(HeapItemKind::BoxedValue));
+        set_uninit!(
+            scope.descriptor,
+            cx.base_descriptors.get(HeapItemKind::BoxedValue)
+        );
         set_uninit!(scope.value, *value);
 
         Ok(scope)
@@ -37,7 +40,7 @@ impl BoxedValue {
 
 impl HeapItem for HeapPtr<BoxedValue> {
     fn byte_size(&self) -> usize {
-        std::mem::size_of::<BoxedValue>()
+        core::mem::size_of::<BoxedValue>()
     }
 
     fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {

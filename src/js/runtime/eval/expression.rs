@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use core::convert::TryInto;
 
 use num_bigint::{BigInt, Sign};
 
@@ -52,19 +52,35 @@ pub fn generate_template_object(
             Some(cooked) => cx.alloc_wtf8_str(cooked)?.as_value(),
         };
         let cooked_desc = PropertyDescriptor::data(cooked_value, false, true, false);
-        must_a!(define_property_or_throw(cx, template_object, index_key, cooked_desc));
+        must_a!(define_property_or_throw(
+            cx,
+            template_object,
+            index_key,
+            cooked_desc
+        ));
 
         let raw_value = cx.alloc_wtf8_str(quasi.raw)?;
         let raw_desc = PropertyDescriptor::data(raw_value.as_value(), false, true, false);
-        must_a!(define_property_or_throw(cx, raw_object, index_key, raw_desc));
+        must_a!(define_property_or_throw(
+            cx, raw_object, index_key, raw_desc
+        ));
     }
 
     must_a!(set_integrity_level(cx, raw_object, IntegrityLevel::Frozen));
 
     let raw_object_desc = PropertyDescriptor::data(raw_object.into(), false, false, false);
-    must_a!(define_property_or_throw(cx, template_object, cx.names.raw(), raw_object_desc));
+    must_a!(define_property_or_throw(
+        cx,
+        template_object,
+        cx.names.raw(),
+        raw_object_desc
+    ));
 
-    must_a!(set_integrity_level(cx, template_object, IntegrityLevel::Frozen));
+    must_a!(set_integrity_level(
+        cx,
+        template_object,
+        IntegrityLevel::Frozen
+    ));
 
     Ok(template_object)
 }
@@ -297,7 +313,10 @@ pub fn eval_exponentiation(
             range_error(cx, "BigInt is too large")
         }
     } else {
-        Ok(cx.number(number_exponentiate(left_num.as_number(), right_num.as_number())))
+        Ok(cx.number(number_exponentiate(
+            left_num.as_number(),
+            right_num.as_number(),
+        )))
     }
 }
 

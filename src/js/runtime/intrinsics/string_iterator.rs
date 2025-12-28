@@ -1,4 +1,4 @@
-use std::mem::size_of;
+use core::mem::size_of;
 
 use crate::{
     cast_from_value_fn, extend_object,
@@ -79,7 +79,11 @@ impl StringIteratorPrototype {
             Some(next_code_point) => {
                 let code_point_string =
                     FlatString::from_code_point(cx, next_code_point)?.as_string();
-                Ok(create_iter_result_object(cx, code_point_string.into(), false)?)
+                Ok(create_iter_result_object(
+                    cx,
+                    code_point_string.into(),
+                    false,
+                )?)
             }
         }
     }

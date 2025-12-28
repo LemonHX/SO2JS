@@ -1,15 +1,15 @@
-use std::{
-    marker::PhantomData,
-    ops::{Deref, DerefMut},
-    pin::Pin,
-    ptr::NonNull,
-};
-
 use crate::runtime::{
     object_value::ObjectValue,
     string_value::StringValue,
     value::{BigIntValue, SymbolValue},
     Context, Value,
+};
+use alloc::boxed::Box;
+use core::{
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+    pin::Pin,
+    ptr::NonNull,
 };
 
 use super::{Heap, HeapInfo, HeapPtr, HeapVisitor, IsHeapItem};
@@ -66,7 +66,10 @@ impl<T: ToHandleContents> Handle<T> {
 
     #[inline]
     pub const fn dangling() -> Handle<T> {
-        Handle { ptr: NonNull::dangling(), phantom_data: PhantomData }
+        Handle {
+            ptr: NonNull::dangling(),
+            phantom_data: PhantomData,
+        }
     }
 
     #[inline]
@@ -91,7 +94,10 @@ impl<T: ToHandleContents> Handle<T> {
 impl<T> Handle<T> {
     #[inline]
     pub fn cast<U>(&self) -> Handle<U> {
-        Handle { ptr: self.ptr, phantom_data: PhantomData }
+        Handle {
+            ptr: self.ptr,
+            phantom_data: PhantomData,
+        }
     }
 }
 
@@ -216,7 +222,9 @@ pub struct HandleScopeGuard {
 impl HandleScopeGuard {
     #[inline]
     pub fn new(cx: Context) -> HandleScopeGuard {
-        HandleScopeGuard { handle_scope: HandleScope::enter(cx) }
+        HandleScopeGuard {
+            handle_scope: HandleScope::enter(cx),
+        }
     }
 }
 
@@ -264,8 +272,8 @@ impl HandleBlock {
         // Block must first be allocated on heap before start and end ptrs can be calculated.
         let mut block = Pin::new(Box::new(HandleBlock {
             ptrs: [0; HANDLE_BLOCK_SIZE],
-            start_ptr: std::ptr::null_mut(),
-            end_ptr: std::ptr::null_mut(),
+            start_ptr: core::ptr::null_mut(),
+            end_ptr: core::ptr::null_mut(),
             prev_block,
         }));
 
@@ -323,7 +331,7 @@ impl HandleContext {
         };
 
         // Initial value was uninitialized, so replace without dropping uninitialized value
-        std::mem::forget(std::mem::replace(self, handle_context));
+        core::mem::forget(core::mem::replace(self, handle_context));
     }
 
     fn push_block(&mut self) {
@@ -331,17 +339,17 @@ impl HandleContext {
             None => {
                 // Allocate a new block and push it as the current block
                 let new_block = HandleBlock::new(None);
-                let old_current_block = std::mem::replace(&mut self.current_block, new_block);
+                let old_current_block = core::mem::replace(&mut self.current_block, new_block);
                 self.current_block.prev_block = Some(old_current_block);
             }
             Some(free_blocks) => {
                 // Pull the top free block off of the free list
                 let rest_free_blocks = free_blocks.prev_block.take();
-                let free_block = std::mem::replace(&mut self.free_blocks, rest_free_blocks);
+                let free_block = core::mem::replace(&mut self.free_blocks, rest_free_blocks);
 
                 // Push free block as the current block
                 let old_current_block =
-                    std::mem::replace(&mut self.current_block, free_block.unwrap());
+                    core::mem::replace(&mut self.current_block, free_block.unwrap());
                 self.current_block.prev_block = Some(old_current_block);
             }
         }
@@ -356,7 +364,7 @@ impl HandleContext {
 
         let new_current_block = old_prev_block.unwrap();
         let new_end_ptr = new_current_block.end_ptr;
-        let old_current_block = std::mem::replace(&mut self.current_block, new_current_block);
+        let old_current_block = core::mem::replace(&mut self.current_block, new_current_block);
 
         // Current block is moved to start of free list
         let old_free_blocks = self.free_blocks.replace(old_current_block);
@@ -437,7 +445,10 @@ impl HandleContext {
 
     #[cfg(feature = "handle_stats")]
     pub fn handle_stats(&self) -> HandleStats {
-        HandleStats { num_handles: self.num_handles, max_handles: self.max_handles }
+        HandleStats {
+            num_handles: self.num_handles,
+            max_handles: self.max_handles,
+        }
     }
 }
 
@@ -445,7 +456,10 @@ impl Handle<Value> {
     #[inline]
     pub fn from_fixed_non_heap_ptr(value_ref: &Value) -> Handle<Value> {
         let ptr = unsafe { NonNull::new_unchecked(value_ref as *const Value as *mut Value) };
-        Handle { ptr: ptr.cast(), phantom_data: PhantomData }
+        Handle {
+            ptr: ptr.cast(),
+            phantom_data: PhantomData,
+        }
     }
 
     #[inline]

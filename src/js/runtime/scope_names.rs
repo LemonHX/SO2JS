@@ -66,7 +66,10 @@ impl ScopeNames {
         let size = Self::calculate_size_in_bytes(names.len());
         let mut scope_names = cx.alloc_uninit_with_size::<ScopeNames>(size)?;
 
-        set_uninit!(scope_names.descriptor, cx.base_descriptors.get(HeapItemKind::ScopeNames));
+        set_uninit!(
+            scope_names.descriptor,
+            cx.base_descriptors.get(HeapItemKind::ScopeNames)
+        );
         set_uninit!(scope_names.flags, flags);
 
         // Copy names into inline names array
@@ -78,7 +81,7 @@ impl ScopeNames {
         // Copy name flags into name flags section
         let name_flags_ptr = scope_names.get_name_flags_ptr() as *mut u8;
         unsafe {
-            std::ptr::copy_nonoverlapping(
+            core::ptr::copy_nonoverlapping(
                 name_flags.as_ptr().cast::<u8>(),
                 name_flags_ptr,
                 name_flags.len(),

@@ -1,9 +1,3 @@
-use std::mem::size_of;
-
-use brimstone_macros::wrap_ordinary_object;
-use half::f16;
-use num_bigint::{BigInt, Sign};
-
 use crate::{
     common::math::f64_to_f16,
     create_typed_array_constructor, create_typed_array_prototype, extend_object, heap_trait_object,
@@ -37,6 +31,14 @@ use crate::{
     },
     set_uninit,
 };
+use alloc::format;
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
+use brimstone_macros::wrap_ordinary_object;
+use core::mem::size_of;
+use half::f16;
+use num_bigint::{BigInt, Sign};
 
 use super::{
     array_buffer_constructor::{clone_array_buffer, ArrayBufferObject},

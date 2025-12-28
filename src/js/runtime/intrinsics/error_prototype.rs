@@ -1,22 +1,23 @@
-use crate::{
-    common::error::FormatOptions,
-    runtime::{
-        abstract_operations::get, alloc_error::AllocResult, error::type_error,
-        eval_result::EvalResult, object_value::ObjectValue, realm::Realm,
-        string_value::StringValue, to_console_string, type_utilities::to_string, Context, Handle,
-        Value,
-    },
-};
-
 use super::{error_constructor::ErrorObject, intrinsics::Intrinsic};
+use crate::runtime::{
+    abstract_operations::get, alloc_error::AllocResult, error::type_error, eval_result::EvalResult,
+    object_value::ObjectValue, realm::Realm, string_value::StringValue, to_console_string,
+    type_utilities::to_string, Context, Handle, Value,
+};
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::format;
 
 pub struct ErrorPrototype;
 
 impl ErrorPrototype {
     /// Properties of the Error Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-error-prototype-object)
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         // Constructor property is added once ErrorConstructor has been created
         object.intrinsic_data_prop(cx, cx.names.name(), cx.names.error().as_string().into())?;
@@ -110,9 +111,7 @@ pub fn error_name(cx: Context, error: Handle<ErrorObject>) -> Handle<StringValue
 
 pub fn error_message(cx: Context, error: Handle<ErrorObject>) -> AllocResult<Option<String>> {
     match get(cx, error.as_object(), cx.names.message()) {
-        Ok(message_value) => {
-            Ok(Some(to_console_string(cx, message_value, &FormatOptions::default())?))
-        }
+        Ok(message_value) => Ok(Some(to_console_string(cx, message_value)?)),
         Err(_) => Ok(None),
     }
 }

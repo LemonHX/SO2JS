@@ -1,3 +1,4 @@
+use super::{error_constructor::ErrorObject, intrinsics::Intrinsic};
 use crate::{
     must, must_a,
     runtime::{
@@ -19,8 +20,7 @@ use crate::{
         Context, Handle, Value,
     },
 };
-
-use super::{error_constructor::ErrorObject, intrinsics::Intrinsic};
+use alloc::vec;
 
 /// AggregateError Objects (https://tc39.es/ecma262/#sec-aggregate-error-objects)
 pub struct AggregateErrorObject;
@@ -33,7 +33,12 @@ impl AggregateErrorObject {
             /* skip_current_frame */ true,
         )?;
 
-        must_a!(create_data_property_or_throw(cx, object.into(), cx.names.errors(), errors));
+        must_a!(create_data_property_or_throw(
+            cx,
+            object.into(),
+            cx.names.errors(),
+            errors
+        ));
 
         Ok(object)
     }
@@ -108,7 +113,12 @@ impl AggregateErrorConstructor {
         let errors_array = create_array_from_list(cx, &errors_list)?.as_object();
 
         let errors_desc = PropertyDescriptor::data(errors_array.into(), true, false, true);
-        must!(define_property_or_throw(cx, object.into(), cx.names.errors(), errors_desc));
+        must!(define_property_or_throw(
+            cx,
+            object.into(),
+            cx.names.errors(),
+            errors_desc
+        ));
 
         Ok(object.as_value())
     }

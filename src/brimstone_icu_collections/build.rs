@@ -164,8 +164,8 @@ fn gen_overrides_file(
     let mut file = String::new();
 
     file.push_str("use icu_collections::codepointinvlist::{CodePointInversionList, CodePointInversionListBuilder};
-use std::collections::HashMap;
-use std::sync::LazyLock;
+use hashbrown::HashMap;
+use once_cell::sync::Lazy;
 
 fn build_overrides_set() -> CodePointInversionList<'static> {
   let mut builder = CodePointInversionListBuilder::new();
@@ -192,15 +192,17 @@ fn build_overrides_map() -> HashMap<char, CodePointInversionList<'static>> {
             file.push_str(&format!("  builder.add_char('{closure_char}');\n"));
         }
 
-        file.push_str(&format!("  map.insert('{overriden_char}', builder.build());\n\n"));
+        file.push_str(&format!(
+            "  map.insert('{overriden_char}', builder.build());\n\n"
+        ));
     }
 
     file.push_str(
         "  map
 }
 
-static OVERRIDES_SET: LazyLock<CodePointInversionList<'static>> = LazyLock::new(build_overrides_set);
-static OVERRIDES_MAP: LazyLock<HashMap<char, CodePointInversionList<'static>>> = LazyLock::new(build_overrides_map);
+static OVERRIDES_SET: Lazy<CodePointInversionList<'static>> = Lazy::new(build_overrides_set);
+static OVERRIDES_MAP: Lazy<HashMap<char, CodePointInversionList<'static>>> = Lazy::new(build_overrides_map);
 
 pub fn has_case_closure_override(c: char) -> bool {
   OVERRIDES_SET.contains(c)
@@ -214,10 +216,14 @@ const ALL_CASE_FOLDED_DATA",
 );
 
     let inv_list_vec = all_case_folded.get_inversion_list_vec();
-    file.push_str(&format!(": [u32; {}] = {:?};\n\n", inv_list_vec.len(), inv_list_vec));
+    file.push_str(&format!(
+        ": [u32; {}] = {:?};\n\n",
+        inv_list_vec.len(),
+        inv_list_vec
+    ));
 
     file.push_str(
-        "static ALL_CASE_FOLDED_SET: LazyLock<CodePointInversionList<'static>> = LazyLock::new(|| {
+        "static ALL_CASE_FOLDED_SET: Lazy<CodePointInversionList<'static>> = Lazy::new(|| {
     CodePointInversionList::try_from_u32_inversion_list_slice(&ALL_CASE_FOLDED_DATA).unwrap()
 });
 

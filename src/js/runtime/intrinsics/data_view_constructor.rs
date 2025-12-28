@@ -1,5 +1,3 @@
-use std::mem::size_of;
-
 use crate::{
     extend_object,
     runtime::{
@@ -18,6 +16,8 @@ use crate::{
         Context, Handle, HeapPtr, Value,
     },
 };
+use alloc::format;
+use core::mem::size_of;
 
 use super::{array_buffer_constructor::ArrayBufferObject, intrinsics::Intrinsic};
 

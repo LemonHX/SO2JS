@@ -1,5 +1,5 @@
-use std::rc::Rc;
-use std::str::FromStr;
+use alloc::rc::Rc;
+use alloc::str::FromStr;
 
 use brimstone_macros::match_u32;
 use num_bigint::BigInt;
@@ -64,7 +64,10 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn save(&self) -> SavedLexerState {
-        SavedLexerState { current: self.current, pos: self.pos }
+        SavedLexerState {
+            current: self.current,
+            pos: self.pos,
+        }
     }
 
     pub fn restore(&mut self, save_state: &SavedLexerState) {
@@ -141,7 +144,10 @@ impl<'a> Lexer<'a> {
     }
 
     fn mark_loc(&self, start_pos: Pos) -> Loc {
-        Loc { start: start_pos, end: self.pos }
+        Loc {
+            start: start_pos,
+            end: self.pos,
+        }
     }
 
     fn emit<'b>(&self, token: Token<'b>, start_pos: Pos) -> LexResult<'b> {
@@ -150,7 +156,10 @@ impl<'a> Lexer<'a> {
 
     fn localized_parse_error(&self, loc: Loc, error: ParseError) -> LocalizedParseError {
         let source = (*self.source).clone();
-        LocalizedParseError { error, source_loc: Some((loc, source)) }
+        LocalizedParseError {
+            error,
+            source_loc: Some((loc, source)),
+        }
     }
 
     fn error<T>(&self, loc: Loc, error: ParseError) -> ParseResult<T> {
@@ -600,8 +609,10 @@ impl<'a> Lexer<'a> {
                     }
                     EOF_CHAR => {
                         let loc = self.mark_loc(self.pos + 1);
-                        return self
-                            .error(loc, ParseError::new_expected_token(Token::Eof, Token::Divide));
+                        return self.error(
+                            loc,
+                            ParseError::new_expected_token(Token::Eof, Token::Divide),
+                        );
                     }
                     _ => self.advance(),
                 }),
@@ -611,8 +622,10 @@ impl<'a> Lexer<'a> {
                 }
                 EOF_CHAR => {
                     let loc = self.mark_loc(self.pos);
-                    return self
-                        .error(loc, ParseError::new_expected_token(Token::Eof, Token::Multiply));
+                    return self.error(
+                        loc,
+                        ParseError::new_expected_token(Token::Eof, Token::Multiply),
+                    );
                 }
                 other => {
                     if is_ascii(other) {
@@ -695,7 +708,13 @@ impl<'a> Lexer<'a> {
                 return self.error(loc, ParseError::BigIntLeadingZero);
             }
 
-            return self.emit(Token::BigIntLiteral { digits_slice, base: 10 }, start_pos);
+            return self.emit(
+                Token::BigIntLiteral {
+                    digits_slice,
+                    base: 10,
+                },
+                start_pos,
+            );
         }
 
         // Read optional decimal point with its optional following digits
@@ -721,11 +740,11 @@ impl<'a> Lexer<'a> {
             has_numeric_separator |= self.skip_decimal_digits(allow_numeric_separator)?;
         }
 
-        // Parse float using rust stdlib. Rust stdlib cannot handle numeric separators, so if there
+        // Parse float using rust corelib. Rust corelib cannot handle numeric separators, so if there
         // were numeric separators then first generate string with numeric separators removed. It is
         // safe to treat this slice as valid UTF-8 as it only contains ASCII characters.
         let end_pos = self.pos;
-        let string = unsafe { std::str::from_utf8_unchecked(&self.buf[start_pos..end_pos]) };
+        let string = unsafe { core::str::from_utf8_unchecked(&self.buf[start_pos..end_pos]) };
 
         let value = if has_numeric_separator {
             f64::from_str(&string.replace('_', "")).unwrap()
@@ -898,7 +917,10 @@ impl<'a> Lexer<'a> {
         }
 
         if cannot_follow_numeric_literal {
-            let loc = Loc { start: start_pos, end: end_pos };
+            let loc = Loc {
+                start: start_pos,
+                end: end_pos,
+            };
             self.error(loc, ParseError::InvalidNumericLiteralNextChar)
         } else {
             Ok(())
@@ -1086,8 +1108,10 @@ impl<'a> Lexer<'a> {
                 // If we find the end of the string then return the newly allocated string
                 quote if quote == quote_char => {
                     self.advance();
-                    return self
-                        .emit(Token::StringLiteral(value.into_arena_str()), quote_start_pos);
+                    return self.emit(
+                        Token::StringLiteral(value.into_arena_str()),
+                        quote_start_pos,
+                    );
                 }
                 // Unterminated string literal
                 '\n' | '\r' | EOF_CHAR => {
@@ -1158,7 +1182,11 @@ impl<'a> Lexer<'a> {
         let flags = Wtf8Str::from_bytes_unchecked(&self.buf[flags_start_pos..self.pos]);
         let raw = Wtf8Str::from_bytes_unchecked(&self.buf[start_pos..self.pos]);
 
-        let regexp_token = self.alloc.alloc(RegExpToken { raw, pattern, flags });
+        let regexp_token = self.alloc.alloc(RegExpToken {
+            raw,
+            pattern,
+            flags,
+        });
 
         self.emit(Token::RegExpLiteral(regexp_token), start_pos)
     }
@@ -1263,9 +1291,12 @@ impl<'a> Lexer<'a> {
 
         let raw = Wtf8Str::from_bytes_unchecked(&self.buf[raw_start_pos..raw_end_pos]);
 
-        let template_part_token =
-            self.alloc
-                .alloc(TemplatePartToken { raw, cooked: Ok(raw), is_head, is_tail });
+        let template_part_token = self.alloc.alloc(TemplatePartToken {
+            raw,
+            cooked: Ok(raw),
+            is_head,
+            is_tail,
+        });
 
         self.emit(Token::TemplatePart(template_part_token), start_pos)
     }
@@ -1464,9 +1495,12 @@ impl<'a> Lexer<'a> {
             Some(loc) => Err(loc),
         };
 
-        let template_part_token =
-            self.alloc
-                .alloc(TemplatePartToken { raw, cooked, is_head, is_tail });
+        let template_part_token = self.alloc.alloc(TemplatePartToken {
+            raw,
+            cooked,
+            is_head,
+            is_tail,
+        });
 
         self.emit(Token::TemplatePart(template_part_token), start_pos)
     }
@@ -1603,7 +1637,7 @@ impl<'a> Lexer<'a> {
         }
 
         // Safe since this slice is ASCII only and therefore valid UTF-8
-        let id_str = unsafe { std::str::from_utf8_unchecked(&self.buf[start_pos..self.pos]) };
+        let id_str = unsafe { core::str::from_utf8_unchecked(&self.buf[start_pos..self.pos]) };
 
         if let Some(keyword_token) = self.ascii_id_to_keyword(id_str) {
             self.emit(keyword_token, start_pos)
@@ -1655,7 +1689,10 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        self.emit(Token::Identifier(string_builder.into_arena_str()), start_pos)
+        self.emit(
+            Token::Identifier(string_builder.into_arena_str()),
+            start_pos,
+        )
     }
 
     fn lex_identifier_unicode_escape_sequence(&mut self) -> ParseResult<CodePoint> {

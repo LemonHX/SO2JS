@@ -1,4 +1,7 @@
-use std::rc::Rc;
+use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
+use alloc::rc::Rc;
+use alloc::string::String;
 
 use bumpalo::Bump;
 
@@ -14,7 +17,10 @@ pub struct ParseContext {
 
 impl ParseContext {
     pub fn new(source: Rc<Source>) -> Self {
-        Self { source, alloc: Box::new(Bump::new()) }
+        Self {
+            source,
+            alloc: Box::new(Bump::new()),
+        }
     }
 
     pub fn source(&self) -> &Rc<Source> {

@@ -1,5 +1,5 @@
-use std::{fmt, mem::size_of};
-
+use alloc::vec::Vec;
+use core::{fmt, mem::size_of};
 pub trait Width {
     /// Representative unsigned type for this width.
     type UInt: UnsignedWidthRepr<Self::SInt>;

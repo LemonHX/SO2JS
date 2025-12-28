@@ -1,9 +1,11 @@
-use std::fmt;
-
 use crate::{
-    common::error::{ErrorFormatter, FormatOptions},
+    common::error::ErrorFormatter,
     runtime::{bytecode::generator::EmitError, eval_result::EvalError, gc::Escapable, Context},
 };
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::borrow::ToOwned;
+use core::fmt;
 
 pub type AllocResult<T> = Result<T, AllocError>;
 
@@ -53,16 +55,16 @@ impl Escapable for AllocError {
     }
 }
 
-pub fn format_oom_error_message(opts: &FormatOptions) -> String {
-    let mut formatter = ErrorFormatter::new("Error".to_string(), opts);
+pub fn format_oom_error_message() -> String {
+    let mut formatter = ErrorFormatter::new("Error".to_string());
     formatter.set_message("Ran out of heap memory".to_owned());
     formatter.build()
 }
 
 impl AllocError {
-    pub fn format(&self, opts: &FormatOptions) -> String {
+    pub fn format(&self) -> String {
         match self {
-            Self::Oom(_) => format_oom_error_message(opts),
+            Self::Oom(_) => format_oom_error_message(),
         }
     }
 }

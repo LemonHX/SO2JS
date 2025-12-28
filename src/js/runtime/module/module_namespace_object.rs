@@ -1,5 +1,3 @@
-use brimstone_macros::wrap_ordinary_object;
-
 use crate::{
     extend_object,
     runtime::{
@@ -22,6 +20,9 @@ use crate::{
     },
     set_uninit,
 };
+use alloc::vec;
+use alloc::vec::Vec;
+use brimstone_macros::wrap_ordinary_object;
 
 use super::{
     module::{DynModule, HeapDynModule, ModuleEnum},

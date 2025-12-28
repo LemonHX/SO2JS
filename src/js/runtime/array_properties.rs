@@ -1,4 +1,6 @@
-use std::mem::size_of;
+use core::mem::size_of;
+
+use alloc::vec::Vec;
 
 use crate::{field_offset, runtime::alloc_error::AllocResult, set_uninit};
 
@@ -119,7 +121,7 @@ impl ArrayProperties {
 
         unsafe {
             // Copy data from old array to new array
-            std::ptr::copy_nonoverlapping(
+            core::ptr::copy_nonoverlapping(
                 dense_properties.array.data_ptr(),
                 new_dense_properties.array.data_mut_ptr(),
                 old_length as usize,
@@ -158,7 +160,7 @@ impl ArrayProperties {
 
         unsafe {
             // Copy data from old array to new array
-            std::ptr::copy_nonoverlapping(
+            core::ptr::copy_nonoverlapping(
                 dense_properties.array.data_ptr(),
                 new_dense_properties.array.data_mut_ptr(),
                 new_length as usize,
@@ -357,7 +359,10 @@ impl DenseArrayProperties {
         let size = Self::calculate_size_in_bytes(capacity as usize);
         let mut object = cx.alloc_uninit_with_size::<DenseArrayProperties>(size)?;
 
-        set_uninit!(object.descriptor, cx.base_descriptors.get(HeapItemKind::DenseArrayProperties));
+        set_uninit!(
+            object.descriptor,
+            cx.base_descriptors.get(HeapItemKind::DenseArrayProperties)
+        );
         set_uninit!(object.len, 0);
         object.array.init_with_uninit(capacity as usize);
 
@@ -423,7 +428,11 @@ impl DenseArrayProperties {
 impl Handle<DenseArrayProperties> {
     #[inline]
     pub fn iter(&self) -> DenseArrayPropertiesIter {
-        DenseArrayPropertiesIter { dense_array_properties: *self, current: 0, len: self.len() }
+        DenseArrayPropertiesIter {
+            dense_array_properties: *self,
+            current: 0,
+            len: self.len(),
+        }
     }
 }
 

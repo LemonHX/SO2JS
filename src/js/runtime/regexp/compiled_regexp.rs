@@ -1,5 +1,3 @@
-use std::mem::size_of;
-
 use crate::{
     common::math::round_to_power_of_two,
     field_offset,
@@ -15,6 +13,10 @@ use crate::{
     },
     set_uninit,
 };
+use alloc::vec;
+use alloc::vec::Vec;
+use alloc::format;
+use core::mem::size_of;
 
 use super::instruction::InstructionIterator;
 
@@ -69,7 +71,10 @@ impl CompiledRegExpObject {
         let size = Self::calculate_size_in_bytes(instructions.len(), num_capture_groups);
         let mut object = cx.alloc_uninit_with_size::<CompiledRegExpObject>(size)?;
 
-        set_uninit!(object.descriptor, cx.base_descriptors.get(HeapItemKind::CompiledRegExpObject));
+        set_uninit!(
+            object.descriptor,
+            cx.base_descriptors.get(HeapItemKind::CompiledRegExpObject)
+        );
         set_uninit!(object.escaped_pattern_source, *escaped_pattern_source);
         set_uninit!(object.flags, regexp.flags);
         set_uninit!(object.has_named_capture_groups, has_named_capture_groups);
@@ -131,7 +136,7 @@ impl CompiledRegExpObject {
     #[inline]
     pub fn capture_groups_as_slice(&self) -> &[Option<HeapPtr<FlatString>>] {
         unsafe {
-            std::slice::from_raw_parts(
+            core::slice::from_raw_parts(
                 self.capture_groups_as_ptr(),
                 self.num_capture_groups as usize,
             )
@@ -141,7 +146,7 @@ impl CompiledRegExpObject {
     #[inline]
     pub fn capture_groups_as_slice_mut(&mut self) -> &mut [Option<HeapPtr<FlatString>>] {
         unsafe {
-            std::slice::from_raw_parts_mut(
+            core::slice::from_raw_parts_mut(
                 self.capture_groups_as_ptr().cast_mut(),
                 self.num_capture_groups as usize,
             )
@@ -151,7 +156,10 @@ impl CompiledRegExpObject {
 
 impl DebugPrint for HeapPtr<CompiledRegExpObject> {
     fn debug_format(&self, printer: &mut DebugPrinter) {
-        let source = format!("/{}/", self.escaped_pattern_source().format().unwrap_or_default());
+        let source = format!(
+            "/{}/",
+            self.escaped_pattern_source().format().unwrap_or_default()
+        );
         printer.write_heap_item_with_context(self.cast(), &source);
 
         if printer.is_short_mode() {

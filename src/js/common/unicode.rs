@@ -1,6 +1,7 @@
 use core::panic;
 
 use super::icu::ICU;
+use alloc::string::String;
 
 use brimstone_macros::match_u32;
 
@@ -76,7 +77,10 @@ pub fn try_encode_surrogate_pair(code_point: CodePoint) -> Option<(CodeUnit, Cod
     let high_bits = ((offset_code_point) >> 10) as u16;
     let low_bits = (offset_code_point & 0x3FF) as u16;
 
-    Some((high_bits + HIGH_SURROGATE_START, low_bits + LOW_SURROGATE_START))
+    Some((
+        high_bits + HIGH_SURROGATE_START,
+        low_bits + LOW_SURROGATE_START,
+    ))
 }
 
 pub fn code_point_from_surrogate_pair(high: CodeUnit, low: CodeUnit) -> CodePoint {
@@ -461,9 +465,9 @@ pub fn utf16_code_unit_count(code_point: CodePoint) -> usize {
 
 pub fn to_string_or_unicode_escape_sequence(code_point: CodePoint) -> String {
     if let Some(char) = char::from_u32(code_point) {
-        return String::from(char);
+        return alloc::string::String::from(char);
     }
 
     // Code points in the surrogate pair range are encoded as a \uXXXX unicode escape sequence
-    format!("\\u{code_point:X}")
+    alloc::format!("\\u{code_point:X}")
 }

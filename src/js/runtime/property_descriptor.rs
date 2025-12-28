@@ -204,7 +204,12 @@ pub fn from_property_descriptor(
     let object = ordinary_object_create(cx)?;
 
     if let Some(value) = desc.value {
-        must_a!(create_data_property_or_throw(cx, object, cx.names.value(), value,));
+        must_a!(create_data_property_or_throw(
+            cx,
+            object,
+            cx.names.value(),
+            value,
+        ));
     }
 
     if let Some(is_writable) = desc.is_writable {
@@ -224,7 +229,12 @@ pub fn from_property_descriptor(
             cx.undefined()
         };
 
-        must_a!(create_data_property_or_throw(cx, object, cx.names.get(), get_value));
+        must_a!(create_data_property_or_throw(
+            cx,
+            object,
+            cx.names.get(),
+            get_value
+        ));
     }
 
     if desc.has_set {
@@ -234,7 +244,12 @@ pub fn from_property_descriptor(
             cx.undefined()
         };
 
-        must_a!(create_data_property_or_throw(cx, object, cx.names.set_(), set_value));
+        must_a!(create_data_property_or_throw(
+            cx,
+            object,
+            cx.names.set_(),
+            set_value
+        ));
     }
 
     if let Some(is_enumerable) = desc.is_enumerable {

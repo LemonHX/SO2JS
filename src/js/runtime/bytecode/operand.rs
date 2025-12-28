@@ -1,4 +1,4 @@
-use std::fmt;
+use alloc::fmt;
 
 use super::{
     stack_frame::{

@@ -23,32 +23,35 @@ pub struct MathObject;
 
 impl MathObject {
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         // Value Properties of the Math Object (https://tc39.es/ecma262/#sec-value-properties-of-the-math-object)
-        let e_value = cx.number(std::f64::consts::E);
+        let e_value = cx.number(core::f64::consts::E);
         object.intrinsic_frozen_property(cx, cx.names.e(), e_value)?;
 
-        let ln_10_value = cx.number(std::f64::consts::LN_10);
+        let ln_10_value = cx.number(core::f64::consts::LN_10);
         object.intrinsic_frozen_property(cx, cx.names.ln10(), ln_10_value)?;
 
-        let ln_2_value = cx.number(std::f64::consts::LN_2);
+        let ln_2_value = cx.number(core::f64::consts::LN_2);
         object.intrinsic_frozen_property(cx, cx.names.ln2(), ln_2_value)?;
 
-        let log10_e_value = cx.number(std::f64::consts::LOG10_E);
+        let log10_e_value = cx.number(core::f64::consts::LOG10_E);
         object.intrinsic_frozen_property(cx, cx.names.log10e(), log10_e_value)?;
 
-        let log2_e_value = cx.number(std::f64::consts::LOG2_E);
+        let log2_e_value = cx.number(core::f64::consts::LOG2_E);
         object.intrinsic_frozen_property(cx, cx.names.log2e(), log2_e_value)?;
 
-        let pi_value = cx.number(std::f64::consts::PI);
+        let pi_value = cx.number(core::f64::consts::PI);
         object.intrinsic_frozen_property(cx, cx.names.pi(), pi_value)?;
 
-        let sqrt1_2_value = cx.number(std::f64::consts::FRAC_1_SQRT_2);
+        let sqrt1_2_value = cx.number(core::f64::consts::FRAC_1_SQRT_2);
         object.intrinsic_frozen_property(cx, cx.names.sqrt1_2(), sqrt1_2_value)?;
 
-        let sqrt_2_value = cx.number(std::f64::consts::SQRT_2);
+        let sqrt_2_value = cx.number(core::f64::consts::SQRT_2);
         object.intrinsic_frozen_property(cx, cx.names.sqrt2(), sqrt_2_value)?;
 
         // Math [ @@toStringTag ] (https://tc39.es/ecma262/#sec-math-%symbol.tostringtag%)
@@ -516,7 +519,7 @@ impl MathObject {
         _: Handle<Value>,
         _: &[Handle<Value>],
     ) -> EvalResult<Handle<Value>> {
-        let n = cx.rand.gen::<f64>();
+        let n = cx.rand.random::<f64>();
         Ok(cx.number(n))
     }
 

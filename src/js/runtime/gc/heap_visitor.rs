@@ -1,4 +1,4 @@
-use std::mem::transmute;
+use core::mem::transmute;
 
 use crate::runtime::{PropertyKey, Value};
 
@@ -38,7 +38,10 @@ pub trait HeapVisitor {
     fn visit_pointer_opt<T>(&mut self, ptr: &mut Option<HeapPtr<T>>) {
         if ptr.is_some() {
             unsafe {
-                self.visit(transmute::<&mut Option<HeapPtr<T>>, &mut HeapPtr<AnyHeapItem>>(ptr))
+                self.visit(transmute::<
+                    &mut Option<HeapPtr<T>>,
+                    &mut HeapPtr<AnyHeapItem>,
+                >(ptr))
             };
         }
     }

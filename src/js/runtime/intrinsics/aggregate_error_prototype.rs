@@ -9,8 +9,11 @@ pub struct AggregateErrorPrototype;
 impl AggregateErrorPrototype {
     /// Properties of the AggregateError Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-aggregate-error-prototype-objects)
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ErrorPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ErrorPrototype)),
+            true,
+        )?;
 
         // Constructor property is added once AggregateErrorConstructor has been created
         object.intrinsic_name_prop(cx, "AggregateError")?;

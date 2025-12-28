@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use core::cmp::Ordering;
 
 use super::{type_utilities::is_integral_number, Value};
 

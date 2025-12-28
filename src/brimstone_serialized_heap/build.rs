@@ -33,10 +33,16 @@ fn gen_serialized_heap_file(out_path: &Path) -> String {
     let serializer = HeapSerializer::serialize(cx);
     let serialized_heap = serializer.as_serialized();
 
-    let permanent_space_file =
-        write_bytes_to_file(serialized_heap.permanent_space.bytes, out_path, "permanent_space.in");
-    let current_space_file =
-        write_bytes_to_file(serialized_heap.current_space.bytes, out_path, "current_space.in");
+    let permanent_space_file = write_bytes_to_file(
+        serialized_heap.permanent_space.bytes,
+        out_path,
+        "permanent_space.in",
+    );
+    let current_space_file = write_bytes_to_file(
+        serialized_heap.current_space.bytes,
+        out_path,
+        "current_space.in",
+    );
 
     let root_offsets_file = write_bytes_to_file(
         usize_slice_to_u8_slice(serialized_heap.root_offsets),

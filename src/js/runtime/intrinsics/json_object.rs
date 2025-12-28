@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::{
     common::{unicode::is_surrogate_code_point, wtf_8::Wtf8String},
     must, must_a,
@@ -25,6 +23,10 @@ use crate::{
         Context, EvalResult, Handle, PropertyKey, Realm, Value,
     },
 };
+use alloc::vec;
+use alloc::vec::Vec;
+use alloc::format;
+use hashbrown::HashSet;
 
 use super::intrinsics::Intrinsic;
 
@@ -33,8 +35,11 @@ pub struct JSONObject;
 
 impl JSONObject {
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         object.intrinsic_func(cx, cx.names.parse(), Self::parse, 2, realm)?;
         object.intrinsic_func(cx, cx.names.stringify(), Self::stringify, 3, realm)?;
@@ -241,7 +246,12 @@ impl JSONObject {
         let wrapper = ordinary_object_create(cx)?;
 
         let value = get_argument(cx, arguments, 0);
-        must!(create_data_property_or_throw(cx, wrapper, cx.names.empty_string(), value));
+        must!(create_data_property_or_throw(
+            cx,
+            wrapper,
+            cx.names.empty_string(),
+            value
+        ));
 
         let mut serializer = JSONSerializer::new(replacer_function, property_list, gap);
         if !serializer.serialize_json_property(cx, cx.names.empty_string(), wrapper)? {

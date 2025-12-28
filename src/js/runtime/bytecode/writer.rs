@@ -1,9 +1,10 @@
-use std::ops::Range;
-
 use crate::{
     common::varint::encode_varint,
     parser::loc::{Pos, NO_POS},
 };
+use alloc::vec;
+use alloc::vec::Vec;
+use core::ops::Range;
 
 use super::{
     instruction::{
@@ -25,7 +26,11 @@ pub struct BytecodeWriter {
 
 impl BytecodeWriter {
     pub fn new() -> Self {
-        Self { bytes: vec![], source_map: vec![], last_pos: NO_POS }
+        Self {
+            bytes: vec![],
+            source_map: vec![],
+            last_pos: NO_POS,
+        }
     }
 
     pub fn finish(self) -> (Vec<u8>, Vec<u8>) {

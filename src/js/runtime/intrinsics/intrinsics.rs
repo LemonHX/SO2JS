@@ -346,7 +346,10 @@ impl Intrinsics {
         register_intrinsic_pair!(WeakRefPrototype, WeakRefConstructor);
         register_intrinsic_pair!(WeakSetPrototype, WeakSetConstructor);
         register_intrinsic_pair!(WeakMapPrototype, WeakMapConstructor);
-        register_intrinsic_pair!(FinalizationRegistryPrototype, FinalizationRegistryConstructor);
+        register_intrinsic_pair!(
+            FinalizationRegistryPrototype,
+            FinalizationRegistryConstructor
+        );
 
         // Properties of basic intrinsics
         handle_scope!(cx, {
@@ -400,7 +403,10 @@ impl Intrinsics {
         register_intrinsic!(IteratorConstructor, IteratorConstructor);
         register_intrinsic!(IteratorHelperPrototype, IteratorHelperPrototype);
         register_intrinsic!(AsyncIteratorPrototype, AsyncIteratorPrototype);
-        register_intrinsic!(AsyncFromSyncIteratorPrototype, AsyncFromSyncIteratorPrototype);
+        register_intrinsic!(
+            AsyncFromSyncIteratorPrototype,
+            AsyncFromSyncIteratorPrototype
+        );
         register_intrinsic!(ArrayIteratorPrototype, ArrayIteratorPrototype);
         register_intrinsic!(StringIteratorPrototype, StringIteratorPrototype);
         register_intrinsic!(MapIteratorPrototype, MapIteratorPrototype);
@@ -430,8 +436,14 @@ impl Intrinsics {
 
         // Async generators
         register_intrinsic!(AsyncGeneratorPrototype, AsyncGeneratorPrototype);
-        register_intrinsic!(AsyncGeneratorFunctionPrototype, AsyncGeneratorFunctionPrototype);
-        register_intrinsic!(AsyncGeneratorFunctionConstructor, AsyncGeneratorFunctionConstructor);
+        register_intrinsic!(
+            AsyncGeneratorFunctionPrototype,
+            AsyncGeneratorFunctionPrototype
+        );
+        register_intrinsic!(
+            AsyncGeneratorFunctionConstructor,
+            AsyncGeneratorFunctionConstructor
+        );
         Self::add_non_writable_constructor_to_prototype(
             cx,
             realm,
@@ -564,7 +576,12 @@ fn create_throw_type_error_intrinsic(
         // Is anonymous function so name is empty
         let name = cx.names.empty_string().as_string().into();
         let name_desc = PropertyDescriptor::data(name, false, false, false);
-        must_a!(define_property_or_throw(cx, throw_type_error_func, cx.names.name(), name_desc,));
+        must_a!(define_property_or_throw(
+            cx,
+            throw_type_error_func,
+            cx.names.name(),
+            name_desc,
+        ));
 
         must_a!(throw_type_error_func.prevent_extensions(cx));
 
@@ -584,11 +601,21 @@ fn add_restricted_function_properties(
 
     let caller_desc =
         PropertyDescriptor::accessor(Some(thrower_func), Some(thrower_func), false, true);
-    must_a!(define_property_or_throw(cx, func, cx.names.caller(), caller_desc));
+    must_a!(define_property_or_throw(
+        cx,
+        func,
+        cx.names.caller(),
+        caller_desc
+    ));
 
     let arguments_desc =
         PropertyDescriptor::accessor(Some(thrower_func), Some(thrower_func), false, true);
-    must_a!(define_property_or_throw(cx, func, cx.names.arguments(), arguments_desc));
+    must_a!(define_property_or_throw(
+        cx,
+        func,
+        cx.names.arguments(),
+        arguments_desc
+    ));
 
     Ok(())
 }

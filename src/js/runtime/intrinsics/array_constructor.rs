@@ -81,12 +81,23 @@ impl ArrayConstructor {
                 int_len
             } else {
                 let first_key = PropertyKey::array_index_handle(cx, 0)?;
-                must!(create_data_property_or_throw(cx, array.into(), first_key, length));
+                must!(create_data_property_or_throw(
+                    cx,
+                    array.into(),
+                    first_key,
+                    length
+                ));
                 1
             };
 
             let int_len_value = Value::from(int_len).to_handle(cx);
-            must!(set(cx, array.into(), cx.names.length(), int_len_value, true));
+            must!(set(
+                cx,
+                array.into(),
+                cx.names.length(),
+                int_len_value,
+                true
+            ));
 
             Ok(array.as_value())
         } else {

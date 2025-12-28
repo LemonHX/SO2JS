@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use alloc::rc::Rc;
 
 use crate::common::{
     string_iterators::{CodePointIterator, CodeUnitIterator},
@@ -133,7 +133,13 @@ impl<'a> Utf8LexerStream<'a> {
             buf[0].into()
         };
 
-        Utf8LexerStream { buf, pos: 0, current, buf_start_pos, source }
+        Utf8LexerStream {
+            buf,
+            pos: 0,
+            current,
+            buf_start_pos,
+            source,
+        }
     }
 
     #[inline]
@@ -249,11 +255,17 @@ impl LexerStream for Utf8LexerStream<'_> {
     fn error<T>(&self, start_pos: Pos, error: ParseError) -> ParseResult<T> {
         let loc = self.loc_from_start_pos(start_pos);
         let source = self.source.clone();
-        Err(LocalizedParseError { error, source_loc: Some((loc, source)) })
+        Err(LocalizedParseError {
+            error,
+            source_loc: Some((loc, source)),
+        })
     }
 
     fn save(&self) -> SavedLexerStreamState {
-        SavedLexerStreamState { current: self.current, pos: self.pos }
+        SavedLexerStreamState {
+            current: self.current,
+            pos: self.pos,
+        }
     }
 
     fn restore(&mut self, save_state: &SavedLexerStreamState) {
@@ -280,7 +292,11 @@ impl<'a> HeapOneByteLexerStream<'a> {
             buf[0].into()
         };
 
-        HeapOneByteLexerStream { buf, pos: 0, current }
+        HeapOneByteLexerStream {
+            buf,
+            pos: 0,
+            current,
+        }
     }
 
     #[inline]
@@ -404,11 +420,17 @@ impl LexerStream for HeapOneByteLexerStream<'_> {
     }
 
     fn error<T>(&self, _: Pos, error: ParseError) -> ParseResult<T> {
-        Err(LocalizedParseError { error, source_loc: None })
+        Err(LocalizedParseError {
+            error,
+            source_loc: None,
+        })
     }
 
     fn save(&self) -> SavedLexerStreamState {
-        SavedLexerStreamState { current: self.current, pos: self.pos }
+        SavedLexerStreamState {
+            current: self.current,
+            pos: self.pos,
+        }
     }
 
     fn restore(&mut self, save_state: &SavedLexerStreamState) {
@@ -439,7 +461,12 @@ impl<'a> HeapTwoByteCodeUnitLexerStream<'a> {
             buf[0] as u32
         };
 
-        HeapTwoByteCodeUnitLexerStream { buf, pos: 0, current, source }
+        HeapTwoByteCodeUnitLexerStream {
+            buf,
+            pos: 0,
+            current,
+            source,
+        }
     }
 
     #[inline]
@@ -552,12 +579,12 @@ impl LexerStream for HeapTwoByteCodeUnitLexerStream<'_> {
 
     fn slice(&self, start: Pos, end: Pos) -> &[u8] {
         let u16_slice = &self.buf[start..end];
-        unsafe { std::slice::from_raw_parts(u16_slice.as_ptr() as *const u8, u16_slice.len() * 2) }
+        unsafe { core::slice::from_raw_parts(u16_slice.as_ptr() as *const u8, u16_slice.len() * 2) }
     }
 
     fn slice_equals(&self, start: Pos, slice: &[u8]) -> bool {
         let slice =
-            unsafe { std::slice::from_raw_parts(slice.as_ptr() as *const u16, slice.len() / 2) };
+            unsafe { core::slice::from_raw_parts(slice.as_ptr() as *const u16, slice.len() / 2) };
 
         let end = start + slice.len();
         if end > self.buf.len() {
@@ -569,7 +596,10 @@ impl LexerStream for HeapTwoByteCodeUnitLexerStream<'_> {
 
     fn error<T>(&self, pos: Pos, error: ParseError) -> ParseResult<T> {
         let source_loc = if let Some(source) = &self.source {
-            let loc = Loc { start: pos, end: pos };
+            let loc = Loc {
+                start: pos,
+                end: pos,
+            };
             Some((loc, source.clone()))
         } else {
             None
@@ -579,7 +609,10 @@ impl LexerStream for HeapTwoByteCodeUnitLexerStream<'_> {
     }
 
     fn save(&self) -> SavedLexerStreamState {
-        SavedLexerStreamState { current: self.current, pos: self.pos }
+        SavedLexerStreamState {
+            current: self.current,
+            pos: self.pos,
+        }
     }
 
     fn restore(&mut self, save_state: &SavedLexerStreamState) {
@@ -607,7 +640,11 @@ impl<'a> HeapTwoByteCodePointLexerStream<'a> {
             buf[0] as u32
         };
 
-        HeapTwoByteCodePointLexerStream { buf, pos: 0, current }
+        HeapTwoByteCodePointLexerStream {
+            buf,
+            pos: 0,
+            current,
+        }
     }
 
     // Return a code point and the number of code units that make up that code point.
@@ -772,12 +809,12 @@ impl LexerStream for HeapTwoByteCodePointLexerStream<'_> {
 
     fn slice(&self, start: Pos, end: Pos) -> &[u8] {
         let u16_slice = &self.buf[start..end];
-        unsafe { std::slice::from_raw_parts(u16_slice.as_ptr() as *const u8, u16_slice.len() * 2) }
+        unsafe { core::slice::from_raw_parts(u16_slice.as_ptr() as *const u8, u16_slice.len() * 2) }
     }
 
     fn slice_equals(&self, start: Pos, slice: &[u8]) -> bool {
         let slice =
-            unsafe { std::slice::from_raw_parts(slice.as_ptr() as *const u16, slice.len() / 2) };
+            unsafe { core::slice::from_raw_parts(slice.as_ptr() as *const u16, slice.len() / 2) };
 
         let end = start + slice.len();
         if end > self.buf.len() {
@@ -788,11 +825,17 @@ impl LexerStream for HeapTwoByteCodePointLexerStream<'_> {
     }
 
     fn error<T>(&self, _: Pos, error: ParseError) -> ParseResult<T> {
-        Err(LocalizedParseError { error, source_loc: None })
+        Err(LocalizedParseError {
+            error,
+            source_loc: None,
+        })
     }
 
     fn save(&self) -> SavedLexerStreamState {
-        SavedLexerStreamState { current: self.current, pos: self.pos }
+        SavedLexerStreamState {
+            current: self.current,
+            pos: self.pos,
+        }
     }
 
     fn restore(&mut self, save_state: &SavedLexerStreamState) {

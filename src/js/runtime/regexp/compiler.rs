@@ -1,13 +1,13 @@
-use std::{
-    collections::HashSet,
-    hash::{Hash, Hasher},
-    sync::LazyLock,
-};
-
+use alloc::vec;
+use alloc::vec::Vec;
 use brimstone_icu_collections::{
     all_case_folded_set, get_case_closure_override, has_case_closure_override,
 };
+use core::hash::{Hash, Hasher};
+use core::error::Error;
+use hashbrown::HashSet;
 use icu_collections::codepointinvlist::{CodePointInversionList, CodePointInversionListBuilder};
+use once_cell::sync::Lazy;
 
 use crate::{
     common::{
@@ -82,11 +82,17 @@ struct SubExpressionInfo {
 
 impl SubExpressionInfo {
     fn no_captures(always_consumes: bool) -> Self {
-        Self { always_consumes, captures: vec![] }
+        Self {
+            always_consumes,
+            captures: vec![],
+        }
     }
 
     fn with_captures(always_consumes: bool, captures: Vec<CaptureGroupIndex>) -> Self {
-        Self { always_consumes, captures }
+        Self {
+            always_consumes,
+            captures,
+        }
     }
 }
 
@@ -549,7 +555,10 @@ impl CompiledRegExpBuilder {
             // insensitive closure of the code point. This will check for any code points which
             // canonicalize to the same value as the literal code point.
             let mut closure_set_builder = CodePointInversionListBuilder::new();
-            self.add_case_closure(&mut closure_set_builder, char::from_u32(code_point).unwrap());
+            self.add_case_closure(
+                &mut closure_set_builder,
+                char::from_u32(code_point).unwrap(),
+            );
             let closure_set = closure_set_builder.build();
 
             self.emit_code_point_set(&closure_set, /* is_inverted */ false);
@@ -960,7 +969,7 @@ impl CompiledRegExpBuilder {
 
         // Reverse order of capture indices when emitting backwards
         if !self.is_forwards() {
-            std::mem::swap(&mut capture_start_index, &mut capture_end_index);
+            core::mem::swap(&mut capture_start_index, &mut capture_end_index);
         }
 
         self.emit_mark_capture_point_instruction(capture_start_index);
@@ -1466,12 +1475,11 @@ impl CompiledRegExpBuilder {
 
 /// Set of word characters to be used for word character classes and word boundary assertions when
 /// in case sensitive or unicode unaware mode.
-static WORD_SET: LazyLock<CodePointInversionList> =
-    LazyLock::new(|| create_word_set_builder().build());
+static WORD_SET: Lazy<CodePointInversionList> = Lazy::new(|| create_word_set_builder().build());
 
 /// Set of word characters to be used for word character classes and word boundary assertions when
 /// in case insensitive, unicode aware mode.
-static WORD_CASE_INSENSITIVE_UNICODE_SET: LazyLock<CodePointInversionList> = LazyLock::new(|| {
+static WORD_CASE_INSENSITIVE_UNICODE_SET: Lazy<CodePointInversionList> = Lazy::new(|| {
     let mut set_builder = create_word_set_builder();
 
     // Add extra code points to form the case insensitive closure of the word set
@@ -1483,7 +1491,7 @@ static WORD_CASE_INSENSITIVE_UNICODE_SET: LazyLock<CodePointInversionList> = Laz
 
 /// Set of non-word characters to be used for non-word character classes when in case sensitive or
 /// unicode unaware mode.
-static NOT_WORD_SET: LazyLock<CodePointInversionList> = LazyLock::new(|| {
+static NOT_WORD_SET: Lazy<CodePointInversionList> = Lazy::new(|| {
     let mut set_builder = create_word_set_builder();
     set_builder.complement();
     set_builder.build()
@@ -1491,24 +1499,23 @@ static NOT_WORD_SET: LazyLock<CodePointInversionList> = LazyLock::new(|| {
 
 /// Set of non-word characters to be used for non-word character classes when in case insensitive,
 /// unicode aware mode.
-static NOT_WORD_CASE_INSENSITIVE_UNICODE_SET: LazyLock<CodePointInversionList> =
-    LazyLock::new(|| {
-        let mut set_builder = create_word_set_builder();
+static NOT_WORD_CASE_INSENSITIVE_UNICODE_SET: Lazy<CodePointInversionList> = Lazy::new(|| {
+    let mut set_builder = create_word_set_builder();
 
-        // Add extra code points to form the case insensitive closure of the word set
-        set_builder.add_char('\u{017f}');
-        set_builder.add_char('\u{212a}');
+    // Add extra code points to form the case insensitive closure of the word set
+    set_builder.add_char('\u{017f}');
+    set_builder.add_char('\u{212a}');
 
-        set_builder.complement();
-        set_builder.build()
-    });
+    set_builder.complement();
+    set_builder.build()
+});
 
 /// Set of whitespace characters to be used for whitespace character classes.
-static WHITESPACE_SET: LazyLock<CodePointInversionList> =
-    LazyLock::new(|| create_whitespace_set_builder().build());
+static WHITESPACE_SET: Lazy<CodePointInversionList> =
+    Lazy::new(|| create_whitespace_set_builder().build());
 
 /// Set of non-whitespace characters to be used for non-whitespace character classes.
-static NOT_WHITESPACE_SET: LazyLock<CodePointInversionList> = LazyLock::new(|| {
+static NOT_WHITESPACE_SET: Lazy<CodePointInversionList> = Lazy::new(|| {
     let mut set_builder = create_whitespace_set_builder();
     set_builder.complement();
     set_builder.build()

@@ -14,7 +14,6 @@ brimstone_core.workspace = true
 brimstone_serialized_heap.workspace = true
 
 [features]
-default = ["alloc_error", "jemalloc"]
+default = ["alloc_error"]
 build_fuzz = []
 alloc_error = ["brimstone_core/alloc_error"]
-jemalloc = ["brimstone_core/jemalloc"]

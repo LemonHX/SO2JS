@@ -1,3 +1,7 @@
+use super::{
+    module::{DynModule, Module, ResolveExportName, ResolveExportResult},
+    source_text_module::{ImportEntry, ModuleEntry, SourceTextModule},
+};
 use crate::{
     handle_scope,
     runtime::{
@@ -7,11 +11,8 @@ use crate::{
         Context, EvalResult, Handle,
     },
 };
-
-use super::{
-    module::{DynModule, Module, ResolveExportName, ResolveExportResult},
-    source_text_module::{ImportEntry, ModuleEntry, SourceTextModule},
-};
+use alloc::vec;
+use alloc::vec::Vec;
 
 struct GraphLinker {
     stack: Vec<Handle<SourceTextModule>>,

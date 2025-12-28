@@ -1,13 +1,14 @@
-use std::{
-    collections::{HashMap, HashSet},
-    convert::TryFrom,
-};
+use alloc::string::String;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::convert::TryFrom;
+use hashbrown::{HashMap, HashSet};
 
 use brimstone_macros::match_u32;
 
 use crate::{
     common::{
-        alloc,
+        jsalloc,
         options::Options,
         unicode::{
             as_id_part, as_id_start, code_point_from_surrogate_pair, get_hex_value,
@@ -91,7 +92,7 @@ impl<'a, T: LexerStream> RegExpParser<'a, T> {
             lexer_stream,
             flags,
             num_capture_groups: 0,
-            capture_groups: alloc::vec![in alloc],
+            capture_groups: allocator_api2::vec![in alloc],
             capture_group_names: HashMap::new(),
             current_capture_group_names: HashSet::new(),
             current_capture_group_name_scope: vec![],
@@ -195,11 +196,11 @@ impl<'a, T: LexerStream> RegExpParser<'a, T> {
     }
 
     fn alloc_vec<U>(&self) -> AstSliceBuilder<'a, U> {
-        AstSliceBuilder::new(alloc::Vec::new_in(self.alloc))
+        AstSliceBuilder::new(jsalloc::Vec::new_in(self.alloc))
     }
 
     fn alloc_vec_with_element<U>(&self, element: U) -> AstSliceBuilder<'a, U> {
-        let mut vec = alloc::Vec::new_in(self.alloc);
+        let mut vec = jsalloc::Vec::new_in(self.alloc);
         vec.push(element);
         AstSliceBuilder::new(vec)
     }
@@ -280,7 +281,7 @@ impl<'a, T: LexerStream> RegExpParser<'a, T> {
             // group, otherwise we need to reparse knowing the actual number of capture groups.
             let num_capture_groups = parser.capture_groups.len() as u64;
             let annex_b_maybe_backreferences =
-                std::mem::take(&mut parser.annex_b_maybe_backreferences);
+                core::mem::take(&mut parser.annex_b_maybe_backreferences);
             let needs_reparse = annex_b_maybe_backreferences
                 .iter()
                 .any(|(_, capture_group_index)| *capture_group_index > num_capture_groups);
@@ -308,7 +309,11 @@ impl<'a, T: LexerStream> RegExpParser<'a, T> {
 
         parser.resolve_backreferences()?;
 
-        let RegExpParser { capture_groups, has_duplicate_named_capture_groups, .. } = parser;
+        let RegExpParser {
+            capture_groups,
+            has_duplicate_named_capture_groups,
+            ..
+        } = parser;
 
         Ok(RegExp {
             disjunction,
@@ -363,7 +368,10 @@ impl<'a, T: LexerStream> RegExpParser<'a, T> {
             // Set up new empty capture group name scope. Old scope is saved on the stack, forming
             // an implicit scope stack.
             let mut previous_scope = vec![];
-            std::mem::swap(&mut self.current_capture_group_name_scope, &mut previous_scope);
+            core::mem::swap(
+                &mut self.current_capture_group_name_scope,
+                &mut previous_scope,
+            );
 
             // Parse the alternative inside the scope
             alternatives.push(self.parse_alternative()?);
@@ -381,12 +389,16 @@ impl<'a, T: LexerStream> RegExpParser<'a, T> {
 
             // A trailing `|` means there is a final empty alternative
             if self.is_end() {
-                alternatives.push(Alternative { terms: AstSlice::new_empty() });
+                alternatives.push(Alternative {
+                    terms: AstSlice::new_empty(),
+                });
                 break;
             }
         }
 
-        Ok(Disjunction { alternatives: alternatives.build() })
+        Ok(Disjunction {
+            alternatives: alternatives.build(),
+        })
     }
 
     fn parse_alternative(&mut self) -> ParseResult<Alternative<'a>> {
@@ -441,7 +453,9 @@ impl<'a, T: LexerStream> RegExpParser<'a, T> {
             terms.push(Term::Literal(current_literal.into_arena_str()));
         }
 
-        Ok(Alternative { terms: terms.build() })
+        Ok(Alternative {
+            terms: terms.build(),
+        })
     }
 
     fn parse_term(&mut self) -> ParseResult<Term<'a>> {
@@ -707,7 +721,12 @@ impl<'a, T: LexerStream> RegExpParser<'a, T> {
                 _ => {}
             }
 
-            Ok(Term::Quantifier(Quantifier { term: p!(self, term), min, max, is_greedy }))
+            Ok(Term::Quantifier(Quantifier {
+                term: p!(self, term),
+                min,
+                max,
+                is_greedy,
+            }))
         } else {
             Ok(term)
         }
@@ -937,7 +956,11 @@ impl<'a, T: LexerStream> RegExpParser<'a, T> {
             let disjunction = self.parse_disjunction()?;
             self.expect(')')?;
 
-            Ok(Term::CaptureGroup(CaptureGroup { name: None, index, disjunction }))
+            Ok(Term::CaptureGroup(CaptureGroup {
+                name: None,
+                index,
+                disjunction,
+            }))
         }
     }
 
@@ -1254,11 +1277,18 @@ impl<'a, T: LexerStream> RegExpParser<'a, T> {
 
         // Inverted character classes cannot contain strings
         if may_contain_strings && is_inverted {
-            return self.error(first_operand_pos, ParseError::InvertedCharacterClassContainStrings);
+            return self.error(
+                first_operand_pos,
+                ParseError::InvertedCharacterClassContainStrings,
+            );
         }
 
         Ok((
-            CharacterClass { expression_type, is_inverted, operands: operands.build() },
+            CharacterClass {
+                expression_type,
+                is_inverted,
+                operands: operands.build(),
+            },
             may_contain_strings,
         ))
     }
@@ -1277,7 +1307,10 @@ impl<'a, T: LexerStream> RegExpParser<'a, T> {
         // String disjunction \q{...}
         if self.current() == '\\' as u32 && self.peek() == 'q' as u32 {
             let (string_disjunction, may_contain_strings) = self.parse_string_disjunction()?;
-            return Ok((ClassRange::StringDisjunction(string_disjunction), may_contain_strings));
+            return Ok((
+                ClassRange::StringDisjunction(string_disjunction),
+                may_contain_strings,
+            ));
         }
 
         // Otherwise defer to standard character class atom parsing
@@ -1613,7 +1646,12 @@ impl<'a, T: LexerStream> RegExpParser<'a, T> {
 
         self.expect('}')?;
 
-        Ok((StringDisjunction { alternatives: alternatives.build() }, may_contain_strings))
+        Ok((
+            StringDisjunction {
+                alternatives: alternatives.build(),
+            },
+            may_contain_strings,
+        ))
     }
 
     /// Parse a single alternative in a class string disjunction. Return both the string and its

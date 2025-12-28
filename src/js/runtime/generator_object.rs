@@ -135,7 +135,14 @@ impl GeneratorObject {
         let proto =
             get_prototype_from_constructor(cx, closure.into(), Intrinsic::GeneratorPrototype)?;
 
-        Ok(Self::new(cx, Some(proto), pc_to_resume_offset, fp_index, None, stack_frame)?)
+        Ok(Self::new(
+            cx,
+            Some(proto),
+            pc_to_resume_offset,
+            fp_index,
+            None,
+            stack_frame,
+        )?)
     }
 
     pub fn new_for_async_function(
@@ -145,7 +152,14 @@ impl GeneratorObject {
         completion_indices: (u32, u32),
         stack_frame: &[StackSlotValue],
     ) -> AllocResult<HeapPtr<GeneratorObject>> {
-        Self::new(cx, None, pc_to_resume_offset, fp_index, Some(completion_indices), stack_frame)
+        Self::new(
+            cx,
+            None,
+            pc_to_resume_offset,
+            fp_index,
+            Some(completion_indices),
+            stack_frame,
+        )
     }
 
     const STACK_FRAME_OFFSET: usize = field_offset!(GeneratorObject, stack_frame);
@@ -236,7 +250,12 @@ pub fn generator_resume(
 
     debug_assert!(generator.state.is_suspended());
 
-    generate_resume_impl(cx, generator, completion_value, GeneratorCompletionType::Normal)
+    generate_resume_impl(
+        cx,
+        generator,
+        completion_value,
+        GeneratorCompletionType::Normal,
+    )
 }
 
 fn generate_resume_impl(

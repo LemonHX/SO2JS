@@ -21,8 +21,11 @@ pub struct GeneratorPrototype;
 impl GeneratorPrototype {
     /// The %GeneratorPrototype% Object (https://tc39.es/ecma262/#sec-properties-of-generator-prototype)
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::IteratorPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::IteratorPrototype)),
+            true,
+        )?;
 
         // Constructor property is added once GeneratorFunctionPrototype is created
 

@@ -1,5 +1,6 @@
-use std::str::FromStr;
-
+use alloc::string::String;
+use alloc::vec::Vec;
+use core::str::FromStr;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
@@ -37,7 +38,11 @@ impl StringLexer {
     pub fn new(string: Handle<StringValue>) -> AllocResult<StringLexer> {
         let iter = string.iter_code_units()?;
         let prev_ptr = iter.ptr();
-        let mut lexer = StringLexer { iter, prev_ptr, current: None };
+        let mut lexer = StringLexer {
+            iter,
+            prev_ptr,
+            current: None,
+        };
 
         // Prime the lexer
         lexer.advance();
@@ -356,7 +361,9 @@ fn non_decimal_literal_with_base(
     // Reparse as a BigInt if overflow occurred
     if overflows_u64 {
         let end_ptr = lexer.current_ptr();
-        return Some(parse_between_ptrs_to_f64_overflowing(lexer, base, start_ptr, end_ptr));
+        return Some(parse_between_ptrs_to_f64_overflowing(
+            lexer, base, start_ptr, end_ptr,
+        ));
     }
 
     Some(value as f64)
@@ -604,8 +611,8 @@ pub fn parse_between_ptrs_to_f64(
         // is guaranteed that all code units are ASCII).
         let str = unsafe {
             let bytes =
-                std::slice::from_raw_parts(start_ptr, end_ptr.offset_from(start_ptr) as usize);
-            std::str::from_utf8_unchecked(bytes)
+                core::slice::from_raw_parts(start_ptr, end_ptr.offset_from(start_ptr) as usize);
+            core::str::from_utf8_unchecked(bytes)
         };
 
         f64::from_str(str).unwrap()
@@ -614,7 +621,7 @@ pub fn parse_between_ptrs_to_f64(
         let start_ptr = start_ptr as *const u16;
         let end_ptr = end_ptr as *const u16;
         let code_units = unsafe {
-            std::slice::from_raw_parts(start_ptr, end_ptr.offset_from(start_ptr) as usize)
+            core::slice::from_raw_parts(start_ptr, end_ptr.offset_from(start_ptr) as usize)
         };
 
         let mut utf8_string = String::with_capacity(code_units.len());
@@ -638,7 +645,7 @@ pub fn parse_between_ptrs_to_f64_overflowing(
     if lexer.width() == StringWidth::OneByte {
         // If string is one-byte we can directly parse slice
         let slice = unsafe {
-            std::slice::from_raw_parts(start_ptr, end_ptr.offset_from(start_ptr) as usize)
+            core::slice::from_raw_parts(start_ptr, end_ptr.offset_from(start_ptr) as usize)
         };
 
         // Guaranteed to return a valid f64 as BigInt -> f64 conversion always succeeds
@@ -648,7 +655,7 @@ pub fn parse_between_ptrs_to_f64_overflowing(
         let start_ptr = start_ptr as *const u16;
         let end_ptr = end_ptr as *const u16;
         let code_units = unsafe {
-            std::slice::from_raw_parts(start_ptr, end_ptr.offset_from(start_ptr) as usize)
+            core::slice::from_raw_parts(start_ptr, end_ptr.offset_from(start_ptr) as usize)
         };
 
         let u8_slice = code_units

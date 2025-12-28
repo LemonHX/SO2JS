@@ -1,15 +1,3 @@
-use std::{
-    cell::Cell,
-    cmp::Ordering,
-    collections::hash_map::DefaultHasher,
-    convert::TryFrom,
-    fmt::{self, Write},
-    hash::{self, Hash, Hasher},
-    mem::{align_of, size_of},
-    num::NonZeroU32,
-    ptr::copy_nonoverlapping,
-};
-
 use crate::{
     common::{
         string::StringWidth,
@@ -27,6 +15,23 @@ use crate::{
     runtime::alloc_error::AllocResult,
     set_uninit, static_assert,
 };
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
+use alloc::borrow::ToOwned;
+use core::hash::BuildHasher;
+use core::{
+    cell::Cell,
+    cmp::Ordering,
+    convert::TryFrom,
+    fmt::{self, Write},
+    hash::{self, Hash, Hasher},
+    mem::{align_of, size_of},
+    num::NonZeroU32,
+    ptr::copy_nonoverlapping,
+};
+use hashbrown::DefaultHashBuilder;
 
 use super::{
     debug_print::{DebugPrint, DebugPrinter},
@@ -285,7 +290,10 @@ impl Handle<StringValue> {
                 let mut search_string_code_units = search_string_code_units.clone();
 
                 loop {
-                    match (string_code_units.next_back(), search_string_code_units.next_back()) {
+                    match (
+                        string_code_units.next_back(),
+                        search_string_code_units.next_back(),
+                    ) {
                         // If we reach the start of the search string we must have a match
                         (_, None) => return Ok(Some(current_index)),
                         (Some(code_unit_1), Some(code_unit_2)) if code_unit_1 == code_unit_2 => {
@@ -450,7 +458,7 @@ impl Handle<StringValue> {
                 // Must copy into a temporary buffer as GC may occur
                 let buf = unsafe {
                     let length = end_ptr.offset_from(start_ptr);
-                    std::slice::from_raw_parts(start_ptr, length as usize).to_owned()
+                    core::slice::from_raw_parts(start_ptr, length as usize).to_owned()
                 };
 
                 Ok(FlatString::new_one_byte(cx, &buf)?.as_string().to_handle())
@@ -459,7 +467,7 @@ impl Handle<StringValue> {
                 // Must copy into a temporary buffer as GC may occur
                 let buf = unsafe {
                     let length = (end_ptr as *const u16).offset_from(start_ptr as *const u16);
-                    std::slice::from_raw_parts(start_ptr as *const u16, length as usize).to_owned()
+                    core::slice::from_raw_parts(start_ptr as *const u16, length as usize).to_owned()
                 };
 
                 Ok(FlatString::new_two_byte(cx, &buf)?.as_string().to_handle())
@@ -591,12 +599,16 @@ impl Handle<StringValue> {
         let flat_string = self.flatten()?;
 
         match flat_string.width() {
-            StringWidth::OneByte => {
-                Ok(UnsafeCodeUnitIterator::from_one_byte_slice(*flat_string, start, end))
-            }
-            StringWidth::TwoByte => {
-                Ok(UnsafeCodeUnitIterator::from_two_byte_slice(*flat_string, start, end))
-            }
+            StringWidth::OneByte => Ok(UnsafeCodeUnitIterator::from_one_byte_slice(
+                *flat_string,
+                start,
+                end,
+            )),
+            StringWidth::TwoByte => Ok(UnsafeCodeUnitIterator::from_two_byte_slice(
+                *flat_string,
+                start,
+                end,
+            )),
         }
     }
 
@@ -610,12 +622,16 @@ impl Handle<StringValue> {
         let flat_string = self.flatten()?;
 
         match flat_string.width() {
-            StringWidth::OneByte => {
-                Ok(UnsafeCodePointIterator::from_one_byte_slice(*flat_string, start, end))
-            }
-            StringWidth::TwoByte => {
-                Ok(UnsafeCodePointIterator::from_two_byte_slice(*flat_string, start, end))
-            }
+            StringWidth::OneByte => Ok(UnsafeCodePointIterator::from_one_byte_slice(
+                *flat_string,
+                start,
+                end,
+            )),
+            StringWidth::TwoByte => Ok(UnsafeCodePointIterator::from_two_byte_slice(
+                *flat_string,
+                start,
+                end,
+            )),
         }
     }
 
@@ -726,7 +742,10 @@ impl FlatString {
         let size = Self::calculate_size_in_bytes(len, StringWidth::OneByte);
         let mut string = cx.alloc_uninit_with_size::<FlatString>(size)?;
 
-        set_uninit!(string.descriptor, cx.base_descriptors.get(HeapItemKind::String));
+        set_uninit!(
+            string.descriptor,
+            cx.base_descriptors.get(HeapItemKind::String)
+        );
         set_uninit!(string.len, len);
         set_uninit!(string.kind, StringKind::OneByte);
         set_uninit!(string.is_interned, false);
@@ -749,7 +768,10 @@ impl FlatString {
         let size = Self::calculate_size_in_bytes(len, StringWidth::TwoByte);
         let mut string = cx.alloc_uninit_with_size::<FlatString>(size)?;
 
-        set_uninit!(string.descriptor, cx.base_descriptors.get(HeapItemKind::String));
+        set_uninit!(
+            string.descriptor,
+            cx.base_descriptors.get(HeapItemKind::String)
+        );
         set_uninit!(string.len, len);
         set_uninit!(string.kind, StringKind::TwoByte);
         set_uninit!(string.is_interned, false);
@@ -940,12 +962,16 @@ impl FlatString {
 
     #[inline]
     pub const fn as_one_byte_slice(&self) -> &[u8] {
-        unsafe { std::slice::from_raw_parts(self.one_byte_data(), string_index_to_usize(self.len)) }
+        unsafe {
+            core::slice::from_raw_parts(self.one_byte_data(), string_index_to_usize(self.len))
+        }
     }
 
     #[inline]
     pub const fn as_two_byte_slice(&self) -> &[u16] {
-        unsafe { std::slice::from_raw_parts(self.two_byte_data(), string_index_to_usize(self.len)) }
+        unsafe {
+            core::slice::from_raw_parts(self.two_byte_data(), string_index_to_usize(self.len))
+        }
     }
 
     #[inline]
@@ -1033,7 +1059,8 @@ impl HeapPtr<FlatString> {
             Some(hash_code) => hash_code,
             // Lazily compute and cache hash code
             None => {
-                let mut hasher = DefaultHasher::new();
+                let hasher = DefaultHashBuilder::default();
+                let mut hasher = hasher.build_hasher();
 
                 for code_unit in self.iter_code_units() {
                     code_unit.hash(&mut hasher);
@@ -1194,19 +1221,19 @@ impl hash::Hash for Handle<FlatString> {
 }
 
 impl PartialOrd for HeapPtr<FlatString> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl PartialOrd for Handle<FlatString> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl Ord for HeapPtr<FlatString> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         // Cannot allocate while iterating
         let mut iter1 = self.iter_code_units();
         let mut iter2 = other.iter_code_units();
@@ -1229,7 +1256,7 @@ impl Ord for HeapPtr<FlatString> {
 }
 
 impl Ord for Handle<FlatString> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         (**self).cmp(&**other)
     }
 }
@@ -1266,7 +1293,10 @@ impl ConcatString {
     ) -> AllocResult<Handle<StringValue>> {
         let mut string = cx.alloc_uninit::<ConcatString>()?;
 
-        set_uninit!(string.descriptor, cx.base_descriptors.get(HeapItemKind::String));
+        set_uninit!(
+            string.descriptor,
+            cx.base_descriptors.get(HeapItemKind::String)
+        );
         set_uninit!(string.len, len);
         set_uninit!(string.kind, StringKind::Concat);
         set_uninit!(string.width, width);
@@ -1305,11 +1335,15 @@ pub struct UnsafeCodeUnitIterator {
 
 impl UnsafeCodeUnitIterator {
     fn new_one_byte(ptr: *const u8, end: *const u8) -> Self {
-        Self { iter: CodeUnitIterator::new_one_byte(ptr, end) }
+        Self {
+            iter: CodeUnitIterator::new_one_byte(ptr, end),
+        }
     }
 
     fn new_two_byte(ptr: *const u16, end: *const u16) -> Self {
-        Self { iter: CodeUnitIterator::new_two_byte(ptr, end) }
+        Self {
+            iter: CodeUnitIterator::new_two_byte(ptr, end),
+        }
     }
 
     fn from_one_byte(string: HeapPtr<FlatString>) -> Self {
@@ -1384,7 +1418,10 @@ pub struct SafeCodeUnitIterator {
 
 impl SafeCodeUnitIterator {
     fn from_string(string: Handle<FlatString>) -> Self {
-        SafeCodeUnitIterator { string: *string, index: 0 }
+        SafeCodeUnitIterator {
+            string: *string,
+            index: 0,
+        }
     }
 }
 

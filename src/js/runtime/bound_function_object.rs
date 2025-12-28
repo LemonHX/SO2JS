@@ -1,5 +1,3 @@
-use crate::runtime::alloc_error::AllocResult;
-
 use super::{
     abstract_operations::{call_object, construct, length_of_array_like},
     array_object::{create_array_from_list, ArrayObject},
@@ -13,6 +11,9 @@ use super::{
     value::Value,
     Context, Handle,
 };
+use crate::runtime::alloc_error::AllocResult;
+use alloc::vec;
+use alloc::vec::Vec;
 
 pub struct BoundFunctionObject;
 

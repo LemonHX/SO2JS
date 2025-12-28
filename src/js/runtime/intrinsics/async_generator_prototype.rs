@@ -47,7 +47,12 @@ impl AsyncGeneratorPrototype {
         object.set_property(
             cx,
             to_string_tag_key,
-            Property::data(cx.names.async_generator().as_string().into(), false, false, true),
+            Property::data(
+                cx.names.async_generator().as_string().into(),
+                false,
+                false,
+                true,
+            ),
         )?;
 
         Ok(object)
@@ -72,7 +77,12 @@ impl AsyncGeneratorPrototype {
         // Immediately return if generator was already complete
         if state == AsyncGeneratorState::Completed {
             let iter_result = create_iter_result_object(cx, cx.undefined(), true)?;
-            must!(call_object(cx, capability.resolve(), cx.undefined(), &[iter_result]));
+            must!(call_object(
+                cx,
+                capability.resolve(),
+                cx.undefined(),
+                &[iter_result]
+            ));
             return Ok(capability.promise().as_value());
         }
 
@@ -142,7 +152,12 @@ impl AsyncGeneratorPrototype {
 
         // Throw on a completed generator rejects the promise
         if state == AsyncGeneratorState::Completed {
-            must!(call_object(cx, capability.reject(), cx.undefined(), &[error]));
+            must!(call_object(
+                cx,
+                capability.reject(),
+                cx.undefined(),
+                &[error]
+            ));
             return Ok(capability.promise().as_value());
         }
 

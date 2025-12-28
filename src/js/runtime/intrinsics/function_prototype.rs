@@ -1,3 +1,4 @@
+use super::{intrinsics::Intrinsic, rust_runtime::return_undefined};
 use crate::{
     must,
     runtime::{
@@ -22,8 +23,9 @@ use crate::{
         Context, Handle, HeapPtr, Value,
     },
 };
-
-use super::{intrinsics::Intrinsic, rust_runtime::return_undefined};
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
 
 pub struct FunctionPrototype {}
 

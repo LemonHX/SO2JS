@@ -1,5 +1,4 @@
 use crate::{
-    common::error::FormatOptions,
     eval_err,
     parser::{LocalizedParseError, LocalizedParseErrors},
     runtime::{
@@ -7,6 +6,8 @@ use crate::{
         eval_result::EvalError,
     },
 };
+use alloc::string::String;
+use alloc::{borrow::ToOwned, format};
 
 use super::{
     bytecode::generator::EmitError,
@@ -66,16 +67,17 @@ impl From<AllocError> for BsError {
 }
 
 impl BsError {
-    pub fn format(&self, cx: Context, opts: &FormatOptions) -> String {
+    pub fn format(&self, cx: Context) -> String {
         match self {
-            BsError::Parse(error) => error.format(opts),
-            BsError::Analyze(errors) => errors.format(opts),
-            BsError::Emit(error) => error.format(opts),
-            BsError::Eval(EvalError::Value(error)) => to_console_string(cx, *error, opts)
-                .unwrap_or_else(|_| format_oom_error_message(opts)),
-            BsError::Alloc(error) => error.format(opts),
+            BsError::Parse(error) => error.format(),
+            BsError::Analyze(errors) => errors.format(),
+            BsError::Emit(error) => error.format(),
+            BsError::Eval(EvalError::Value(error)) => {
+                to_console_string(cx, *error).unwrap_or_else(|_| format_oom_error_message())
+            }
+            BsError::Alloc(error) => error.format(),
             #[cfg(feature = "alloc_error")]
-            BsError::Eval(EvalError::Alloc(error)) => error.format(opts),
+            BsError::Eval(EvalError::Alloc(error)) => error.format(),
         }
     }
 }
@@ -131,7 +133,7 @@ pub fn err_assign_constant<T>(cx: Context, name: HeapPtr<FlatString>) -> EvalRes
     type_error(cx, &format!("can't assign constant `{name}`"))
 }
 
-pub fn err_cannot_set_property<T>(cx: Context, name: impl std::fmt::Display) -> EvalResult<T> {
+pub fn err_cannot_set_property<T>(cx: Context, name: impl core::fmt::Display) -> EvalResult<T> {
     type_error(cx, &format!("can't set property {name}"))
 }
 

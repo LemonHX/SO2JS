@@ -1,8 +1,8 @@
-use std::{
+use alloc::vec::Vec;
+use core::{
     mem::{size_of, transmute_copy},
     num::NonZeroU32,
 };
-
 use rand::Rng;
 
 use crate::{handle_scope_guard, runtime::alloc_error::AllocResult, set_uninit};
@@ -72,7 +72,7 @@ macro_rules! extend_object_without_conversions {
             is_extensible_field: bool,
 
             // Stable hash code for this object, since object can be moved by GC. Lazily initialized.
-            hash_code: Option<std::num::NonZeroU32>,
+            hash_code: Option<core::num::NonZeroU32>,
 
             // Child fields
             $($field_vis $field_name: $field_type,)*
@@ -178,7 +178,10 @@ impl ObjectValue {
     ) -> AllocResult<Handle<ObjectValue>> {
         let mut object = cx.alloc_uninit::<ObjectValue>()?;
 
-        set_uninit!(object.descriptor, cx.base_descriptors.get(HeapItemKind::OrdinaryObject));
+        set_uninit!(
+            object.descriptor,
+            cx.base_descriptors.get(HeapItemKind::OrdinaryObject)
+        );
         set_uninit!(object.prototype, prototype.map(|p| *p));
         set_uninit!(object.named_properties, cx.default_named_properties);
         set_uninit!(object.array_properties, cx.default_array_properties);
@@ -322,8 +325,8 @@ impl HeapPtr<ObjectValue> {
         match self.hash_code {
             Some(hash_code) => hash_code,
             None => {
-                // May be called from std::hash::Hash so cannot pass in Context
-                let hash_code = self.cx().rand.gen::<NonZeroU32>();
+                // May be called from core::hash::Hash so cannot pass in Context
+                let hash_code = self.cx().rand.random::<NonZeroU32>();
                 self.hash_code = Some(hash_code);
                 hash_code
             }
@@ -453,14 +456,22 @@ impl Handle<ObjectValue> {
         handle_scope_guard!(cx);
 
         let length_value = cx.smi(length);
-        self.set_property(cx, cx.names.length(), Property::data(length_value, false, false, true))
+        self.set_property(
+            cx,
+            cx.names.length(),
+            Property::data(length_value, false, false, true),
+        )
     }
 
     pub fn intrinsic_name_prop(&mut self, mut cx: Context, name: &str) -> AllocResult<()> {
         handle_scope_guard!(cx);
 
         let name_value = cx.alloc_string(name)?.into();
-        self.set_property(cx, cx.names.name(), Property::data(name_value, false, false, true))
+        self.set_property(
+            cx,
+            cx.names.name(),
+            Property::data(name_value, false, false, true),
+        )
     }
 
     pub fn intrinsic_getter(
@@ -474,7 +485,11 @@ impl Handle<ObjectValue> {
 
         let getter = BuiltinFunction::create(cx, func, 0, name, realm, Some("get"))?;
         let accessor_value = Accessor::new(cx, Some(getter), None)?;
-        self.set_property(cx, name, Property::accessor(accessor_value.into(), false, true))
+        self.set_property(
+            cx,
+            name,
+            Property::accessor(accessor_value.into(), false, true),
+        )
     }
 
     pub fn intrinsic_getter_and_setter(
@@ -490,7 +505,11 @@ impl Handle<ObjectValue> {
         let getter = BuiltinFunction::create(cx, getter, 0, name, realm, Some("get"))?;
         let setter = BuiltinFunction::create(cx, setter, 1, name, realm, Some("set"))?;
         let accessor_value = Accessor::new(cx, Some(getter), Some(setter))?;
-        self.set_property(cx, name, Property::accessor(accessor_value.into(), false, true))
+        self.set_property(
+            cx,
+            name,
+            Property::accessor(accessor_value.into(), false, true),
+        )
     }
 
     pub fn intrinsic_func(
@@ -738,7 +757,7 @@ impl BsIndexMapField<PropertyKey, HeapProperty> for NamedPropertiesMapField {
     }
 }
 
-// Same layout as in std::raw, which is not exposed in stable. This definition is only used
+// Same layout as in core::raw, which is not exposed in stable. This definition is only used
 // to properly type our custom trait object creation.
 #[repr(C)]
 struct ObjectTraitObject {
@@ -819,24 +838,74 @@ impl_subtype_casts!(
     is_boolean_object,
     as_boolean_object
 );
-impl_subtype_casts!(NumberObject, HeapItemKind::NumberObject, is_number_object, as_number_object);
-impl_subtype_casts!(StringObject, HeapItemKind::StringObject, is_string_object, as_string_object);
-impl_subtype_casts!(SymbolObject, HeapItemKind::SymbolObject, is_symbol_object, as_symbol_object);
-impl_subtype_casts!(BigIntObject, HeapItemKind::BigIntObject, is_bigint_object, as_bigint_object);
-impl_subtype_casts!(DateObject, HeapItemKind::DateObject, is_date_object, as_date_object);
-impl_subtype_casts!(RegExpObject, HeapItemKind::RegExpObject, is_regexp_object, as_regexp_object);
+impl_subtype_casts!(
+    NumberObject,
+    HeapItemKind::NumberObject,
+    is_number_object,
+    as_number_object
+);
+impl_subtype_casts!(
+    StringObject,
+    HeapItemKind::StringObject,
+    is_string_object,
+    as_string_object
+);
+impl_subtype_casts!(
+    SymbolObject,
+    HeapItemKind::SymbolObject,
+    is_symbol_object,
+    as_symbol_object
+);
+impl_subtype_casts!(
+    BigIntObject,
+    HeapItemKind::BigIntObject,
+    is_bigint_object,
+    as_bigint_object
+);
+impl_subtype_casts!(
+    DateObject,
+    HeapItemKind::DateObject,
+    is_date_object,
+    as_date_object
+);
+impl_subtype_casts!(
+    RegExpObject,
+    HeapItemKind::RegExpObject,
+    is_regexp_object,
+    as_regexp_object
+);
 impl_subtype_casts!(Closure, HeapItemKind::Closure, is_closure, as_closure);
-impl_subtype_casts!(MapObject, HeapItemKind::MapObject, is_map_object, as_map_object);
-impl_subtype_casts!(SetObject, HeapItemKind::SetObject, is_set_object, as_set_object);
+impl_subtype_casts!(
+    MapObject,
+    HeapItemKind::MapObject,
+    is_map_object,
+    as_map_object
+);
+impl_subtype_casts!(
+    SetObject,
+    HeapItemKind::SetObject,
+    is_set_object,
+    as_set_object
+);
 impl_subtype_casts!(
     ArrayBufferObject,
     HeapItemKind::ArrayBufferObject,
     is_array_buffer,
     as_array_buffer
 );
-impl_subtype_casts!(DataViewObject, HeapItemKind::DataViewObject, is_data_view, as_data_view);
+impl_subtype_casts!(
+    DataViewObject,
+    HeapItemKind::DataViewObject,
+    is_data_view,
+    as_data_view
+);
 impl_subtype_casts!(ProxyObject, HeapItemKind::Proxy, is_proxy, as_proxy);
-impl_subtype_casts!(GeneratorObject, HeapItemKind::Generator, is_generator, as_generator);
+impl_subtype_casts!(
+    GeneratorObject,
+    HeapItemKind::Generator,
+    is_generator,
+    as_generator
+);
 impl_subtype_casts!(
     AsyncGeneratorObject,
     HeapItemKind::AsyncGenerator,

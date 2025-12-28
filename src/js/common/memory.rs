@@ -3,10 +3,10 @@
 macro_rules! field_offset {
     ($base_type:ty, $field_name:ident) => {{
         const FIELD_OFFSET: usize = unsafe {
-            let base_uninit = std::mem::MaybeUninit::uninit();
+            let base_uninit = core::mem::MaybeUninit::uninit();
             let base_ptr: *const $base_type = base_uninit.as_ptr();
 
-            let field_ptr = std::ptr::addr_of!((*base_ptr).$field_name);
+            let field_ptr = core::ptr::addr_of!((*base_ptr).$field_name);
 
             (field_ptr as *const u8).offset_from(base_ptr as *const u8) as usize
         };
@@ -21,7 +21,7 @@ macro_rules! set_uninit {
     ($field:expr, $value:expr) => {
         #[allow(clippy::macro_metavars_in_unsafe)]
         unsafe {
-            std::ptr::addr_of_mut!($field).write($value)
+            core::ptr::addr_of_mut!($field).write($value)
         }
     };
 }

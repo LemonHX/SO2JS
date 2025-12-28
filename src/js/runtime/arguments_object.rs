@@ -1,6 +1,6 @@
-use std::mem::size_of;
-
+use alloc::vec::Vec;
 use brimstone_macros::wrap_ordinary_object;
+use core::mem::size_of;
 
 use crate::{
     extend_object, field_offset, must,
@@ -116,23 +116,43 @@ impl MappedArgumentsObject {
         // Set indexed argument properties
         for (i, argument) in arguments.iter().enumerate() {
             index_key.replace(PropertyKey::array_index(cx, i as u32)?);
-            must!(create_data_property_or_throw(cx, object.into(), index_key, *argument));
+            must!(create_data_property_or_throw(
+                cx,
+                object.into(),
+                index_key,
+                *argument
+            ));
         }
 
         // Set length property
         let length_value = Value::from(arguments.len()).to_handle(cx);
         let length_desc = PropertyDescriptor::data(length_value, true, false, true);
-        must!(define_property_or_throw(cx, object.into(), cx.names.length(), length_desc));
+        must!(define_property_or_throw(
+            cx,
+            object.into(),
+            cx.names.length(),
+            length_desc
+        ));
 
         // Set @@iterator to Array.prototype.values
         let iterator_key = cx.well_known_symbols.iterator();
         let iterator_value = cx.get_intrinsic(Intrinsic::ArrayPrototypeValues);
         let iterator_desc = PropertyDescriptor::data(iterator_value.into(), true, false, true);
-        must!(define_property_or_throw(cx, object.into(), iterator_key, iterator_desc));
+        must!(define_property_or_throw(
+            cx,
+            object.into(),
+            iterator_key,
+            iterator_desc
+        ));
 
         // Set callee property to the enclosing function
         let callee_desc = PropertyDescriptor::data(callee.into(), true, false, true);
-        must!(define_property_or_throw(cx, object.into(), cx.names.callee(), callee_desc));
+        must!(define_property_or_throw(
+            cx,
+            object.into(),
+            cx.names.callee(),
+            callee_desc
+        ));
 
         Ok(())
     }
@@ -212,7 +232,12 @@ impl VirtualObject for Handle<MappedArgumentsObject> {
             }
         }
 
-        if !must!(ordinary_define_own_property(cx, self.as_object(), key, new_arg_desc)) {
+        if !must!(ordinary_define_own_property(
+            cx,
+            self.as_object(),
+            key,
+            new_arg_desc
+        )) {
             return Ok(false);
         }
 
@@ -291,7 +316,12 @@ pub fn create_unmapped_arguments_object(
     // Set length property
     let length_value = cx.smi(arguments.len() as i32);
     let length_desc = PropertyDescriptor::data(length_value, true, false, true);
-    must!(define_property_or_throw(cx, object, cx.names.length(), length_desc));
+    must!(define_property_or_throw(
+        cx,
+        object,
+        cx.names.length(),
+        length_desc
+    ));
 
     // Property key is shared between iterations
     let mut index_key = PropertyKey::uninit().to_handle(cx);
@@ -299,20 +329,32 @@ pub fn create_unmapped_arguments_object(
     // Set indexed argument properties
     for (i, argument) in arguments.iter().enumerate() {
         index_key.replace(PropertyKey::array_index(cx, i as u32)?);
-        must!(create_data_property_or_throw(cx, object, index_key, *argument));
+        must!(create_data_property_or_throw(
+            cx, object, index_key, *argument
+        ));
     }
 
     // Set @@iterator to Array.prototype.values
     let iterator_key = cx.well_known_symbols.iterator();
     let iterator_value = cx.get_intrinsic(Intrinsic::ArrayPrototypeValues);
     let iterator_desc = PropertyDescriptor::data(iterator_value.into(), true, false, true);
-    must!(define_property_or_throw(cx, object, iterator_key, iterator_desc));
+    must!(define_property_or_throw(
+        cx,
+        object,
+        iterator_key,
+        iterator_desc
+    ));
 
     // Set callee to throw a type error when accessed
     let throw_type_error = cx.get_intrinsic(Intrinsic::ThrowTypeError);
     let callee_desc =
         PropertyDescriptor::accessor(Some(throw_type_error), Some(throw_type_error), false, false);
-    must!(define_property_or_throw(cx, object, cx.names.callee(), callee_desc));
+    must!(define_property_or_throw(
+        cx,
+        object,
+        cx.names.callee(),
+        callee_desc
+    ));
 
     Ok(object.into())
 }

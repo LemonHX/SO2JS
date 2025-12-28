@@ -25,6 +25,8 @@ use crate::{
         Context, Handle, Value,
     },
 };
+use alloc::vec;
+use alloc::vec::Vec;
 
 use super::{intrinsics::Intrinsic, map_constructor::add_entries_from_iterable};
 
@@ -50,8 +52,20 @@ impl ObjectConstructor {
 
         func.intrinsic_func(cx, cx.names.assign(), Self::assign, 2, realm)?;
         func.intrinsic_func(cx, cx.names.create(), Self::create, 2, realm)?;
-        func.intrinsic_func(cx, cx.names.define_properties(), Self::define_properties, 2, realm)?;
-        func.intrinsic_func(cx, cx.names.define_property(), Self::define_property, 3, realm)?;
+        func.intrinsic_func(
+            cx,
+            cx.names.define_properties(),
+            Self::define_properties,
+            2,
+            realm,
+        )?;
+        func.intrinsic_func(
+            cx,
+            cx.names.define_property(),
+            Self::define_property,
+            3,
+            realm,
+        )?;
         func.intrinsic_func(cx, cx.names.from_entries(), Self::from_entries, 1, realm)?;
         func.intrinsic_func(
             cx,
@@ -83,7 +97,13 @@ impl ObjectConstructor {
             1,
             realm,
         )?;
-        func.intrinsic_func(cx, cx.names.get_prototype_of(), Self::get_prototype_of, 1, realm)?;
+        func.intrinsic_func(
+            cx,
+            cx.names.get_prototype_of(),
+            Self::get_prototype_of,
+            1,
+            realm,
+        )?;
         func.intrinsic_func(cx, cx.names.group_by(), Self::group_by, 2, realm)?;
         func.intrinsic_func(cx, cx.names.has_own(), Self::has_own, 2, realm)?;
         func.intrinsic_func(cx, cx.names.is(), Self::is, 2, realm)?;
@@ -91,9 +111,21 @@ impl ObjectConstructor {
         func.intrinsic_func(cx, cx.names.is_frozen(), Self::is_frozen, 1, realm)?;
         func.intrinsic_func(cx, cx.names.is_sealed(), Self::is_sealed, 1, realm)?;
         func.intrinsic_func(cx, cx.names.keys(), Self::keys, 1, realm)?;
-        func.intrinsic_func(cx, cx.names.prevent_extensions(), Self::prevent_extensions, 1, realm)?;
+        func.intrinsic_func(
+            cx,
+            cx.names.prevent_extensions(),
+            Self::prevent_extensions,
+            1,
+            realm,
+        )?;
         func.intrinsic_func(cx, cx.names.seal(), Self::seal, 1, realm)?;
-        func.intrinsic_func(cx, cx.names.set_prototype_of(), Self::set_prototype_of, 2, realm)?;
+        func.intrinsic_func(
+            cx,
+            cx.names.set_prototype_of(),
+            Self::set_prototype_of,
+            2,
+            realm,
+        )?;
         func.intrinsic_func(cx, cx.names.values(), Self::values, 1, realm)?;
 
         Ok(func)
@@ -305,7 +337,12 @@ impl ObjectConstructor {
 
         add_entries_from_iterable(cx, object.into(), iterable, |cx, key, value| {
             let property_key = to_property_key(cx, key)?;
-            must!(create_data_property_or_throw(cx, object, property_key, value));
+            must!(create_data_property_or_throw(
+                cx,
+                object,
+                property_key,
+                value
+            ));
             Ok(())
         })
     }
@@ -349,7 +386,12 @@ impl ObjectConstructor {
             let desc = object.get_own_property(cx, key)?;
             if let Some(desc) = desc {
                 let desc_object = from_property_descriptor(cx, desc)?;
-                must!(create_data_property_or_throw(cx, descriptors, key, desc_object.into()));
+                must!(create_data_property_or_throw(
+                    cx,
+                    descriptors,
+                    key,
+                    desc_object.into()
+                ));
             }
         }
 
@@ -438,7 +480,12 @@ impl ObjectConstructor {
         for group in groups {
             let property_key = group.key.cast::<PropertyKey>();
             let items = create_array_from_list(cx, &group.items)?;
-            must!(create_data_property_or_throw(cx, object, property_key, items.into()));
+            must!(create_data_property_or_throw(
+                cx,
+                object,
+                property_key,
+                items.into()
+            ));
         }
 
         Ok(object.as_value())
@@ -466,7 +513,10 @@ impl ObjectConstructor {
         _: Handle<Value>,
         arguments: &[Handle<Value>],
     ) -> EvalResult<Handle<Value>> {
-        let is_same = same_value(get_argument(cx, arguments, 0), get_argument(cx, arguments, 1))?;
+        let is_same = same_value(
+            get_argument(cx, arguments, 0),
+            get_argument(cx, arguments, 1),
+        )?;
         Ok(cx.bool(is_same))
     }
 

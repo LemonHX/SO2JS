@@ -13,6 +13,7 @@ use crate::runtime::{
     type_utilities::to_string,
     Context, Handle, HeapPtr, Value,
 };
+use alloc::string::String;
 
 macro_rules! create_native_error {
     ($native_error:ident, $rust_name:ident, $prototype:ident, $constructor:ident) => {
@@ -138,14 +139,34 @@ macro_rules! create_native_error {
     };
 }
 
-create_native_error!(EvalError, eval_error, EvalErrorPrototype, EvalErrorConstructor);
-create_native_error!(RangeError, range_error, RangeErrorPrototype, RangeErrorConstructor);
+create_native_error!(
+    EvalError,
+    eval_error,
+    EvalErrorPrototype,
+    EvalErrorConstructor
+);
+create_native_error!(
+    RangeError,
+    range_error,
+    RangeErrorPrototype,
+    RangeErrorConstructor
+);
 create_native_error!(
     ReferenceError,
     reference_error,
     ReferenceErrorPrototype,
     ReferenceErrorConstructor
 );
-create_native_error!(SyntaxError, syntax_error, SyntaxErrorPrototype, SyntaxErrorConstructor);
-create_native_error!(TypeError, type_error, TypeErrorPrototype, TypeErrorConstructor);
+create_native_error!(
+    SyntaxError,
+    syntax_error,
+    SyntaxErrorPrototype,
+    SyntaxErrorConstructor
+);
+create_native_error!(
+    TypeError,
+    type_error,
+    TypeErrorPrototype,
+    TypeErrorConstructor
+);
 create_native_error!(URIError, uri_error, URIErrorPrototype, URIErrorConstructor);

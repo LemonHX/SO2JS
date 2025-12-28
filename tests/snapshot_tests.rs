@@ -1,8 +1,5 @@
 use brimstone_core::{
-    common::{
-        error::FormatOptions,
-        options::{Options, OptionsBuilder},
-    },
+    common::options::{Options, OptionsBuilder},
     parser::{self, ast, source::Source, ParseContext},
     runtime::{
         bytecode::generator::{BytecodeProgramGenerator, BytecodeScript},
@@ -93,7 +90,7 @@ fn print_error(path: &str) -> GenericResult<String> {
 
         match result {
             Ok(_) => Err(format!("{path}: Expected an error").into()),
-            Err(err) => Ok(err.format(cx, &FormatOptions::default())),
+            Err(err) => Ok(err.format(cx)),
         }
     })
 }
@@ -111,7 +108,9 @@ fn js_regexp_bytecode_snapshot_tests() -> GenericResult<()> {
     init();
 
     let regexp_bytecode_tests_dir = get_test_root("js_regexp_bytecode");
-    run_snapshot_tests(&regexp_bytecode_tests_dir, &mut |path| print_regexp_bytecode(path))
+    run_snapshot_tests(&regexp_bytecode_tests_dir, &mut |path| {
+        print_regexp_bytecode(path)
+    })
 }
 
 fn print_bytecode(path: &str) -> GenericResult<String> {

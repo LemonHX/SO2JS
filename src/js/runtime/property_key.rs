@@ -1,6 +1,8 @@
-use std::hash;
-
 use crate::runtime::{alloc_error::AllocResult, string_parsing::StringLexer};
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::{borrow::ToOwned, format};
+use core::hash;
 
 use super::{
     gc::{Handle, HandleContents, ToHandleContents},
@@ -29,7 +31,9 @@ pub struct PropertyKey {
 
 impl PropertyKey {
     pub const fn uninit() -> PropertyKey {
-        PropertyKey { value: Value::empty() }
+        PropertyKey {
+            value: Value::empty(),
+        }
     }
 
     #[inline]
@@ -62,7 +66,9 @@ impl PropertyKey {
         // Enforce that all string property keys are interned
         let flat_string = value.flatten()?;
         let interned_string = InternedStrings::get(cx, *flat_string)?.as_string();
-        Ok(PropertyKey { value: interned_string.into() })
+        Ok(PropertyKey {
+            value: interned_string.into(),
+        })
     }
 
     #[inline]
@@ -87,7 +93,9 @@ impl PropertyKey {
         }
 
         // Intentionally store u32 value in i32 smi payload
-        Ok(PropertyKey { value: Value::smi(value as i32) })
+        Ok(PropertyKey {
+            value: Value::smi(value as i32),
+        })
     }
 
     #[inline]
@@ -97,7 +105,9 @@ impl PropertyKey {
     }
 
     pub const fn from_u8(value: u8) -> PropertyKey {
-        PropertyKey { value: Value::smi(value as i32) }
+        PropertyKey {
+            value: Value::smi(value as i32),
+        }
     }
 
     pub fn from_u64(mut cx: Context, value: u64) -> AllocResult<PropertyKey> {
@@ -106,7 +116,9 @@ impl PropertyKey {
             return PropertyKey::string_not_array_index(cx, string_value);
         }
 
-        Ok(PropertyKey { value: Value::smi(value as u32 as i32) })
+        Ok(PropertyKey {
+            value: Value::smi(value as u32 as i32),
+        })
     }
 
     #[inline]

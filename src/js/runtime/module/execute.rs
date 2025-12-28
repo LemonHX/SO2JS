@@ -1,5 +1,3 @@
-use std::{collections::HashMap, path::Path};
-
 use crate::{
     completion_value, eval_err, if_abrupt_reject_promise, must, must_a,
     runtime::{
@@ -26,6 +24,10 @@ use crate::{
         to_string, Context, EvalResult, Handle, PropertyKey, Value,
     },
 };
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
+use hashbrown::HashMap;
 
 use super::{
     import_attributes::ImportAttributes,
@@ -44,31 +46,34 @@ pub fn execute_module(
     let promise_constructor = cx.get_intrinsic(Intrinsic::PromiseConstructor);
     let capability = must_a!(PromiseCapability::new(cx, promise_constructor.into()));
 
-    // Cache the module at its canonical source path
-    let source_file_path = Path::new(&module.source_file_path().to_string())
-        .canonicalize()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string();
+    match &cx.sys {
+        Some(sys) => {
+            // Cache the module at its canonical source path
+            let source_file_path =
+                sys.file_path_canonicalize(&module.source_file_path().to_string());
 
-    // Modules executing directly are assumed to have no attributes
-    let module_cache_key = ModuleCacheKey::new(source_file_path, None);
-    cx.insert_module(module_cache_key, module.as_dyn_module())?;
+            // Modules executing directly are assumed to have no attributes
+            let module_cache_key = ModuleCacheKey::new(source_file_path, None);
+            cx.insert_module(module_cache_key, module.as_dyn_module())?;
 
-    let promise = module.load_requested_modules(cx)?;
+            let promise = module.load_requested_modules(cx)?;
 
-    let on_resolve = callback(cx, load_requested_modules_static_resolve)?;
-    set_module(cx, on_resolve, module)?;
-    set_capability(cx, on_resolve, capability)?;
+            let on_resolve = callback(cx, load_requested_modules_static_resolve)?;
+            set_module(cx, on_resolve, module)?;
+            set_capability(cx, on_resolve, capability)?;
 
-    let on_reject = callback(cx, load_requested_modules_reject)?;
-    set_capability(cx, on_reject, capability)?;
+            let on_reject = callback(cx, load_requested_modules_reject)?;
+            set_capability(cx, on_reject, capability)?;
 
-    perform_promise_then(cx, promise, on_resolve.into(), on_reject.into(), None)?;
+            perform_promise_then(cx, promise, on_resolve.into(), on_reject.into(), None)?;
 
-    // Guaranteed to be a PromiseObject since created with the Promise constructor
-    Ok(capability.promise().cast::<PromiseObject>())
+            // Guaranteed to be a PromiseObject since created with the Promise constructor
+            Ok(capability.promise().cast::<PromiseObject>())
+        }
+        None => {
+            todo!()
+        }
+    }
 }
 
 fn get_module(cx: Context, function: Handle<ObjectValue>) -> Handle<SourceTextModule> {
@@ -147,7 +152,12 @@ pub fn load_requested_modules_static_resolve(
     let capability = get_capability(cx, current_function);
 
     if let Err(error) = completion_value!(module.link(cx)) {
-        must!(call_object(cx, capability.reject(), cx.undefined(), &[error]));
+        must!(call_object(
+            cx,
+            capability.reject(),
+            cx.undefined(),
+            &[error]
+        ));
         return Ok(cx.undefined());
     }
 
@@ -176,7 +186,12 @@ pub fn load_requested_modules_reject(
     let capability = get_capability(cx, current_function);
 
     let error = get_argument(cx, arguments, 0);
-    must!(call_object(cx, capability.reject(), cx.undefined(), &[error]));
+    must!(call_object(
+        cx,
+        capability.reject(),
+        cx.undefined(),
+        &[error]
+    ));
 
     Ok(cx.undefined())
 }
@@ -217,7 +232,10 @@ impl GraphEvaluator {
         cx: Context,
         mut module: Handle<SourceTextModule>,
     ) -> AllocResult<Handle<PromiseObject>> {
-        if matches!(module.state(), ModuleState::Evaluated | ModuleState::EvaluatingAsync) {
+        if matches!(
+            module.state(),
+            ModuleState::Evaluated | ModuleState::EvaluatingAsync
+        ) {
             module = module.cycle_root().unwrap();
         } else {
             debug_assert!(module.state() == ModuleState::Linked);
@@ -263,7 +281,12 @@ impl GraphEvaluator {
 
                 debug_assert!(module.state() == ModuleState::Evaluated);
 
-                must_a!(call_object(cx, capability.reject(), cx.undefined(), &[error]));
+                must_a!(call_object(
+                    cx,
+                    capability.reject(),
+                    cx.undefined(),
+                    &[error]
+                ));
             }
         }
 
@@ -293,7 +316,10 @@ impl GraphEvaluator {
             ModuleEnum::SourceText(module) => module,
         };
 
-        if matches!(module.state(), ModuleState::Evaluated | ModuleState::EvaluatingAsync) {
+        if matches!(
+            module.state(),
+            ModuleState::Evaluated | ModuleState::EvaluatingAsync
+        ) {
             if let Some(error) = module.evaluation_error(cx) {
                 return eval_err!(error);
             } else {
@@ -390,7 +416,10 @@ impl GraphEvaluator {
 
 /// ExecuteAsyncModule (https://tc39.es/ecma262/#sec-execute-async-module)
 fn execute_async_module(mut cx: Context, module: Handle<SourceTextModule>) -> AllocResult<()> {
-    debug_assert!(matches!(module.state(), ModuleState::Evaluating | ModuleState::EvaluatingAsync));
+    debug_assert!(matches!(
+        module.state(),
+        ModuleState::Evaluating | ModuleState::EvaluatingAsync
+    ));
     debug_assert!(module.has_top_level_await());
 
     let promise_constructor = cx.get_intrinsic(Intrinsic::PromiseConstructor);
@@ -440,7 +469,12 @@ pub fn async_module_execution_fulfilled(
     // If an entire cycle has been completed, resolve the top-level capability for the cycle
     if let Some(capability) = module.top_level_capability_ptr() {
         debug_assert!(module.cycle_root_ptr().unwrap().ptr_eq(&module));
-        must!(call_object(cx, capability.resolve(), cx.undefined(), &[cx.undefined()]));
+        must!(call_object(
+            cx,
+            capability.resolve(),
+            cx.undefined(),
+            &[cx.undefined()]
+        ));
     }
 
     // Gather available ancestors
@@ -474,7 +508,12 @@ pub fn async_module_execution_fulfilled(
 
         if let Some(capability) = ancestor.top_level_capability_ptr() {
             debug_assert!(ancestor.cycle_root_ptr().unwrap().ptr_eq(&ancestor));
-            must!(call_object(cx, capability.resolve(), cx.undefined(), &[cx.undefined()]));
+            must!(call_object(
+                cx,
+                capability.resolve(),
+                cx.undefined(),
+                &[cx.undefined()]
+            ));
         }
     }
 
@@ -551,7 +590,12 @@ fn async_module_execution_rejected(
     // If entire cycle has been completed, reject the top-level capability for the cycle
     if let Some(capability) = module.top_level_capability_ptr() {
         debug_assert!(module.cycle_root_ptr().unwrap().ptr_eq(&module));
-        must_a!(call_object(cx, capability.reject(), cx.undefined(), &[error]));
+        must_a!(call_object(
+            cx,
+            capability.reject(),
+            cx.undefined(),
+            &[error]
+        ));
     }
 
     Ok(())
@@ -590,7 +634,12 @@ pub fn dynamic_import(
     if !options.is_undefined() {
         if !options.is_object() {
             let error = type_error_value(cx, "Import options must be an object")?;
-            must!(call_object(cx, capability.reject(), cx.undefined(), &[error]));
+            must!(call_object(
+                cx,
+                capability.reject(),
+                cx.undefined(),
+                &[error]
+            ));
             return Ok(capability.promise());
         }
 
@@ -601,7 +650,12 @@ pub fn dynamic_import(
         if !attributes_object.is_undefined() {
             if !attributes_object.is_object() {
                 let error = type_error_value(cx, "Import attributes must be an object")?;
-                must!(call_object(cx, capability.reject(), cx.undefined(), &[error]));
+                must!(call_object(
+                    cx,
+                    capability.reject(),
+                    cx.undefined(),
+                    &[error]
+                ));
                 return Ok(capability.promise());
             }
 
@@ -620,7 +674,12 @@ pub fn dynamic_import(
 
                 if !value.is_string() {
                     let error = type_error_value(cx, "Import attribute values must be strings")?;
-                    must!(call_object(cx, capability.reject(), cx.undefined(), &[error]));
+                    must!(call_object(
+                        cx,
+                        capability.reject(),
+                        cx.undefined(),
+                        &[error]
+                    ));
                     return Ok(capability.promise());
                 }
 
@@ -650,7 +709,10 @@ pub fn dynamic_import(
     let specifier = specifier.flatten()?;
     let specifier = InternedStrings::get(cx, *specifier)?.to_handle();
 
-    let module_request = ModuleRequest { specifier, attributes };
+    let module_request = ModuleRequest {
+        specifier,
+        attributes,
+    };
 
     let load_completion =
         host_load_imported_module(cx, source_file_path, module_request, cx.current_realm());
@@ -668,7 +730,12 @@ fn continue_dynamic_import(
     let module = match completion_value!(load_completion) {
         Ok(module) => module,
         Err(error) => {
-            must_a!(call_object(cx, capability.reject(), cx.undefined(), &[error]));
+            must_a!(call_object(
+                cx,
+                capability.reject(),
+                cx.undefined(),
+                &[error]
+            ));
             return Ok(());
         }
     };
@@ -698,7 +765,12 @@ pub fn load_requested_modules_dynamic_resolve(
     let capability = get_capability(cx, current_function);
 
     if let Err(error) = completion_value!(module.link(cx)) {
-        must!(call_object(cx, capability.reject(), cx.undefined(), &[error]));
+        must!(call_object(
+            cx,
+            capability.reject(),
+            cx.undefined(),
+            &[error]
+        ));
         return Ok(cx.undefined());
     }
 
@@ -727,7 +799,13 @@ pub fn load_requested_modules_dynamic_resolve(
     let on_reject = callback(cx, load_requested_modules_reject)?;
     set_capability(cx, on_reject, capability)?;
 
-    perform_promise_then(cx, evaluate_promise, on_resolve.into(), on_reject.into(), None)?;
+    perform_promise_then(
+        cx,
+        evaluate_promise,
+        on_resolve.into(),
+        on_reject.into(),
+        None,
+    )?;
 
     Ok(cx.undefined())
 }

@@ -1,13 +1,14 @@
-use crate::{
-    must, must_a,
-    runtime::{alloc_error::AllocResult, EvalResult},
-};
-
 use super::{
     abstract_operations::define_property_or_throw, object_value::ObjectValue,
     property_descriptor::PropertyDescriptor, property_key::PropertyKey, string_value::StringValue,
     value::Value, Context, Handle,
 };
+use crate::{
+    must, must_a,
+    runtime::{alloc_error::AllocResult, EvalResult},
+};
+use alloc::format;
+use core::error::Error;
 
 /// SetFunctionName (https://tc39.es/ecma262/#sec-setfunctionname)
 pub fn set_function_name(
@@ -33,7 +34,11 @@ pub fn build_function_name(
         let symbol = name.as_symbol();
         if let Some(description) = symbol.description() {
             if symbol.is_private() {
-                StringValue::concat(cx, cx.alloc_string("#")?.as_string(), description.as_string())?
+                StringValue::concat(
+                    cx,
+                    cx.alloc_string("#")?.as_string(),
+                    description.as_string(),
+                )?
             } else {
                 let left_paren = cx.alloc_string("[")?.as_string();
                 let right_paren = cx.alloc_string("]")?.as_string();

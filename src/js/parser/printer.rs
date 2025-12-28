@@ -1,5 +1,3 @@
-use crate::common::unicode::to_string_or_unicode_escape_sequence;
-
 use super::ast::*;
 use super::loc::{find_line_col_for_pos, Loc};
 use super::parser::ParseProgramResult;
@@ -9,6 +7,10 @@ use super::regexp::{
     StringDisjunction, Term,
 };
 use super::source::Source;
+use crate::common::unicode::to_string_or_unicode_escape_sequence;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 struct Printer<'a> {
     buf: String,
@@ -18,7 +20,11 @@ struct Printer<'a> {
 
 impl<'a> Printer<'a> {
     fn new(source: &'a Source) -> Printer<'a> {
-        Printer { buf: String::new(), indent: 0, source }
+        Printer {
+            buf: String::new(),
+            indent: 0,
+            source,
+        }
     }
 
     fn finish(self) -> String {
@@ -86,7 +92,9 @@ impl<'a> Printer<'a> {
 
         // Write loc as string in concise format
         self.indent();
-        self.string(&format!("loc: \"{start_line}:{start_col}-{end_line}:{end_col}\",\n"));
+        self.string(&format!(
+            "loc: \"{start_line}:{start_col}-{end_line}:{end_col}\",\n"
+        ));
     }
 
     fn start_regexp_node(&mut self, name: &str) {
@@ -207,7 +215,11 @@ impl<'a> Printer<'a> {
     fn print_function(&mut self, func: &Function, name: &str) {
         self.start_node(name, &func.loc);
         self.property("id", func.id.as_ref(), Printer::print_optional_identifier);
-        self.array_property("params", func.params.as_ref(), Printer::print_function_param);
+        self.array_property(
+            "params",
+            func.params.as_ref(),
+            Printer::print_function_param,
+        );
         self.property("body", func.body.as_ref(), Printer::print_function_body);
         self.property("async", func.is_async(), Printer::print_bool);
         self.property("generator", func.is_generator(), Printer::print_bool);
@@ -278,7 +290,11 @@ impl<'a> Printer<'a> {
             self.property("key", &method.key, Printer::print_outer_expression);
         }
 
-        self.property("value", method.value.as_ref(), Printer::print_function_expression);
+        self.property(
+            "value",
+            method.value.as_ref(),
+            Printer::print_function_expression,
+        );
         self.property("kind", method.kind, Printer::print_class_method_kind);
         self.property("computed", method.is_computed, Printer::print_bool);
         self.property("static", method.is_static, Printer::print_bool);
@@ -305,7 +321,11 @@ impl<'a> Printer<'a> {
             self.property("key", &prop.key, Printer::print_outer_expression);
         }
 
-        self.property("value", prop.value.as_ref(), Printer::print_optional_outer_expression);
+        self.property(
+            "value",
+            prop.value.as_ref(),
+            Printer::print_optional_outer_expression,
+        );
         self.property("computed", prop.is_computed, Printer::print_bool);
         self.property("static", prop.is_static, Printer::print_bool);
         self.end_node();
@@ -338,20 +358,32 @@ impl<'a> Printer<'a> {
         self.start_node("IfStatement", &stmt.loc);
         self.property("test", &stmt.test, Printer::print_outer_expression);
         self.property("consequent", &stmt.conseq, Printer::print_statement);
-        self.property("alternate", stmt.altern.as_ref(), Printer::print_optional_statement);
+        self.property(
+            "alternate",
+            stmt.altern.as_ref(),
+            Printer::print_optional_statement,
+        );
         self.end_node();
     }
 
     fn print_switch_statement(&mut self, stmt: &SwitchStatement) {
         self.start_node("SwitchStatement", &stmt.loc);
-        self.property("discriminant", &stmt.discriminant, Printer::print_outer_expression);
+        self.property(
+            "discriminant",
+            &stmt.discriminant,
+            Printer::print_outer_expression,
+        );
         self.array_property("cases", stmt.cases.as_ref(), Printer::print_switch_case);
         self.end_node();
     }
 
     fn print_switch_case(&mut self, case: &SwitchCase) {
         self.start_node("SwitchCase", &case.loc);
-        self.property("test", case.test.as_ref(), Printer::print_optional_outer_expression);
+        self.property(
+            "test",
+            case.test.as_ref(),
+            Printer::print_optional_outer_expression,
+        );
         self.array_property("body", case.body.as_ref(), Printer::print_statement);
         self.end_node();
     }
@@ -359,8 +391,16 @@ impl<'a> Printer<'a> {
     fn print_for_statement(&mut self, stmt: &ForStatement) {
         self.start_node("ForStatement", &stmt.loc);
         self.property("init", stmt.init.as_ref(), Printer::print_for_init);
-        self.property("test", stmt.test.as_ref(), Printer::print_optional_outer_expression);
-        self.property("update", stmt.update.as_ref(), Printer::print_optional_outer_expression);
+        self.property(
+            "test",
+            stmt.test.as_ref(),
+            Printer::print_optional_outer_expression,
+        );
+        self.property(
+            "update",
+            stmt.update.as_ref(),
+            Printer::print_optional_outer_expression,
+        );
         self.property("body", &stmt.body, Printer::print_statement);
         self.end_node();
     }
@@ -423,15 +463,27 @@ impl<'a> Printer<'a> {
     fn print_try_statement(&mut self, stmt: &TryStatement) {
         self.start_node("TryStatement", &stmt.loc);
         self.property("block", stmt.block.as_ref(), Printer::print_block);
-        self.property("handler", stmt.handler.as_deref(), Printer::print_try_handler);
-        self.property("finalizer", stmt.finalizer.as_ref(), Printer::print_optional_block);
+        self.property(
+            "handler",
+            stmt.handler.as_deref(),
+            Printer::print_try_handler,
+        );
+        self.property(
+            "finalizer",
+            stmt.finalizer.as_ref(),
+            Printer::print_optional_block,
+        );
         self.end_node();
     }
 
     fn print_try_handler(&mut self, handler: Option<&CatchClause>) {
         if let Some(handler) = handler {
             self.start_node("CatchClause", &handler.loc);
-            self.property("param", handler.param.as_ref(), Printer::print_optional_pattern);
+            self.property(
+                "param",
+                handler.param.as_ref(),
+                Printer::print_optional_pattern,
+            );
             self.property("body", handler.body.as_ref(), Printer::print_block);
             self.end_node();
         } else {
@@ -447,7 +499,11 @@ impl<'a> Printer<'a> {
 
     fn print_return_statement(&mut self, stmt: &ReturnStatement) {
         self.start_node("ReturnStatement", &stmt.loc);
-        self.property("argument", stmt.argument.as_ref(), Printer::print_optional_outer_expression);
+        self.property(
+            "argument",
+            stmt.argument.as_ref(),
+            Printer::print_optional_outer_expression,
+        );
         self.end_node();
     }
 
@@ -496,7 +552,11 @@ impl<'a> Printer<'a> {
     fn print_variable_declarator(&mut self, var_decl: &VariableDeclarator) {
         self.start_node("VariableDeclarator", &var_decl.loc);
         self.property("id", &var_decl.id, Printer::print_pattern);
-        self.property("init", var_decl.init.as_ref(), Printer::print_optional_outer_expression);
+        self.property(
+            "init",
+            var_decl.init.as_ref(),
+            Printer::print_optional_outer_expression,
+        );
         self.end_node();
     }
 
@@ -568,7 +628,11 @@ impl<'a> Printer<'a> {
     fn print_bigint_literal(&mut self, lit: &BigIntLiteral) {
         self.start_node("Literal", &lit.loc);
         self.property("value", (), Printer::print_null_in_property);
-        self.property("bigint", lit.value().to_string().as_str(), Printer::print_str);
+        self.property(
+            "bigint",
+            lit.value().to_string().as_str(),
+            Printer::print_str,
+        );
         self.end_node();
     }
 
@@ -665,7 +729,11 @@ impl<'a> Printer<'a> {
 
     fn print_logical_expression(&mut self, logical: &LogicalExpression) {
         self.start_node("LogicalExpression", &logical.loc);
-        self.property("operator", &logical.operator, Printer::print_logical_operator);
+        self.property(
+            "operator",
+            &logical.operator,
+            Printer::print_logical_operator,
+        );
         self.property("left", &logical.left, Printer::print_expression);
         self.property("right", &logical.right, Printer::print_expression);
         self.end_node();
@@ -695,7 +763,11 @@ impl<'a> Printer<'a> {
 
     fn print_assignment_expression(&mut self, assign: &AssignmentExpression) {
         self.start_node("AssignmentExpression", &assign.loc);
-        self.property("operator", &assign.operator, Printer::print_assignment_operator);
+        self.property(
+            "operator",
+            &assign.operator,
+            Printer::print_assignment_operator,
+        );
         self.property("left", &assign.left, Printer::print_pattern);
         self.property("right", &assign.right, Printer::print_expression);
         self.end_node();
@@ -722,7 +794,11 @@ impl<'a> Printer<'a> {
         self.property("object", &member.object, Printer::print_expression);
 
         if member.is_private {
-            self.property("property", &member.property, Printer::print_private_identifier);
+            self.property(
+                "property",
+                &member.property,
+                Printer::print_private_identifier,
+            );
         } else {
             self.property("property", &member.property, Printer::print_expression);
         }
@@ -757,7 +833,11 @@ impl<'a> Printer<'a> {
     fn print_call_expression(&mut self, call: &CallExpression) {
         self.start_node("CallExpression", &call.loc);
         self.property("callee", &call.callee, Printer::print_expression);
-        self.array_property("arguments", call.arguments.as_ref(), Printer::print_call_argument);
+        self.array_property(
+            "arguments",
+            call.arguments.as_ref(),
+            Printer::print_call_argument,
+        );
         self.property("optional", call.is_optional, Printer::print_bool);
         self.end_node();
     }
@@ -772,7 +852,11 @@ impl<'a> Printer<'a> {
     fn print_new_expression(&mut self, new: &NewExpression) {
         self.start_node("NewExpression", &new.loc);
         self.property("callee", &new.callee, Printer::print_expression);
-        self.array_property("arguments", new.arguments.as_ref(), Printer::print_call_argument);
+        self.array_property(
+            "arguments",
+            new.arguments.as_ref(),
+            Printer::print_call_argument,
+        );
         self.end_node();
     }
 
@@ -789,7 +873,11 @@ impl<'a> Printer<'a> {
 
     fn print_array_expression(&mut self, arr: &ArrayExpression) {
         self.start_node("ArrayExpression", &arr.loc);
-        self.array_property("elements", arr.elements.as_ref(), Printer::print_array_element);
+        self.array_property(
+            "elements",
+            arr.elements.as_ref(),
+            Printer::print_array_element,
+        );
         self.end_node();
     }
 
@@ -809,7 +897,11 @@ impl<'a> Printer<'a> {
 
     fn print_object_expression(&mut self, obj: &ObjectExpression) {
         self.start_node("ObjectExpression", &obj.loc);
-        self.array_property("properties", obj.properties.as_ref(), Printer::print_property);
+        self.array_property(
+            "properties",
+            obj.properties.as_ref(),
+            Printer::print_property,
+        );
         self.end_node();
     }
 
@@ -823,7 +915,11 @@ impl<'a> Printer<'a> {
 
         self.start_node("Property", &prop.loc);
         self.property("key", &prop.key, Printer::print_expression);
-        self.property("value", prop.value.as_ref(), Printer::print_optional_expression);
+        self.property(
+            "value",
+            prop.value.as_ref(),
+            Printer::print_optional_expression,
+        );
         self.property("computed", prop.is_computed, Printer::print_bool);
         self.property("shorthand", prop.value.is_none(), Printer::print_bool);
         self.property("method", prop.is_method, Printer::print_bool);
@@ -850,7 +946,11 @@ impl<'a> Printer<'a> {
 
     fn print_yield_expression(&mut self, expr: &YieldExpression) {
         self.start_node("YieldExpression", &expr.loc);
-        self.property("argument", expr.argument.as_ref(), Printer::print_optional_expression);
+        self.property(
+            "argument",
+            expr.argument.as_ref(),
+            Printer::print_optional_expression,
+        );
         self.property("delegate", expr.is_delegate, Printer::print_bool);
         self.end_node();
     }
@@ -871,7 +971,11 @@ impl<'a> Printer<'a> {
     fn print_super_call_expression(&mut self, call: &SuperCallExpression) {
         self.start_node("CallExpression", &call.loc);
         self.property("callee", &call.super_, Printer::print_super);
-        self.array_property("arguments", call.arguments.as_ref(), Printer::print_call_argument);
+        self.array_property(
+            "arguments",
+            call.arguments.as_ref(),
+            Printer::print_call_argument,
+        );
         self.end_node();
     }
 
@@ -886,7 +990,11 @@ impl<'a> Printer<'a> {
             .map(|(i, quasi)| (quasi, i == num_quasis - 1))
             .collect::<Vec<_>>();
 
-        self.array_property("quasis", &quasis_with_is_tail, Printer::print_template_element);
+        self.array_property(
+            "quasis",
+            &quasis_with_is_tail,
+            Printer::print_template_element,
+        );
         self.array_property("expressions", &lit.expressions, Printer::print_expression);
         self.end_node();
     }
@@ -902,7 +1010,11 @@ impl<'a> Printer<'a> {
         self.string("{\n");
         self.inc_indent();
 
-        self.property("cooked", element.cooked.as_ref(), Printer::print_optional_wtf8_str);
+        self.property(
+            "cooked",
+            element.cooked.as_ref(),
+            Printer::print_optional_wtf8_str,
+        );
         self.property("raw", &element.raw, Printer::print_wtf8_str);
 
         self.dec_indent();
@@ -913,7 +1025,11 @@ impl<'a> Printer<'a> {
     fn print_tagged_template_expression(&mut self, expr: &TaggedTemplateExpression) {
         self.start_node("TaggedTemplateExpression", &expr.loc);
         self.property("tag", &expr.tag, Printer::print_expression);
-        self.property("quasi", expr.quasi.as_ref(), Printer::print_template_literal);
+        self.property(
+            "quasi",
+            expr.quasi.as_ref(),
+            Printer::print_template_literal,
+        );
         self.end_node();
     }
 
@@ -923,11 +1039,23 @@ impl<'a> Printer<'a> {
         match expr.kind {
             MetaPropertyKind::NewTarget { .. } => {
                 self.property("meta", (&expr.loc, "new"), Printer::print_str_as_identifier);
-                self.property("property", (&expr.loc, "target"), Printer::print_str_as_identifier);
+                self.property(
+                    "property",
+                    (&expr.loc, "target"),
+                    Printer::print_str_as_identifier,
+                );
             }
             MetaPropertyKind::ImportMeta => {
-                self.property("meta", (&expr.loc, "import"), Printer::print_str_as_identifier);
-                self.property("property", (&expr.loc, "meta"), Printer::print_str_as_identifier);
+                self.property(
+                    "meta",
+                    (&expr.loc, "import"),
+                    Printer::print_str_as_identifier,
+                );
+                self.property(
+                    "property",
+                    (&expr.loc, "meta"),
+                    Printer::print_str_as_identifier,
+                );
             }
         }
 
@@ -937,7 +1065,11 @@ impl<'a> Printer<'a> {
     fn print_import_expression(&mut self, expr: &ImportExpression) {
         self.start_node("ImportExpression", &expr.loc);
         self.property("source", &expr.source, Printer::print_expression);
-        self.property("options", expr.options.as_ref(), Printer::print_optional_expression);
+        self.property(
+            "options",
+            expr.options.as_ref(),
+            Printer::print_optional_expression,
+        );
         self.end_node();
     }
 
@@ -1031,7 +1163,11 @@ impl<'a> Printer<'a> {
             import.specifiers.as_ref(),
             Printer::print_import_specifier,
         );
-        self.property("source", import.source.as_ref(), Printer::print_string_literal);
+        self.property(
+            "source",
+            import.source.as_ref(),
+            Printer::print_string_literal,
+        );
         self.print_import_attributes_property(import.attributes.as_ref());
 
         self.end_node();
@@ -1050,7 +1186,11 @@ impl<'a> Printer<'a> {
     fn print_import_attribute(&mut self, attribute: &ImportAttribute) {
         self.start_node("ImportAttribute", &attribute.loc);
         self.property("key", &attribute.key, Printer::print_expression);
-        self.property("value", attribute.value.as_ref(), Printer::print_string_literal);
+        self.property(
+            "value",
+            attribute.value.as_ref(),
+            Printer::print_string_literal,
+        );
         self.end_node();
     }
 
@@ -1070,7 +1210,11 @@ impl<'a> Printer<'a> {
 
     fn print_import_named_specifier(&mut self, spec: &ImportNamedSpecifier) {
         self.start_node("ImportSpecifier", &spec.loc);
-        self.property("imported", spec.imported.as_ref(), Printer::print_optional_export_name);
+        self.property(
+            "imported",
+            spec.imported.as_ref(),
+            Printer::print_optional_export_name,
+        );
         self.property("local", spec.local.as_ref(), Printer::print_identifier);
         self.end_node();
     }
@@ -1083,7 +1227,11 @@ impl<'a> Printer<'a> {
 
     fn print_export_default_declaration(&mut self, export: &ExportDefaultDeclaration) {
         self.start_node("ExportDefaultDeclaration", &export.loc);
-        self.property("declaration", &export.declaration, Printer::print_export_default_kind);
+        self.property(
+            "declaration",
+            &export.declaration,
+            Printer::print_export_default_kind,
+        );
         self.end_node();
     }
 
@@ -1107,22 +1255,38 @@ impl<'a> Printer<'a> {
             export.specifiers.as_ref(),
             Printer::print_export_specifier,
         );
-        self.property("source", export.source.as_ref(), Printer::print_optional_string_literal);
+        self.property(
+            "source",
+            export.source.as_ref(),
+            Printer::print_optional_string_literal,
+        );
         self.print_import_attributes_property(export.source_attributes.as_ref());
         self.end_node();
     }
 
     fn print_export_all_declaration(&mut self, export: &ExportAllDeclaration) {
         self.start_node("ExportAllDeclaration", &export.loc);
-        self.property("exported", export.exported.as_ref(), Printer::print_optional_export_name);
-        self.property("source", export.source.as_ref(), Printer::print_string_literal);
+        self.property(
+            "exported",
+            export.exported.as_ref(),
+            Printer::print_optional_export_name,
+        );
+        self.property(
+            "source",
+            export.source.as_ref(),
+            Printer::print_string_literal,
+        );
         self.print_import_attributes_property(export.source_attributes.as_ref());
         self.end_node();
     }
 
     fn print_export_specifier(&mut self, spec: &ExportSpecifier) {
         self.start_node("ExportSpecifier", &spec.loc);
-        self.property("exported", spec.exported.as_ref(), Printer::print_optional_export_name);
+        self.property(
+            "exported",
+            spec.exported.as_ref(),
+            Printer::print_optional_export_name,
+        );
         self.property("local", spec.local.as_ref(), Printer::print_export_name);
         self.end_node();
     }
@@ -1218,7 +1382,11 @@ impl<'a> Printer<'a> {
     }
 
     fn print_disjunction(&mut self, disjunction: &Disjunction) {
-        self.array_property("alternatives", &disjunction.alternatives, Printer::print_alternative);
+        self.array_property(
+            "alternatives",
+            &disjunction.alternatives,
+            Printer::print_alternative,
+        );
     }
 
     fn print_alternative(&mut self, alternative: &Alternative) {
@@ -1288,7 +1456,11 @@ impl<'a> Printer<'a> {
     fn print_regexp_capture_group(&mut self, group: &CaptureGroup) {
         self.start_regexp_node("CaptureGroup");
         self.property("index", group.index, Printer::print_number);
-        self.property("name", group.name.as_ref(), Printer::print_optional_wtf8_str);
+        self.property(
+            "name",
+            group.name.as_ref(),
+            Printer::print_optional_wtf8_str,
+        );
         self.print_disjunction(&group.disjunction);
         self.end_node();
     }
@@ -1333,8 +1505,10 @@ impl<'a> Printer<'a> {
 
     fn print_regexp_character_class_range(&mut self, range: &ClassRange) {
         match range {
-            ClassRange::Single(single) => self
-                .print_str(&format!("Single({})", to_string_or_unicode_escape_sequence(*single))),
+            ClassRange::Single(single) => self.print_str(&format!(
+                "Single({})",
+                to_string_or_unicode_escape_sequence(*single)
+            )),
             ClassRange::Range(start, end) => {
                 let start_string = to_string_or_unicode_escape_sequence(*start);
                 let end_string = to_string_or_unicode_escape_sequence(*end);
@@ -1371,7 +1545,11 @@ impl<'a> Printer<'a> {
         }
 
         self.property("is_inverted", class.is_inverted, Printer::print_bool);
-        self.array_property("ranges", &class.operands, Printer::print_regexp_character_class_range);
+        self.array_property(
+            "ranges",
+            &class.operands,
+            Printer::print_regexp_character_class_range,
+        );
         self.end_node();
     }
 
@@ -1386,7 +1564,11 @@ impl<'a> Printer<'a> {
 
     fn print_regexp_string_disjunction(&mut self, disjunction: &StringDisjunction) {
         self.start_regexp_node("StringDisjunction");
-        self.array_property("alternatives", &disjunction.alternatives, Printer::print_wtf8_str);
+        self.array_property(
+            "alternatives",
+            &disjunction.alternatives,
+            Printer::print_wtf8_str,
+        );
         self.end_node();
     }
 

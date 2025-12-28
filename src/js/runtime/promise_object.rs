@@ -1,5 +1,3 @@
-use std::mem::size_of;
-
 use crate::{
     completion_value, extend_object,
     runtime::{
@@ -18,6 +16,8 @@ use crate::{
     },
     set_uninit,
 };
+use alloc::vec;
+use core::mem::size_of;
 
 use super::{
     abstract_operations::get_function_realm_no_error,
@@ -93,7 +93,10 @@ impl PromiseObject {
 
         set_uninit!(
             object.state,
-            PromiseState::Pending { reactions: None, already_resolved: false }
+            PromiseState::Pending {
+                reactions: None,
+                already_resolved: false
+            }
         );
 
         Ok(object)
@@ -112,14 +115,23 @@ impl PromiseObject {
 
         set_uninit!(
             object.state,
-            PromiseState::Pending { reactions: None, already_resolved: false }
+            PromiseState::Pending {
+                reactions: None,
+                already_resolved: false
+            }
         );
 
         Ok(object.to_handle())
     }
 
     pub fn is_pending(&self) -> bool {
-        matches!(self.state, PromiseState::Pending { already_resolved: false, .. })
+        matches!(
+            self.state,
+            PromiseState::Pending {
+                already_resolved: false,
+                ..
+            }
+        )
     }
 
     pub fn rejected_value(&self) -> Option<Value> {
@@ -131,7 +143,10 @@ impl PromiseObject {
 
     pub fn set_already_resolved(&mut self, value: bool) {
         match self.state {
-            PromiseState::Pending { ref mut already_resolved, .. } => *already_resolved = value,
+            PromiseState::Pending {
+                ref mut already_resolved,
+                ..
+            } => *already_resolved = value,
             _ => unreachable!("only called when promise is pending"),
         }
     }
@@ -172,11 +187,17 @@ impl PromiseObject {
         // Add a task to the queue for each matching reaction in the order they were added
         for reaction in matching_reactions.into_iter().rev() {
             match reaction.handler {
-                ReactionHandler::AwaitResume { suspended_generator } => {
+                ReactionHandler::AwaitResume {
+                    suspended_generator,
+                } => {
                     cx.task_queue()
                         .enqueue_await_resume_task(kind, suspended_generator, value);
                 }
-                ReactionHandler::Then { fulfill_handler, reject_handler, capability } => {
+                ReactionHandler::Then {
+                    fulfill_handler,
+                    reject_handler,
+                    capability,
+                } => {
                     let handler = match kind {
                         PromiseReactionKind::Fulfill => fulfill_handler,
                         PromiseReactionKind::Reject => reject_handler,
@@ -198,7 +219,9 @@ pub fn resolve(
     // "already resolved" to prevent further settlement, since fulfill or reject may not be called
     // right away.
     match &mut promise.state {
-        PromiseState::Pending { already_resolved, .. } => {
+        PromiseState::Pending {
+            already_resolved, ..
+        } => {
             if *already_resolved {
                 return Ok(());
             }
@@ -258,7 +281,9 @@ pub fn resolve(
 impl Handle<PromiseObject> {
     fn set_reactions(&mut self, value: Option<HeapPtr<PromiseReaction>>) {
         match self.state {
-            PromiseState::Pending { ref mut reactions, .. } => *reactions = value,
+            PromiseState::Pending {
+                ref mut reactions, ..
+            } => *reactions = value,
             _ => unreachable!("only called when promise is pending"),
         }
     }
@@ -435,10 +460,15 @@ impl PromiseReaction {
     ) -> AllocResult<HeapPtr<PromiseReaction>> {
         let mut reaction = cx.alloc_uninit::<PromiseReaction>()?;
 
-        set_uninit!(reaction.descriptor, cx.base_descriptors.get(HeapItemKind::PromiseReaction));
+        set_uninit!(
+            reaction.descriptor,
+            cx.base_descriptors.get(HeapItemKind::PromiseReaction)
+        );
         set_uninit!(
             reaction.handler,
-            ReactionHandler::AwaitResume { suspended_generator: *suspended_generator }
+            ReactionHandler::AwaitResume {
+                suspended_generator: *suspended_generator
+            }
         );
         set_uninit!(reaction.next, next.map(|r| *r));
 
@@ -454,7 +484,10 @@ impl PromiseReaction {
     ) -> AllocResult<HeapPtr<PromiseReaction>> {
         let mut reaction = cx.alloc_uninit::<PromiseReaction>()?;
 
-        set_uninit!(reaction.descriptor, cx.base_descriptors.get(HeapItemKind::PromiseReaction));
+        set_uninit!(
+            reaction.descriptor,
+            cx.base_descriptors.get(HeapItemKind::PromiseReaction)
+        );
         set_uninit!(
             reaction.handler,
             ReactionHandler::Then {
@@ -604,10 +637,16 @@ impl HeapItem for HeapPtr<PromiseReaction> {
     fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
         visitor.visit_pointer(&mut self.descriptor);
         match &mut self.handler {
-            ReactionHandler::AwaitResume { suspended_generator } => {
+            ReactionHandler::AwaitResume {
+                suspended_generator,
+            } => {
                 visitor.visit_pointer(suspended_generator);
             }
-            ReactionHandler::Then { fulfill_handler, reject_handler, capability } => {
+            ReactionHandler::Then {
+                fulfill_handler,
+                reject_handler,
+                capability,
+            } => {
                 visitor.visit_pointer_opt(fulfill_handler);
                 visitor.visit_pointer_opt(reject_handler);
                 visitor.visit_pointer_opt(capability);

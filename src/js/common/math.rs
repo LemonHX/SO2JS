@@ -1,4 +1,4 @@
-use std::ops::{Add, Rem};
+use core::ops::{Add, Rem};
 
 use half::f16;
 

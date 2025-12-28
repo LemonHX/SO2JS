@@ -1,4 +1,4 @@
-use std::{mem::size_of, slice};
+use core::{mem::size_of, slice};
 
 use crate::{
     extend_object, field_offset,
@@ -188,7 +188,8 @@ impl FinalizationRegistryCells {
         for i in 0..self.num_cells_used() {
             // Delete all cells whose unregister token matches the given token
             if let Some(FinalizationRegistryCell {
-                unregister_token: Some(unregister_token), ..
+                unregister_token: Some(unregister_token),
+                ..
             }) = self.cells.get_unchecked(i)
             {
                 if same_value_non_numeric_non_allocating(*unregister_token, token) {

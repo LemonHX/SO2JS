@@ -1,16 +1,11 @@
-use std::rc::Rc;
-
 use crate::parser::{
     loc::{find_line_col_for_pos, Pos},
     source::Source,
 };
-
-use super::terminal::{BOLD, DEFAULT_COLOR, DIM, RED, RESET};
-
-pub fn print_error_message_and_exit(message: &str) -> ! {
-    eprintln!("{message}");
-    std::process::exit(1);
-}
+use alloc::format;
+use alloc::rc::Rc;
+use alloc::string::String;
+use alloc::string::ToString;
 
 /// A configurable formatter for creating error messages.
 pub struct ErrorFormatter {
@@ -22,8 +17,6 @@ pub struct ErrorFormatter {
     stack_trace: Option<String>,
     /// Source info for this error, including source file, line, column, and snippet.
     source_info: Option<SourceInfo>,
-    /// Whether to use color in the output
-    use_color: bool,
     /// The error message builder
     builder: String,
 }
@@ -41,7 +34,12 @@ pub struct SourceInfo {
 
 impl SourceInfo {
     pub fn new(name: String, line: usize, col: usize, snippet: String) -> Self {
-        Self { name, line, col, snippet }
+        Self {
+            name,
+            line,
+            col,
+            snippet,
+        }
     }
 
     pub fn new_static(source: &Rc<Source>, pos: Pos) -> Self {
@@ -59,13 +57,13 @@ impl SourceInfo {
 }
 
 impl ErrorFormatter {
-    pub fn new(kind: String, opts: &FormatOptions) -> Self {
+    pub fn new(kind: String) -> Self {
         Self {
             kind,
             message: None,
             stack_trace: None,
             source_info: None,
-            use_color: opts.use_color,
+            // use_color: opts.use_color,
             builder: String::new(),
         }
     }
@@ -82,69 +80,68 @@ impl ErrorFormatter {
         self.source_info = Some(source_info);
     }
 
-    fn reset(&mut self) {
-        if self.use_color {
-            self.builder.push_str(RESET);
-        }
-    }
+    // fn reset(&mut self) {
+    //     if self.use_color {
+    //         self.builder.push_str(RESET);
+    //     }
+    // }
 
-    fn bold(&mut self) {
-        if self.use_color {
-            self.builder.push_str(BOLD);
-        }
-    }
+    // fn bold(&mut self) {
+    //     if self.use_color {
+    //         self.builder.push_str(BOLD);
+    //     }
+    // }
 
-    fn dim(&mut self) {
-        if self.use_color {
-            self.builder.push_str(DIM);
-        }
-    }
+    // fn dim(&mut self) {
+    //     if self.use_color {
+    //         self.builder.push_str(DIM);
+    //     }
+    // }
 
-    fn red(&mut self) {
-        if self.use_color {
-            self.builder.push_str(RED);
-        }
-    }
+    // fn red(&mut self) {
+    //     if self.use_color {
+    //         self.builder.push_str(RED);
+    //     }
+    // }
 
-    fn default_color(&mut self) {
-        if self.use_color {
-            self.builder.push_str(DEFAULT_COLOR);
-        }
-    }
+    // fn default_color(&mut self) {
+    //     if self.use_color {
+    //         self.builder.push_str(DEFAULT_COLOR);
+    //     }
+    // }
 
-    fn indent(&mut self, indent: u32) {
-        for _ in 0..indent {
-            self.builder.push(' ');
-        }
-    }
+    // fn indent(&mut self, indent: u32) {
+    //     for _ in 0..indent {
+    //         self.builder.push(' ');
+    //     }
+    // }
 
     pub fn build(mut self) -> String {
         // Kind is in bold and red
-        self.bold();
-        self.red();
         self.builder.push_str(&self.kind);
 
         // Message is in bold and default color, if one exists
         if self.message.is_some() {
-            self.default_color();
             self.builder.push_str(": ");
             self.builder.push_str(self.message.as_ref().unwrap());
         }
 
-        self.reset();
         self.builder.push('\n');
 
         // If there is a source location then print it
         let has_source_info = self.source_info.is_some();
-        if let Some(SourceInfo { name, line, col, snippet }) = self.source_info.take() {
+        if let Some(SourceInfo {
+            name,
+            line,
+            col,
+            snippet,
+        }) = self.source_info.take()
+        {
             // Calculate indent containing the line number with a space of padding on the right
             let indent = line.ilog10() + 2;
 
             // Write source name and line/col numbers, after the indent and a divider
-            self.indent(indent);
-            self.dim();
             self.builder.push_str("┌ ");
-            self.reset();
 
             self.builder.push_str(&format!("{name}:{line}:{col}\n"));
 
@@ -153,9 +150,7 @@ impl ErrorFormatter {
             self.builder.push('\n');
 
             // Write the line number and separator before the snippet
-            self.dim();
             self.builder.push_str(&format!("{line} | "));
-            self.reset();
 
             // Write the snippet itself
             self.builder.push_str(&format!("{snippet}\n"));
@@ -164,11 +159,7 @@ impl ErrorFormatter {
             self.snippet_padding(indent);
 
             // Write the column indicator
-            self.indent(col as u32);
-            self.bold();
-            self.red();
             self.builder.push('^');
-            self.reset();
         }
 
         // Finally write the stack trace if one exists
@@ -184,21 +175,9 @@ impl ErrorFormatter {
     }
 
     fn snippet_padding(&mut self, indent: u32) {
-        self.indent(indent);
-        self.dim();
+        for _ in 0..indent {
+            self.builder.push(' ');
+        }
         self.builder.push('|');
-        self.reset();
-    }
-}
-
-#[derive(Default)]
-pub struct FormatOptions {
-    // Whether to use color in the output
-    pub use_color: bool,
-}
-
-impl FormatOptions {
-    pub fn new(use_color: bool) -> Self {
-        Self { use_color }
     }
 }

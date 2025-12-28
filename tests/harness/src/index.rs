@@ -83,7 +83,9 @@ pub struct TestIndex {
 
 impl TestIndex {
     pub fn new(manifest: &TestManifest) -> Result<TestIndex, GenericError> {
-        let mut indexer = TestIndex { tests: HashMap::new() };
+        let mut indexer = TestIndex {
+            tests: HashMap::new(),
+        };
 
         for suite_config in &manifest.suites {
             let suite_path = manifest.manifest_dir.as_path().join(&suite_config.path);

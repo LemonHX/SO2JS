@@ -1,5 +1,4 @@
-use std::{
-    collections::hash_map::RandomState,
+use core::{
     fmt::{self, Debug},
     hash,
     marker::PhantomData,
@@ -15,7 +14,7 @@ use indexmap_allocator_api::IndexMap;
 use num_bigint::{BigInt, Sign};
 
 use crate::common::{
-    alloc::{self, slice_to_alloc_vec},
+    jsalloc::{self, slice_to_alloc_vec},
     wtf_8::{Wtf8Str, Wtf8String},
 };
 
@@ -29,7 +28,7 @@ use super::{
 
 pub type AstAlloc<'a> = &'a Bump;
 
-pub type ArenaVec<'a, T> = alloc::Vec<T, AstAlloc<'a>>;
+pub type ArenaVec<'a, T> = jsalloc::Vec<T, AstAlloc<'a>>;
 
 pub type AstStr<'a> = &'a Wtf8Str;
 
@@ -37,7 +36,7 @@ pub type AstString<'a> = Wtf8String<AstAlloc<'a>>;
 
 pub type AstHashSet<'a, T> = HashSet<T, DefaultHashBuilder, AstAlloc<'a>>;
 
-pub type AstIndexMap<'a, K, V> = IndexMap<K, V, RandomState, AstAlloc<'a>>;
+pub type AstIndexMap<'a, K, V> = IndexMap<K, V, DefaultHashBuilder, AstAlloc<'a>>;
 
 pub type P<'a, T> = AstBox<'a, T>;
 
@@ -55,7 +54,10 @@ impl<'a, T> AstBox<'a, T> {
     pub fn new_in(value: T, alloc: AstAlloc<'a>) -> AstBox<'a, T> {
         let ptr = unsafe { NonNull::new_unchecked(alloc.alloc(value) as *mut _) };
 
-        AstBox { ptr, data: PhantomData }
+        AstBox {
+            ptr,
+            data: PhantomData,
+        }
     }
 
     #[inline]
@@ -107,7 +109,11 @@ pub struct AstSlice<'a, T> {
 
 impl<'a, T> AstSlice<'a, T> {
     fn new_from_raw_parts(ptr: *mut T, len: usize) -> AstSlice<'a, T> {
-        AstSlice { ptr, len, data: PhantomData }
+        AstSlice {
+            ptr,
+            len,
+            data: PhantomData,
+        }
     }
 
     pub fn new_empty() -> AstSlice<'a, T> {
@@ -115,8 +121,8 @@ impl<'a, T> AstSlice<'a, T> {
         Self::new_from_raw_parts(ptr, 0)
     }
 
-    pub fn into_vec<A: Allocator>(self, alloc: A) -> alloc::Vec<T, A> {
-        unsafe { alloc::Vec::from_raw_parts_in(self.ptr, self.len, self.len, alloc) }
+    pub fn into_vec<A: Allocator>(self, alloc: A) -> jsalloc::Vec<T, A> {
+        unsafe { jsalloc::Vec::from_raw_parts_in(self.ptr, self.len, self.len, alloc) }
     }
 }
 
@@ -125,14 +131,14 @@ impl<T> Deref for AstSlice<'_, T> {
 
     #[inline]
     fn deref(&self) -> &[T] {
-        unsafe { std::slice::from_raw_parts(self.ptr.cast_const(), self.len) }
+        unsafe { core::slice::from_raw_parts(self.ptr.cast_const(), self.len) }
     }
 }
 
 impl<T> DerefMut for AstSlice<'_, T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut [T] {
-        unsafe { std::slice::from_raw_parts_mut(self.ptr, self.len) }
+        unsafe { core::slice::from_raw_parts_mut(self.ptr, self.len) }
     }
 }
 
@@ -147,7 +153,7 @@ impl<'a, T> AstSliceBuilder<'a, T> {
         // Intentionally leak inner vector
         let ptr = self.as_mut_ptr();
         let len = self.len();
-        std::mem::forget(self);
+        core::mem::forget(self);
 
         AstSlice::new_from_raw_parts(ptr, len)
     }
@@ -170,12 +176,12 @@ impl<T> DerefMut for AstSliceBuilder<'_, T> {
 impl<'a> AstString<'a> {
     /// Convert `AstString` to an `AstStr` that has the same lifetime as the underlying arena.
     pub fn as_arena_str(&self) -> AstStr<'a> {
-        unsafe { std::mem::transmute(<AstString<'a> as std::ops::Deref>::deref(self)) }
+        unsafe { core::mem::transmute(<AstString<'a> as core::ops::Deref>::deref(self)) }
     }
 
     pub fn into_arena_str(self) -> AstStr<'a> {
         // Prevent destructor so that we can keep reference to memory in the arena
-        std::mem::ManuallyDrop::new(self).as_arena_str()
+        core::mem::ManuallyDrop::new(self).as_arena_str()
     }
 }
 
@@ -202,7 +208,9 @@ pub struct AstPtr<T> {
 
 impl<T> AstPtr<T> {
     pub fn uninit() -> AstPtr<T> {
-        AstPtr { ptr: NonNull::dangling() }
+        AstPtr {
+            ptr: NonNull::dangling(),
+        }
     }
 
     pub fn from_ref(value: &T) -> AstPtr<T> {
@@ -316,7 +324,11 @@ pub struct Identifier<'a> {
 
 impl<'a> Identifier<'a> {
     pub fn new(loc: Loc, name: AstStr<'a>) -> Identifier<'a> {
-        Identifier { loc, name, scope: TaggedResolvedScope::unresolved_global() }
+        Identifier {
+            loc,
+            name,
+            scope: TaggedResolvedScope::unresolved_global(),
+        }
     }
 
     pub fn get_binding(&self) -> &Binding<'a> {
@@ -346,15 +358,24 @@ pub enum ResolvedScope {
 
 impl<'a> TaggedResolvedScope<'a> {
     pub const fn unresolved_global() -> TaggedResolvedScope<'a> {
-        TaggedResolvedScope { ptr: ptr::null_mut(), data: PhantomData }
+        TaggedResolvedScope {
+            ptr: ptr::null_mut(),
+            data: PhantomData,
+        }
     }
 
     pub const fn unresolved_dynamic() -> TaggedResolvedScope<'a> {
-        TaggedResolvedScope { ptr: std::ptr::dangling_mut::<u8>(), data: PhantomData }
+        TaggedResolvedScope {
+            ptr: core::ptr::dangling_mut::<u8>(),
+            data: PhantomData,
+        }
     }
 
     pub const fn resolved(scope: AstPtr<AstScopeNode>) -> TaggedResolvedScope {
-        TaggedResolvedScope { ptr: scope.ptr.as_ptr() as *mut u8, data: PhantomData }
+        TaggedResolvedScope {
+            ptr: scope.ptr.as_ptr() as *mut u8,
+            data: PhantomData,
+        }
     }
 
     pub fn kind(&self) -> ResolvedScope {
@@ -388,7 +409,10 @@ impl<'a> TaggedResolvedScope<'a> {
     }
 
     pub fn is_unresolved(&self) -> bool {
-        matches!(self.kind(), ResolvedScope::UnresolvedGlobal | ResolvedScope::UnresolvedDynamic)
+        matches!(
+            self.kind(),
+            ResolvedScope::UnresolvedGlobal | ResolvedScope::UnresolvedDynamic
+        )
     }
 }
 
@@ -442,7 +466,12 @@ impl<'a> VariableDeclarator<'a> {
         id: Pattern<'a>,
         init: Option<OuterExpression<'a>>,
     ) -> VariableDeclarator<'a> {
-        VariableDeclarator { loc, id, init, id_has_assign_expr: false }
+        VariableDeclarator {
+            loc,
+            id,
+            init,
+            id_has_assign_expr: false,
+        }
     }
 
     pub fn iter_bound_names<F: FnMut(&Identifier<'a>)>(&self, f: &mut F) {
@@ -608,26 +637,37 @@ pub enum FunctionParam<'a> {
 
 impl<'a> FunctionParam<'a> {
     pub fn new_pattern(pattern: Pattern) -> FunctionParam {
-        FunctionParam::Pattern { pattern, has_assign_expr: false }
+        FunctionParam::Pattern {
+            pattern,
+            has_assign_expr: false,
+        }
     }
 
     pub fn new_rest(rest: RestElement) -> FunctionParam {
-        FunctionParam::Rest { rest, has_assign_expr: false }
+        FunctionParam::Rest {
+            rest,
+            has_assign_expr: false,
+        }
     }
 
     pub fn has_assign_expr(&self) -> bool {
         match self {
-            FunctionParam::Pattern { has_assign_expr, .. } => *has_assign_expr,
-            FunctionParam::Rest { has_assign_expr, .. } => *has_assign_expr,
+            FunctionParam::Pattern {
+                has_assign_expr, ..
+            } => *has_assign_expr,
+            FunctionParam::Rest {
+                has_assign_expr, ..
+            } => *has_assign_expr,
         }
     }
 
     pub fn iter_patterns<F: FnMut(&Pattern<'a>)>(&self, f: &mut F) {
         match &self {
             FunctionParam::Pattern { pattern, .. } => pattern.iter_patterns(f),
-            FunctionParam::Rest { rest: RestElement { argument, .. }, .. } => {
-                argument.iter_patterns(f)
-            }
+            FunctionParam::Rest {
+                rest: RestElement { argument, .. },
+                ..
+            } => argument.iter_patterns(f),
         }
     }
 }
@@ -841,7 +881,10 @@ pub enum ForEachInit<'a> {
 
 impl<'a> ForEachInit<'a> {
     pub fn new_pattern(pattern: Pattern) -> ForEachInit {
-        ForEachInit::Pattern { pattern, has_assign_expr: false }
+        ForEachInit::Pattern {
+            pattern,
+            has_assign_expr: false,
+        }
     }
 
     pub fn pattern(&self) -> &Pattern<'a> {
@@ -857,7 +900,9 @@ impl<'a> ForEachInit<'a> {
 
     pub fn has_assign_expr(&self) -> bool {
         match self {
-            ForEachInit::Pattern { has_assign_expr, .. } => *has_assign_expr,
+            ForEachInit::Pattern {
+                has_assign_expr, ..
+            } => *has_assign_expr,
             // Not relevant for var decls
             ForEachInit::VarDecl(_) => false,
         }
@@ -910,7 +955,13 @@ impl<'a> CatchClause<'a> {
         body: P<'a, Block<'a>>,
         scope: AstPtr<AstScopeNode<'a>>,
     ) -> CatchClause<'a> {
-        CatchClause { loc, param, body, param_has_assign_expr: false, scope }
+        CatchClause {
+            loc,
+            param,
+            body,
+            param_has_assign_expr: false,
+            scope,
+        }
     }
 }
 
@@ -931,7 +982,11 @@ pub struct ReturnStatement<'a> {
 
 impl<'a> ReturnStatement<'a> {
     pub fn new(loc: Loc, argument: Option<OuterExpression<'a>>) -> ReturnStatement<'a> {
-        ReturnStatement { loc, argument, this_scope: None }
+        ReturnStatement {
+            loc,
+            argument,
+            this_scope: None,
+        }
     }
 }
 
@@ -1018,7 +1073,7 @@ pub enum Expression<'a> {
     Import(P<'a, ImportExpression<'a>>),
 }
 
-const EXPRESSION_SIZE: usize = std::mem::size_of::<Expression<'_>>();
+const EXPRESSION_SIZE: usize = core::mem::size_of::<Expression<'_>>();
 
 impl<'a> Expression<'a> {
     pub fn to_id(&self) -> &Identifier<'a> {
@@ -1081,7 +1136,7 @@ impl<'a> Expression<'a> {
     /// Return the raw bytes of this expression. These can be compared directly to check for
     /// expression equality.
     pub fn as_raw(&self) -> [u8; EXPRESSION_SIZE] {
-        unsafe { std::mem::transmute_copy(self) }
+        unsafe { core::mem::transmute_copy(self) }
     }
 }
 
@@ -1113,7 +1168,11 @@ impl<'a> BigIntLiteral<'a> {
         let (sign, unsigned) = value.into_parts();
         let digits = slice_to_alloc_vec(&unsigned.to_u32_digits(), alloc);
 
-        BigIntLiteral { loc, sign, digits: AstSliceBuilder::new(digits).build() }
+        BigIntLiteral {
+            loc,
+            sign,
+            digits: AstSliceBuilder::new(digits).build(),
+        }
     }
 
     /// Return a clone of the BigInt value.
@@ -1529,7 +1588,9 @@ impl<'a> MetaProperty<'a> {
     pub fn new_target(loc: Loc) -> MetaProperty<'a> {
         MetaProperty {
             loc,
-            kind: MetaPropertyKind::NewTarget { scope: TaggedResolvedScope::unresolved_global() },
+            kind: MetaPropertyKind::NewTarget {
+                scope: TaggedResolvedScope::unresolved_global(),
+            },
         }
     }
 }

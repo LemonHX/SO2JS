@@ -1,4 +1,4 @@
-use std::{ops::Range, ptr::NonNull};
+use core::{ops::Range, ptr::NonNull};
 
 use crate::{
     common::constants::MAX_HEAP_SIZE,
@@ -115,7 +115,7 @@ impl GarbageCollector {
             if cx.heap.gc_stress_test && matches!(gc.type_, GcType::Normal) {
                 let start = cx.heap.current_heap_bounds().start;
                 unsafe {
-                    std::ptr::write_bytes(start.cast_mut(), 0x01, cx.heap.bytes_allocated());
+                    core::ptr::write_bytes(start.cast_mut(), 0x01, cx.heap.bytes_allocated());
                 }
             }
         }
@@ -305,7 +305,7 @@ impl GarbageCollector {
         // Copy item from old to new heap, and bump alloc_ptr to point past new allocation
         let new_heap_item = HeapPtr::from_ptr(dest_ptr.cast_mut()).cast::<AnyHeapItem>();
         unsafe {
-            std::ptr::copy_nonoverlapping::<u8>(
+            core::ptr::copy_nonoverlapping::<u8>(
                 heap_item.as_ptr().cast(),
                 new_heap_item.as_ptr().cast(),
                 alloc_size,
@@ -659,7 +659,9 @@ fn decode_forwarding_pointer(
 ) -> Option<HeapPtr<AnyHeapItem>> {
     let ptr_bits = descriptor.as_ptr() as usize;
     if ptr_bits & FORWARDING_POINTER_TAG == FORWARDING_POINTER_TAG {
-        return Some(HeapPtr::from_ptr((ptr_bits ^ FORWARDING_POINTER_TAG) as *mut AnyHeapItem));
+        return Some(HeapPtr::from_ptr(
+            (ptr_bits ^ FORWARDING_POINTER_TAG) as *mut AnyHeapItem,
+        ));
     }
 
     None

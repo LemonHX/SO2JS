@@ -40,12 +40,18 @@ impl FinalizationRegistryConstructor {
         let new_target = if let Some(new_target) = cx.current_new_target() {
             new_target
         } else {
-            return type_error(cx, "FinalizationRegistry constructor must be called with new");
+            return type_error(
+                cx,
+                "FinalizationRegistry constructor must be called with new",
+            );
         };
 
         let cleanup_callback = get_argument(cx, arguments, 0);
         if !is_callable(cleanup_callback) {
-            return type_error(cx, "FinalizationRegistry cleanup callback is not a function");
+            return type_error(
+                cx,
+                "FinalizationRegistry cleanup callback is not a function",
+            );
         }
 
         Ok(FinalizationRegistryObject::new_from_constructor(

@@ -1,4 +1,4 @@
-use std::mem::size_of;
+use core::mem::size_of;
 
 use crate::{
     extend_object,
@@ -46,9 +46,15 @@ enum IteratorHelperState {
     /// is either positive infinity or a non-negative integer.
     Take(f64),
     /// Iterator helper for the filter method. Contains the predicate function and a counter.
-    Filter { predicate: HeapPtr<ObjectValue>, counter: u64 },
+    Filter {
+        predicate: HeapPtr<ObjectValue>,
+        counter: u64,
+    },
     /// Iterator helper for the map method. Contains the mapper function and a counter.
-    Map { mapper: HeapPtr<ObjectValue>, counter: u64 },
+    Map {
+        mapper: HeapPtr<ObjectValue>,
+        counter: u64,
+    },
     /// Iterator helper for the flatMap method. Contains the mapper function, a counter, and the
     /// (iterator object, next method) pair of the inner iterator. Inner iterator is None before
     /// the first iteration, and Some after that.
@@ -106,7 +112,10 @@ impl IteratorHelperObject {
         let mut object = Self::new(cx, iterator)?;
         set_uninit!(
             object.state,
-            IteratorHelperState::Filter { predicate: *predicate, counter: 0 }
+            IteratorHelperState::Filter {
+                predicate: *predicate,
+                counter: 0
+            }
         );
         Ok(object)
     }
@@ -117,7 +126,13 @@ impl IteratorHelperObject {
         mapper: Handle<ObjectValue>,
     ) -> AllocResult<Handle<IteratorHelperObject>> {
         let mut object = Self::new(cx, iterator)?;
-        set_uninit!(object.state, IteratorHelperState::Map { mapper: *mapper, counter: 0 });
+        set_uninit!(
+            object.state,
+            IteratorHelperState::Map {
+                mapper: *mapper,
+                counter: 0
+            }
+        );
         Ok(object)
     }
 
@@ -129,7 +144,11 @@ impl IteratorHelperObject {
         let mut object = Self::new(cx, iterator)?;
         set_uninit!(
             object.state,
-            IteratorHelperState::FlatMap { mapper: *mapper, inner_iterator: None, counter: 0 }
+            IteratorHelperState::FlatMap {
+                mapper: *mapper,
+                inner_iterator: None,
+                counter: 0
+            }
         );
         Ok(object)
     }
@@ -330,7 +349,9 @@ impl Handle<IteratorHelperObject> {
 
             // Return the value as an iterator result if the predicate returns true
             if is_selected {
-                return Ok(Some(create_iter_result_object(cx, value, false)?.as_object()));
+                return Ok(Some(
+                    create_iter_result_object(cx, value, false)?.as_object(),
+                ));
             }
 
             // Increment the counter for the next iteration
@@ -369,28 +390,34 @@ impl Handle<IteratorHelperObject> {
                 iterator_close(cx, self.iterator_object(), Err(error))?;
                 Ok(None)
             }
-            Ok(value) => Ok(Some(create_iter_result_object(cx, value, false)?.as_object())),
+            Ok(value) => Ok(Some(
+                create_iter_result_object(cx, value, false)?.as_object(),
+            )),
         }
     }
 
     fn next_flat_map(&mut self, cx: Context) -> EvalResult<Option<Handle<ObjectValue>>> {
         let mut inner_iterator_opt: Option<Iterator> = None;
 
-        let mapper =
-            if let IteratorHelperState::FlatMap { mapper, inner_iterator, .. } = self.state_mut() {
-                // Set the initial inner iterator, if one exists
-                if let Some((iterator, next_method)) = inner_iterator {
-                    inner_iterator_opt = Some(Iterator {
-                        iterator: iterator.to_handle(),
-                        next_method: next_method.to_handle(cx),
-                        is_done: false,
-                    });
-                }
+        let mapper = if let IteratorHelperState::FlatMap {
+            mapper,
+            inner_iterator,
+            ..
+        } = self.state_mut()
+        {
+            // Set the initial inner iterator, if one exists
+            if let Some((iterator, next_method)) = inner_iterator {
+                inner_iterator_opt = Some(Iterator {
+                    iterator: iterator.to_handle(),
+                    next_method: next_method.to_handle(cx),
+                    is_done: false,
+                });
+            }
 
-                mapper.to_handle()
-            } else {
-                unreachable!()
-            };
+            mapper.to_handle()
+        } else {
+            unreachable!()
+        };
 
         let mut iterator = self.iterator(cx);
         let mut counter_value: Handle<Value> = Handle::empty(cx);
@@ -461,7 +488,9 @@ impl Handle<IteratorHelperObject> {
                 }
                 // If the inner iterator returns a value then return it as an iterator result
                 Ok(Some(value)) => {
-                    return Ok(Some(create_iter_result_object(cx, value, false)?.as_object()))
+                    return Ok(Some(
+                        create_iter_result_object(cx, value, false)?.as_object(),
+                    ))
                 }
             }
 
@@ -488,7 +517,11 @@ impl HeapItem for HeapPtr<IteratorHelperObject> {
         match &mut self.state {
             IteratorHelperState::Filter { predicate, .. } => visitor.visit_pointer(predicate),
             IteratorHelperState::Map { mapper, .. } => visitor.visit_pointer(mapper),
-            IteratorHelperState::FlatMap { mapper, inner_iterator, .. } => {
+            IteratorHelperState::FlatMap {
+                mapper,
+                inner_iterator,
+                ..
+            } => {
                 visitor.visit_pointer(mapper);
 
                 if let Some((iterator_object, next_method)) = inner_iterator {

@@ -14,7 +14,9 @@ struct CharRewriter {
 
 impl CharRewriter {
     fn new() -> Self {
-        Self { char_const_decls: HashMap::new() }
+        Self {
+            char_const_decls: HashMap::new(),
+        }
     }
 
     fn add_char_constant(&mut self, lit_char: &syn::LitChar) -> syn::Ident {

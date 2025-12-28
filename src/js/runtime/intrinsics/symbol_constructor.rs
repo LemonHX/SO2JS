@@ -1,4 +1,4 @@
-use std::mem::size_of;
+use core::mem::size_of;
 
 use crate::{
     extend_object,
@@ -154,8 +154,11 @@ impl SymbolConstructor {
             return Ok(symbol_value.to_handle().into());
         }
 
-        let new_symbol =
-            SymbolValue::new(cx, Some(string_key.as_string()), /* is_private */ false)?;
+        let new_symbol = SymbolValue::new(
+            cx,
+            Some(string_key.as_string()),
+            /* is_private */ false,
+        )?;
         cx.global_symbol_registry_field()
             .maybe_grow_for_insertion(cx)?
             .insert_without_growing(*string_key, *new_symbol);

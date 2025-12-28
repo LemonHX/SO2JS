@@ -10,6 +10,10 @@ use super::{
     value::{BigIntValue, SymbolValue},
     HeapPtr,
 };
+use alloc::string::String;
+use alloc::vec;
+use alloc::vec::Vec;
+use alloc::format;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum DebugPrintMode {

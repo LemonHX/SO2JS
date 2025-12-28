@@ -1,9 +1,11 @@
-use std::{
+use core::{
     borrow::Borrow,
     fmt,
     hash::{self, Hash},
     ops::{Deref, Index, Range, RangeFrom, RangeInclusive, RangeTo, RangeToInclusive},
 };
+
+use alloc::string::{String, ToString};
 
 use allocator_api2::{
     alloc::{Allocator, Global},
@@ -11,7 +13,7 @@ use allocator_api2::{
 };
 
 use super::{
-    alloc,
+    // alloc,
     unicode::{
         decode_wtf8_codepoint, encode_utf8_codepoint, is_ascii, is_high_surrogate_code_point,
         is_low_surrogate_code_point, is_surrogate_code_point,
@@ -22,27 +24,29 @@ use super::{
 /// Identical to UTf-8 but also allows unpaired surrogate code points.
 #[derive(Clone)]
 pub struct Wtf8String<A: Allocator + Clone = Global> {
-    buf: alloc::Vec<u8, A>,
+    buf: allocator_api2::vec::Vec<u8, A>,
 }
 
 impl Wtf8String<Global> {
     #[inline]
     pub fn new() -> Self {
-        Wtf8String { buf: alloc::Vec::new() }
+        Wtf8String {
+            buf: allocator_api2::vec::Vec::new(),
+        }
     }
 
     #[inline]
-    pub fn from_string(mut string: String) -> Self {
+    pub fn from_string(mut string: alloc::string::String) -> Self {
         // Decompose the string into its constituent parts
         let ptr = string.as_mut_ptr();
         let len = string.len();
         let capacity = string.capacity();
 
         // Do not drop the String as its memory will be reused in-place by the Vec
-        std::mem::forget(string);
+        core::mem::forget(string);
 
         // Reconstruct the Vec from the parts
-        let buf = unsafe { alloc::Vec::from_raw_parts(ptr, len, capacity) };
+        let buf = unsafe { allocator_api2::vec::Vec::from_raw_parts(ptr, len, capacity) };
 
         Wtf8String { buf }
     }
@@ -62,7 +66,9 @@ impl Wtf8String<Global> {
 impl<A: Allocator + Clone> Wtf8String<A> {
     #[inline]
     pub fn new_in(alloc: A) -> Self {
-        Wtf8String { buf: alloc::Vec::new_in(alloc) }
+        Wtf8String {
+            buf: allocator_api2::vec::Vec::new_in(alloc),
+        }
     }
 
     #[inline]
@@ -73,7 +79,9 @@ impl<A: Allocator + Clone> Wtf8String<A> {
     #[inline]
     pub fn from_bytes_unchecked_in(bytes: &[u8], alloc: A) -> Self {
         #[allow(unstable_name_collisions)]
-        Wtf8String { buf: bytes.to_vec_in(alloc) }
+        Wtf8String {
+            buf: bytes.to_vec_in(alloc),
+        }
     }
 
     #[inline]
@@ -82,7 +90,9 @@ impl<A: Allocator + Clone> Wtf8String<A> {
         let byte_length = encode_utf8_codepoint(&mut buf, c as u32);
 
         #[allow(unstable_name_collisions)]
-        Wtf8String { buf: buf[..byte_length].to_vec_in(alloc) }
+        Wtf8String {
+            buf: buf[..byte_length].to_vec_in(alloc),
+        }
     }
 
     #[inline]
@@ -269,7 +279,7 @@ pub struct Wtf8Str {
 impl Wtf8Str {
     #[inline]
     pub const fn from_bytes_unchecked(bytes: &[u8]) -> &Wtf8Str {
-        unsafe { std::mem::transmute::<&[u8], &Wtf8Str>(bytes) }
+        unsafe { core::mem::transmute::<&[u8], &Wtf8Str>(bytes) }
     }
 
     #[allow(clippy::should_implement_trait)]
@@ -281,7 +291,9 @@ impl Wtf8Str {
     #[inline]
     pub fn to_owned_in<A2: Allocator + Clone>(&self, alloc: A2) -> Wtf8String<A2> {
         #[allow(unstable_name_collisions)]
-        Wtf8String { buf: self.buf.to_vec_in(alloc) }
+        Wtf8String {
+            buf: self.buf.to_vec_in(alloc),
+        }
     }
 
     #[inline]

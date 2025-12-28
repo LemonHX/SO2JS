@@ -10,6 +10,8 @@ use crate::{
     },
     set_uninit,
 };
+use alloc::vec::Vec;
+use alloc::{format, string::ToString};
 
 #[repr(C)]
 pub struct ConstantTable {
@@ -30,7 +32,10 @@ impl ConstantTable {
         let size = Self::calculate_size_in_bytes(constants.len());
         let mut object = cx.alloc_uninit_with_size::<ConstantTable>(size)?;
 
-        set_uninit!(object.descriptor, cx.base_descriptors.get(HeapItemKind::ConstantTable));
+        set_uninit!(
+            object.descriptor,
+            cx.base_descriptors.get(HeapItemKind::ConstantTable)
+        );
 
         // Copy constants into inline constants array
         object.constants.init_with_uninit(constants.len());
@@ -40,7 +45,7 @@ impl ConstantTable {
 
         // Copy metadata into metadata section
         let metadata_ptr = object.get_metadata_ptr() as *mut u8;
-        unsafe { std::ptr::copy_nonoverlapping(metadata.as_ptr(), metadata_ptr, metadata.len()) };
+        unsafe { core::ptr::copy_nonoverlapping(metadata.as_ptr(), metadata_ptr, metadata.len()) };
 
         Ok(object.to_handle())
     }

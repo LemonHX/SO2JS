@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::{
     completion_value, must_a,
     runtime::{
@@ -20,6 +18,8 @@ use crate::{
     },
     set_uninit,
 };
+use alloc::vec::Vec;
+use hashbrown::HashSet;
 
 use super::{
     module::{DynModule, Module, ModuleEnum, ModuleId, ResolveExportName, ResolveExportResult},
@@ -72,7 +72,10 @@ impl SyntheticModule {
         let mut module = cx.alloc_uninit::<SyntheticModule>()?;
 
         // Note that kind is not initialized here, as it is initialized by the caller
-        set_uninit!(module.descriptor, cx.base_descriptors.get(HeapItemKind::SyntheticModule));
+        set_uninit!(
+            module.descriptor,
+            cx.base_descriptors.get(HeapItemKind::SyntheticModule)
+        );
         set_uninit!(module.id, next_module_id());
         set_uninit!(module.module_scope, *module_scope);
         set_uninit!(module.namespace_object, None);
@@ -88,13 +91,16 @@ impl SyntheticModule {
         let default_export_name = cx.names.default.as_string().as_flat().to_handle();
         let mut module = Self::new(cx, realm, &[default_export_name])?;
 
-        set_uninit!(module.kind, SyntheticModuleKind::DefaultExport(*default_export_value));
+        set_uninit!(
+            module.kind,
+            SyntheticModuleKind::DefaultExport(*default_export_value)
+        );
 
         Ok(module.to_handle())
     }
 
     fn calculate_size_in_bytes() -> usize {
-        std::mem::size_of::<SyntheticModule>()
+        core::mem::size_of::<SyntheticModule>()
     }
 
     #[inline]
@@ -169,7 +175,10 @@ impl Module for Handle<SyntheticModule> {
         if let Some(scope_index) = module_scope.scope_names_ptr().lookup_name(export_name) {
             let boxed_value = module_scope.get_module_slot(scope_index);
             Ok(ResolveExportResult::Resolved {
-                name: ResolveExportName::Local { name: export_name, boxed_value },
+                name: ResolveExportName::Local {
+                    name: export_name,
+                    boxed_value,
+                },
                 module: self.as_dyn_module(),
             })
         } else {
@@ -195,10 +204,20 @@ impl Module for Handle<SyntheticModule> {
 
         match completion_value!(result) {
             Ok(result) => {
-                must_a!(call_object(cx, capability.resolve(), cx.undefined(), &[result]));
+                must_a!(call_object(
+                    cx,
+                    capability.resolve(),
+                    cx.undefined(),
+                    &[result]
+                ));
             }
             Err(error) => {
-                must_a!(call_object(cx, capability.reject(), cx.undefined(), &[error]));
+                must_a!(call_object(
+                    cx,
+                    capability.reject(),
+                    cx.undefined(),
+                    &[error]
+                ));
             }
         }
 

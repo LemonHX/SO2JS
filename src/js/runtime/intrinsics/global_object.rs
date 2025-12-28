@@ -1,5 +1,3 @@
-use brimstone_macros::match_u32;
-
 use crate::{
     common::{
         unicode::{encode_utf8_codepoint, get_hex_value, is_continuation_byte},
@@ -11,7 +9,6 @@ use crate::{
         alloc_error::AllocResult,
         builtin_function::BuiltinFunction,
         bytecode::instruction::EvalFlags,
-        console::ConsoleObject,
         error::uri_error,
         eval::eval::perform_eval,
         function::get_argument,
@@ -23,6 +20,8 @@ use crate::{
         Context, EvalResult, Handle, PropertyKey, Realm, Value,
     },
 };
+use alloc::format;
+use brimstone_macros::match_u32;
 
 use super::intrinsics::Intrinsic;
 
@@ -76,7 +75,13 @@ pub fn set_default_global_bindings(cx: Context, realm: Handle<Realm>) -> EvalRes
         let infinity_value = cx.number(f64::INFINITY);
         let nan_value = cx.nan();
 
-        value_prop!(cx.names.global_this(), realm.global_object().into(), true, false, true);
+        value_prop!(
+            cx.names.global_this(),
+            realm.global_object().into(),
+            true,
+            false,
+            true
+        );
         value_prop!(cx.names.infinity(), infinity_value, false, false, false);
         value_prop!(cx.names.nan(), nan_value, false, false, false);
         value_prop!(cx.names.undefined(), cx.undefined(), false, false, false);
@@ -104,7 +109,10 @@ pub fn set_default_global_bindings(cx: Context, realm: Handle<Realm>) -> EvalRes
         intrinsic_prop!(cx.names.date(), DateConstructor);
         intrinsic_prop!(cx.names.error(), ErrorConstructor);
         intrinsic_prop!(cx.names.eval_error(), EvalErrorConstructor);
-        intrinsic_prop!(cx.names.finalization_registry(), FinalizationRegistryConstructor);
+        intrinsic_prop!(
+            cx.names.finalization_registry(),
+            FinalizationRegistryConstructor
+        );
         intrinsic_prop!(cx.names.float16_array(), Float16ArrayConstructor);
         intrinsic_prop!(cx.names.float32_array(), Float32ArrayConstructor);
         intrinsic_prop!(cx.names.float64_array(), Float64ArrayConstructor);
@@ -141,9 +149,6 @@ pub fn set_default_global_bindings(cx: Context, realm: Handle<Realm>) -> EvalRes
         intrinsic_prop!(cx.names.reflect(), Reflect);
 
         // Non-standard, environment specific properties of global object
-        let console_object = ConsoleObject::new(cx, realm)?.into();
-        value_prop!(cx.names.console(), console_object, true, false, true);
-
         Ok(())
     })
 }
@@ -168,7 +173,13 @@ pub fn eval(
 ) -> EvalResult<Handle<Value>> {
     let code_arg = get_argument(cx, arguments, 0);
 
-    perform_eval(cx, code_arg, /* is_strict_caller */ false, None, EvalFlags::empty())
+    perform_eval(
+        cx,
+        code_arg,
+        /* is_strict_caller */ false,
+        None,
+        EvalFlags::empty(),
+    )
 }
 
 /// isFinite (https://tc39.es/ecma262/#sec-isfinite-number)
@@ -557,9 +568,11 @@ fn encode<const INCLUDE_URI_UNESCAPED: bool>(
     }
 
     // Safe since only ASCII characters were used
-    Ok(FlatString::from_one_byte_slice(cx, encoded_string.as_bytes())?
-        .to_handle()
-        .as_value())
+    Ok(
+        FlatString::from_one_byte_slice(cx, encoded_string.as_bytes())?
+            .to_handle()
+            .as_value(),
+    )
 }
 
 // Additional Properties of the Global Object (https://tc39.es/ecma262/#sec-additional-properties-of-the-global-object)

@@ -23,7 +23,9 @@ use crate::{
 };
 
 use super::{AnyHeapItem, GcType, Heap, HeapInfo, HeapPtr, HeapVisitor};
-
+use alloc::vec;
+use alloc::vec::Vec;
+use alloc::borrow::ToOwned;
 pub struct HeapSerializer {
     cx: Context,
     /// Copy of a slice of the heap's semispaces, will have pointers rewritten to offsets.
@@ -210,7 +212,7 @@ impl HeapVisitor for HeapSpaceDeserializer {
 
     fn visit_rust_vtable_pointer(&mut self, ptr: &mut *const ()) {
         // Rust vtable pointers were encoded as their enum value, so lookup the true vtable pointer
-        let enum_value = unsafe { std::mem::transmute::<u8, RustVtable>(*ptr as usize as u8) };
+        let enum_value = unsafe { core::mem::transmute::<u8, RustVtable>(*ptr as usize as u8) };
         *ptr = get_vtable(enum_value);
     }
 }
@@ -231,7 +233,11 @@ impl<'a> HeapRootsDeserializer<'a> {
         let extra_offset = calculate_extra_offset(serialized);
         let base = cx.heap.heap_start().wrapping_add(extra_offset);
 
-        Self { base, root_index: 0, root_offsets: serialized.root_offsets }
+        Self {
+            base,
+            root_index: 0,
+            root_offsets: serialized.root_offsets,
+        }
     }
 
     pub fn deserialize(mut cx: Context, serialized: &'a SerializedHeap) {
@@ -258,7 +264,7 @@ impl HeapVisitor for HeapRootsDeserializer<'_> {
         // All values should be rewritten regardless of whether they are pointers, since only
         // pointers were visited when serializing. This includes uninitialized values which may be
         // represented as the empty value.
-        unsafe { self.visit(std::mem::transmute::<&mut Value, &mut HeapPtr<AnyHeapItem>>(value)) };
+        unsafe { self.visit(core::mem::transmute::<&mut Value, &mut HeapPtr<AnyHeapItem>>(value)) };
     }
 }
 /// Size of the `HeapInfo` struct can be different from the serialized heap, e.g. due to

@@ -79,7 +79,10 @@ pub enum AsyncGeneratorState {
 
 impl AsyncGeneratorState {
     pub fn is_suspended(&self) -> bool {
-        matches!(self, Self::SuspendedStart | Self::SuspendedYield | Self::SuspendedAwait)
+        matches!(
+            self,
+            Self::SuspendedStart | Self::SuspendedYield | Self::SuspendedAwait
+        )
     }
 
     pub fn is_executing(&self) -> bool {
@@ -300,10 +303,20 @@ pub fn async_generator_complete_step(
     match completion_value!(completion) {
         Ok(value) => {
             let result_object = create_iter_result_object(cx, value, is_done)?;
-            must_a!(call_object(cx, capability.resolve(), cx.undefined(), &[result_object]));
+            must_a!(call_object(
+                cx,
+                capability.resolve(),
+                cx.undefined(),
+                &[result_object]
+            ));
         }
         Err(error) => {
-            must_a!(call_object(cx, capability.reject(), cx.undefined(), &[error]));
+            must_a!(call_object(
+                cx,
+                capability.reject(),
+                cx.undefined(),
+                &[error]
+            ));
         }
     }
 
@@ -437,7 +450,12 @@ pub fn await_return_reject(
 
     async_generator.state = AsyncGeneratorState::Completed;
 
-    async_generator_complete_step(cx, async_generator, eval_err!(value), /* is_done */ true)?;
+    async_generator_complete_step(
+        cx,
+        async_generator,
+        eval_err!(value),
+        /* is_done */ true,
+    )?;
     async_generator_drain_queue(cx, async_generator)?;
 
     Ok(cx.undefined())
@@ -520,7 +538,7 @@ impl HeapItem for HeapPtr<AsyncGeneratorObject> {
 
 impl HeapItem for HeapPtr<AsyncGeneratorRequest> {
     fn byte_size(&self) -> usize {
-        std::mem::size_of::<AsyncGeneratorRequest>()
+        core::mem::size_of::<AsyncGeneratorRequest>()
     }
 
     fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {

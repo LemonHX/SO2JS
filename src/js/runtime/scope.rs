@@ -1,9 +1,3 @@
-use crate::{
-    field_offset,
-    runtime::{alloc_error::AllocResult, heap_item_descriptor::HeapItemKind},
-    set_uninit,
-};
-
 use super::{
     abstract_operations::has_property,
     boxed_value::BoxedValue,
@@ -19,6 +13,11 @@ use super::{
     string_value::StringValue,
     type_utilities::to_boolean,
     Context, EvalResult, Handle, HeapPtr, PropertyKey, Realm, Value,
+};
+use crate::{
+    field_offset,
+    runtime::{alloc_error::AllocResult, heap_item_descriptor::HeapItemKind},
+    set_uninit,
 };
 
 #[repr(C)]
@@ -59,7 +58,10 @@ impl Scope {
         let size = Self::calculate_size_in_bytes(num_slots);
         let mut scope = cx.alloc_uninit_with_size::<Scope>(size)?;
 
-        set_uninit!(scope.descriptor, cx.base_descriptors.get(HeapItemKind::Scope));
+        set_uninit!(
+            scope.descriptor,
+            cx.base_descriptors.get(HeapItemKind::Scope)
+        );
         set_uninit!(scope.kind, kind);
         set_uninit!(scope.parent, parent.map(|p| *p));
         set_uninit!(scope.scope_names, *scope_names);
@@ -75,7 +77,13 @@ impl Scope {
         scope_names: Handle<ScopeNames>,
         global_object: Handle<ObjectValue>,
     ) -> AllocResult<Handle<Scope>> {
-        Self::new(cx, ScopeKind::Global, None, scope_names, Some(global_object))
+        Self::new(
+            cx,
+            ScopeKind::Global,
+            None,
+            scope_names,
+            Some(global_object),
+        )
     }
 
     pub fn new_module(
@@ -83,7 +91,13 @@ impl Scope {
         scope_names: Handle<ScopeNames>,
         global_object: Handle<ObjectValue>,
     ) -> AllocResult<Handle<Scope>> {
-        Self::new(cx, ScopeKind::Module, None, scope_names, Some(global_object))
+        Self::new(
+            cx,
+            ScopeKind::Module,
+            None,
+            scope_names,
+            Some(global_object),
+        )
     }
 
     pub fn new_lexical(
@@ -198,7 +212,7 @@ impl Handle<Scope> {
 
         // Can copy the memory directly
         unsafe {
-            std::ptr::copy_nonoverlapping(
+            core::ptr::copy_nonoverlapping(
                 self.as_ptr() as *const u8,
                 new_scope.as_ptr() as *mut u8,
                 size,

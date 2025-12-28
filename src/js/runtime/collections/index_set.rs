@@ -1,4 +1,4 @@
-use std::hash::Hash;
+use core::hash::Hash;
 
 use crate::runtime::{
     alloc_error::AllocResult,
@@ -135,6 +135,8 @@ impl<T: Eq + Hash + Clone> HeapPtr<BsIndexSet<T>> {
         mut entries_visitor: impl FnMut(&mut Self, &mut H),
     ) {
         self.cast_mut::<BsIndexMap<T, ()>>()
-            .visit_pointers_impl(visitor, |map, visitor| entries_visitor(&mut map.cast(), visitor))
+            .visit_pointers_impl(visitor, |map, visitor| {
+                entries_visitor(&mut map.cast(), visitor)
+            })
     }
 }

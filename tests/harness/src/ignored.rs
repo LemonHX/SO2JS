@@ -109,12 +109,18 @@ struct MatcherBuilder {
 
 impl MatcherBuilder {
     fn new() -> Self {
-        Self { test_strings: vec![], features: HashSet::new() }
+        Self {
+            test_strings: vec![],
+            features: HashSet::new(),
+        }
     }
 
     fn finish(self) -> Result<Matcher, GenericError> {
         let tests_regex = Self::build_regexp(&self.test_strings)?;
-        Ok(Matcher { tests_regex, features: self.features })
+        Ok(Matcher {
+            tests_regex,
+            features: self.features,
+        })
     }
 
     fn build_regexp(strings: &[String]) -> Result<Regex, GenericError> {

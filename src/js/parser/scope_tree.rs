@@ -1,8 +1,9 @@
-use std::{cell::Cell, rc::Rc, sync::LazyLock};
-
+use alloc::rc::Rc;
 use allocator_api2::alloc::Global;
+use core::cell::Cell;
+use once_cell::sync::Lazy;
 
-use crate::common::{alloc, options::Options, wtf_8::Wtf8String};
+use crate::common::{options::Options, wtf_8::Wtf8String};
 
 use super::{
     ast::{
@@ -38,8 +39,8 @@ impl<'a> ScopeTree<'a> {
         alloc: AstAlloc<'a>,
     ) -> ScopeTree<'a> {
         let mut scope_tree = ScopeTree {
-            ast_nodes: alloc::vec![in alloc],
-            vm_nodes: alloc::vec![in alloc],
+            ast_nodes: allocator_api2::vec![in alloc],
+            vm_nodes: allocator_api2::vec![in alloc],
             current_node_id: INITIAL_SCOPE_ID,
             alloc,
             options,
@@ -50,7 +51,12 @@ impl<'a> ScopeTree<'a> {
 
         // All root scopes start with an implicit `this` binding
         scope_tree
-            .add_binding(&THIS_NAME, BindingKind::ImplicitThis { in_derived_constructor: false })
+            .add_binding(
+                &THIS_NAME,
+                BindingKind::ImplicitThis {
+                    in_derived_constructor: false,
+                },
+            )
             .unwrap();
 
         scope_tree
@@ -66,7 +72,14 @@ impl<'a> ScopeTree<'a> {
 
     pub fn new_eval(options: Rc<Options>, is_direct: bool, alloc: AstAlloc<'a>) -> ScopeTree<'a> {
         // Start off without setting the strict flag. This flag will be right away during parsing.
-        Self::new_with_root(options, ScopeNodeKind::Eval { is_direct, is_strict: false }, alloc)
+        Self::new_with_root(
+            options,
+            ScopeNodeKind::Eval {
+                is_direct,
+                is_strict: false,
+            },
+            alloc,
+        )
     }
 
     pub fn finish_ast_scope_tree(mut self) -> ScopeTree<'a> {
@@ -183,7 +196,7 @@ impl<'a> ScopeTree<'a> {
             supports_dynamic_bindings,
             allow_empty_vm_node: false,
             enclosing_scope,
-            enclosed_scopes: alloc::vec![in self.alloc],
+            enclosed_scopes: allocator_api2::vec![in self.alloc],
             num_local_registers: 0,
             vm_scope: None,
         };
@@ -292,8 +305,13 @@ impl<'a> ScopeTree<'a> {
                     } else if node.kind == ScopeNodeKind::Global && !kind.is_implicit_this() {
                         // Var bindings in the global scope are immediately known to be global
                         Some(VMLocation::Global)
-                    } else if matches!(node.kind, ScopeNodeKind::Eval { is_strict: false, .. })
-                        && !kind.is_implicit_this()
+                    } else if matches!(
+                        node.kind,
+                        ScopeNodeKind::Eval {
+                            is_strict: false,
+                            ..
+                        }
+                    ) && !kind.is_implicit_this()
                     {
                         // Var bindings in a sloppy eval are dynamically added to their parent
                         // var scope, and require a dynamic lookup at runtime.
@@ -335,8 +353,9 @@ impl<'a> ScopeTree<'a> {
 
     /// Add a binding to the current scope in the AST scope tree.
     pub fn add_binding_to_current_node(&mut self, name: AstStr<'a>, kind: BindingKind<'a>) {
-        self.get_ast_node_mut(self.current_node_id)
-            .add_binding(name, kind, /* vm_location */ None, /* needs_tdz_check */ false);
+        self.get_ast_node_mut(self.current_node_id).add_binding(
+            name, kind, /* vm_location */ None, /* needs_tdz_check */ false,
+        );
     }
 
     /// Resolve a use of the given name in the provided AST scope id to the scope where the binding
@@ -356,8 +375,13 @@ impl<'a> ScopeTree<'a> {
             let scope = self.get_ast_node(scope_id);
             let scope_parent = scope.parent;
             let scope_kind = scope.kind;
-            let is_sloppy_eval_scope =
-                matches!(scope_kind, ScopeNodeKind::Eval { is_strict: false, .. });
+            let is_sloppy_eval_scope = matches!(
+                scope_kind,
+                ScopeNodeKind::Eval {
+                    is_strict: false,
+                    ..
+                }
+            );
             let scope_supports_dynamic_bindings = scope.supports_dynamic_bindings;
 
             let mut found_def = scope.bindings.contains_key(name);
@@ -400,7 +424,10 @@ impl<'a> ScopeTree<'a> {
                     // end of the binding's initialization. If so we need to check for the TDZ.
                     if let BindingKind::Const { init_pos }
                     | BindingKind::Let { init_pos }
-                    | BindingKind::Class { init_pos, in_body_scope: false }
+                    | BindingKind::Class {
+                        init_pos,
+                        in_body_scope: false,
+                    }
                     | BindingKind::CatchParameter { init_pos }
                     | BindingKind::FunctionParameter { init_pos, .. } = binding.kind()
                     {
@@ -414,7 +441,10 @@ impl<'a> ScopeTree<'a> {
                     // have been captured.
                     if matches!(
                         binding.kind(),
-                        BindingKind::Class { in_body_scope: true, .. } | BindingKind::HomeObject
+                        BindingKind::Class {
+                            in_body_scope: true,
+                            ..
+                        } | BindingKind::HomeObject
                     ) {
                         binding.force_vm_scope = true;
                     }
@@ -545,8 +575,13 @@ impl<'a> ScopeTree<'a> {
 
     fn needs_implicit_arguments_object(&mut self, scope_id: ScopeNodeId) -> bool {
         let scope = self.get_ast_node(scope_id);
-        matches!(scope.kind, ScopeNodeKind::Function { is_arrow: false, .. })
-            && !scope.bindings.contains_key(ARGUMENTS_NAME.as_str())
+        matches!(
+            scope.kind,
+            ScopeNodeKind::Function {
+                is_arrow: false,
+                ..
+            }
+        ) && !scope.bindings.contains_key(ARGUMENTS_NAME.as_str())
     }
 
     fn add_implicit_arguments_object(&mut self, scope_id: ScopeNodeId) {
@@ -560,10 +595,15 @@ impl<'a> ScopeTree<'a> {
 
     fn needs_implicit_new_target(&mut self, scope_id: ScopeNodeId) -> bool {
         let scope = self.get_ast_node(scope_id);
-        matches!(scope.kind, ScopeNodeKind::Function { is_arrow: false, .. })
-            && !scope
-                .bindings
-                .contains_key(NEW_TARGET_BINDING_NAME.as_str())
+        matches!(
+            scope.kind,
+            ScopeNodeKind::Function {
+                is_arrow: false,
+                ..
+            }
+        ) && !scope
+            .bindings
+            .contains_key(NEW_TARGET_BINDING_NAME.as_str())
     }
 
     fn add_implicit_new_target(&mut self, scope_id: ScopeNodeId) {
@@ -594,7 +634,7 @@ impl ScopeTree<'_> {
         let ast_node = self.get_ast_node_mut(ast_node_id);
         let enclosing_scope = ast_node.enclosing_scope;
 
-        let mut bindings = AstSliceBuilder::new(alloc::vec![in alloc]);
+        let mut bindings = AstSliceBuilder::new(allocator_api2::vec![in alloc]);
 
         let has_mapped_arguments_object =
             num_extra_slots.is_some() && matches!(ast_node.kind(), ScopeNodeKind::Function { .. });
@@ -737,8 +777,9 @@ impl ScopeTree<'_> {
             || ast_node.supports_dynamic_bindings
             || ast_node.allow_empty_vm_node
         {
-            self.vm_nodes
-                .push(VMScopeNode { bindings: bindings.build() });
+            self.vm_nodes.push(VMScopeNode {
+                bindings: bindings.build(),
+            });
             self.get_ast_node_mut(ast_node_id).vm_scope = Some(vm_node_id)
         }
 
@@ -757,8 +798,8 @@ impl ScopeTree<'_> {
             let mut num_local_registers = 0;
 
             // Extract enclosed scopes
-            let mut enclosed_scopes = alloc::vec![in self.alloc];
-            std::mem::swap(&mut enclosed_scopes, &mut self.ast_nodes[i].enclosed_scopes);
+            let mut enclosed_scopes = allocator_api2::vec![in self.alloc];
+            core::mem::swap(&mut enclosed_scopes, &mut self.ast_nodes[i].enclosed_scopes);
 
             // All bindings without a location are placed in local registers in the enclosing scope.
             //  - Except for implicit this, which is either captured or loaded from the this slot.
@@ -771,7 +812,10 @@ impl ScopeTree<'_> {
                             binding.kind(),
                             BindingKind::ImplicitThis { .. }
                                 | BindingKind::HomeObject
-                                | BindingKind::Class { in_body_scope: true, .. }
+                                | BindingKind::Class {
+                                    in_body_scope: true,
+                                    ..
+                                }
                         )
                     {
                         binding.set_vm_location(VMLocation::LocalRegister(num_local_registers));
@@ -838,7 +882,13 @@ impl ScopeNodeKind {
     }
 
     pub fn is_function_expression(&self) -> bool {
-        matches!(self, ScopeNodeKind::Function { is_expression: true, .. })
+        matches!(
+            self,
+            ScopeNodeKind::Function {
+                is_expression: true,
+                ..
+            }
+        )
     }
 }
 
@@ -920,9 +970,10 @@ impl<'a> AstScopeNode<'a> {
         vm_location: Option<VMLocation>,
         needs_tdz_check: bool,
     ) {
-        let insert_result = self
-            .bindings
-            .insert(name, Binding::new(kind, self.num_bindings, vm_location, needs_tdz_check));
+        let insert_result = self.bindings.insert(
+            name,
+            Binding::new(kind, self.num_bindings, vm_location, needs_tdz_check),
+        );
 
         if insert_result.is_some() {
             self.has_duplicates = true;
@@ -959,7 +1010,11 @@ impl<'a> AstScopeNode<'a> {
         self.bindings.iter().filter(|(_, binding)| {
             matches!(
                 binding.kind,
-                BindingKind::Var | BindingKind::Function { is_lexical: false, .. }
+                BindingKind::Var
+                    | BindingKind::Function {
+                        is_lexical: false,
+                        ..
+                    }
             )
         })
     }
@@ -1059,7 +1114,10 @@ pub enum BindingKind<'a> {
 
 impl<'a> BindingKind<'a> {
     pub fn new_function_parameter(index: u32) -> BindingKind<'a> {
-        BindingKind::FunctionParameter { init_pos: Cell::new(0), index }
+        BindingKind::FunctionParameter {
+            init_pos: Cell::new(0),
+            index,
+        }
     }
 
     /// Whether this is a LexicallyScopedDeclaration from the spec.
@@ -1087,7 +1145,10 @@ impl<'a> BindingKind<'a> {
         matches!(
             self,
             BindingKind::Const { .. }
-                | BindingKind::Class { in_body_scope: true, .. }
+                | BindingKind::Class {
+                    in_body_scope: true,
+                    ..
+                }
                 | BindingKind::Import { .. }
         )
     }
@@ -1097,7 +1158,13 @@ impl<'a> BindingKind<'a> {
     }
 
     pub fn is_function_expression_name(&self) -> bool {
-        matches!(self, BindingKind::Function { is_expression: true, .. })
+        matches!(
+            self,
+            BindingKind::Function {
+                is_expression: true,
+                ..
+            }
+        )
     }
 
     pub fn is_implicit_this(&self) -> bool {
@@ -1145,7 +1212,10 @@ impl<'a> BindingKind<'a> {
         matches!(
             self,
             BindingKind::Var
-                | BindingKind::Function { is_lexical: false, .. }
+                | BindingKind::Function {
+                    is_lexical: false,
+                    ..
+                }
                 | BindingKind::ImplicitArguments
         )
     }
@@ -1231,7 +1301,12 @@ impl<'a> Binding<'a> {
     pub fn is_module_binding(&self) -> bool {
         // Note that `import * as foo` is not a module binding, namespace object is instead stored
         // in scope without needing a BoxedValue.
-        matches!(self.kind(), BindingKind::Import { is_namespace: false }) || self.is_exported()
+        matches!(
+            self.kind(),
+            BindingKind::Import {
+                is_namespace: false
+            }
+        ) || self.is_exported()
     }
 }
 
@@ -1266,27 +1341,22 @@ impl<'a> VMScopeNode<'a> {
     }
 }
 
-pub static THIS_NAME: LazyLock<Wtf8String> = LazyLock::new(|| Wtf8String::from_str("this"));
-pub static ARGUMENTS_NAME: LazyLock<Wtf8String> =
-    LazyLock::new(|| Wtf8String::from_str("arguments"));
-pub static DEFAULT_EXPORT_NAME: LazyLock<Wtf8String> =
-    LazyLock::new(|| Wtf8String::from_str("default"));
+pub static THIS_NAME: Lazy<Wtf8String> = Lazy::new(|| Wtf8String::from_str("this"));
+pub static ARGUMENTS_NAME: Lazy<Wtf8String> = Lazy::new(|| Wtf8String::from_str("arguments"));
+pub static DEFAULT_EXPORT_NAME: Lazy<Wtf8String> = Lazy::new(|| Wtf8String::from_str("default"));
 
-pub static SHADOWED_SCOPE_SLOT_NAME: LazyLock<Wtf8String> =
-    LazyLock::new(|| Wtf8String::from_str("%shadowed"));
-pub static REALM_SCOPE_SLOT_NAME: LazyLock<Wtf8String> =
-    LazyLock::new(|| Wtf8String::from_str("%realm"));
-pub static MODULE_SCOPE_SLOT_NAME: LazyLock<Wtf8String> =
-    LazyLock::new(|| Wtf8String::from_str("%module"));
-pub static NEW_TARGET_BINDING_NAME: LazyLock<Wtf8String> =
-    LazyLock::new(|| Wtf8String::from_str("%new.target"));
-pub static DERIVED_CONSTRUCTOR_BINDING_NAME: LazyLock<Wtf8String> =
-    LazyLock::new(|| Wtf8String::from_str("%constructor"));
-pub static HOME_OBJECT_BINDING_NAME: LazyLock<Wtf8String> =
-    LazyLock::new(|| Wtf8String::from_str("%homeObject"));
-pub static STATIC_HOME_OBJECT_BINDING_NAME: LazyLock<Wtf8String> =
-    LazyLock::new(|| Wtf8String::from_str("%staticHomeObject"));
-pub static ANONYMOUS_DEFAULT_EXPORT_NAME: LazyLock<Wtf8String> =
-    LazyLock::new(|| Wtf8String::from_str("%defaultExport"));
-static CLASS_FIELD_SLOT_NAME: LazyLock<Wtf8String> =
-    LazyLock::new(|| Wtf8String::from_str("%classField"));
+pub static SHADOWED_SCOPE_SLOT_NAME: Lazy<Wtf8String> =
+    Lazy::new(|| Wtf8String::from_str("%shadowed"));
+pub static REALM_SCOPE_SLOT_NAME: Lazy<Wtf8String> = Lazy::new(|| Wtf8String::from_str("%realm"));
+pub static MODULE_SCOPE_SLOT_NAME: Lazy<Wtf8String> = Lazy::new(|| Wtf8String::from_str("%module"));
+pub static NEW_TARGET_BINDING_NAME: Lazy<Wtf8String> =
+    Lazy::new(|| Wtf8String::from_str("%new.target"));
+pub static DERIVED_CONSTRUCTOR_BINDING_NAME: Lazy<Wtf8String> =
+    Lazy::new(|| Wtf8String::from_str("%constructor"));
+pub static HOME_OBJECT_BINDING_NAME: Lazy<Wtf8String> =
+    Lazy::new(|| Wtf8String::from_str("%homeObject"));
+pub static STATIC_HOME_OBJECT_BINDING_NAME: Lazy<Wtf8String> =
+    Lazy::new(|| Wtf8String::from_str("%staticHomeObject"));
+pub static ANONYMOUS_DEFAULT_EXPORT_NAME: Lazy<Wtf8String> =
+    Lazy::new(|| Wtf8String::from_str("%defaultExport"));
+static CLASS_FIELD_SLOT_NAME: Lazy<Wtf8String> = Lazy::new(|| Wtf8String::from_str("%classField"));

@@ -18,8 +18,11 @@ pub struct BigIntPrototype;
 impl BigIntPrototype {
     /// Properties of the BigInt Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-bigint-prototype-object)
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         // Constructor property is added once BigIntConstructor has been created
         object.intrinsic_func(cx, cx.names.to_string(), Self::to_string, 0, realm)?;

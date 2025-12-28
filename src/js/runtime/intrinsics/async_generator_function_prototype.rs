@@ -10,8 +10,11 @@ pub struct AsyncGeneratorFunctionPrototype;
 impl AsyncGeneratorFunctionPrototype {
     /// Properties of the AsyncGeneratorFunction Prototype Object (https://tc39.es/ecma262/#sec-properties-of-asyncgeneratorfunction-prototype)
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::FunctionPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::FunctionPrototype)),
+            true,
+        )?;
 
         // Constructor property is added once AsyncGeneratorFunctionConstructor has been created
 

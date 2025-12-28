@@ -1,12 +1,11 @@
-# Brimstone
+# SO2 JS
+> read as `Sulphur Dioxide JS`
 
-Brimstone is a JavaScript engine written from scratch in Rust, aiming to have full support for the JavaScript language.
+SO2JS is a fork of [Brimstone](https://github.com/Hans-Halverson/brimstone) JS engine which is a JavaScript engine written from scratch in Rust, aiming to have full support for the JavaScript language.
 
-Brimstone is a work in progress but already supports almost all of the JavaScript language (>97% of the ECMAScript language in test262). Not ready for use in production.
+SO2 [Brimstone](https://github.com/Hans-Halverson/brimstone) Implements the [ECMAScript specification](https://tc39.es/ecma262/). Heavy inspiration is taken from the design of [V8](https://v8.dev/) and SerenityOS's [LibJS](https://github.com/LadybirdBrowser/ladybird). Brimstone chooses to implement almost all components of the engine from scratch with minimal dependencies, with the notable exception of [ICU4X](https://github.com/unicode-org/icu4x).
 
-Implements the [ECMAScript specification](https://tc39.es/ecma262/). Heavy inspiration is taken from the design of [V8](https://v8.dev/) and SerenityOS's [LibJS](https://github.com/LadybirdBrowser/ladybird). Brimstone chooses to implement almost all components of the engine from scratch with minimal dependencies, with the notable exception of [ICU4X](https://github.com/unicode-org/icu4x).
-
-Brimstone features:
+## Features
 
 - Bytecode VM, heavily inspired by the design of V8's Ignition
 - Compacting garbage collector, written in *very* unsafe Rust
@@ -33,7 +32,7 @@ Hello world!
 
 ## Testing
 
-Brimstone relies heavily on a set of first and third party integration test suites, most notably the official [test262](https://github.com/tc39/test262) test suite. A custom [integration test runner](./tests/README.md) is included. This can be run with:
+SO2(Brimstone) relies heavily on a set of first and third party integration test suites, most notably the official [test262](https://github.com/tc39/test262) test suite. A custom [integration test runner](./tests/README.md) is included. This can be run with:
 
 ```
 cargo brimstone-test

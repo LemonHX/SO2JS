@@ -1,10 +1,3 @@
-use std::{
-    borrow::Borrow,
-    collections::hash_map::DefaultHasher,
-    hash::{Hash, Hasher},
-    slice,
-};
-
 use crate::{
     field_offset,
     runtime::{
@@ -15,6 +8,14 @@ use crate::{
     },
     set_uninit,
 };
+use alloc::string::String;
+use core::hash::BuildHasher;
+use core::{
+    borrow::Borrow,
+    hash::{Hash, Hasher},
+    slice,
+};
+use hashbrown::DefaultHashBuilder;
 
 use super::InlineArray;
 
@@ -184,7 +185,8 @@ impl<K: Eq + Hash + Clone, V: Clone> BsHashMap<K, V> {
         K: Borrow<Q>,
         Q: Eq + Hash + ?Sized,
     {
-        let mut hasher = DefaultHasher::new();
+        let hasher = DefaultHashBuilder::default();
+        let mut hasher = hasher.build_hasher();
         key.borrow().hash(&mut hasher);
         hasher.finish() as usize
     }

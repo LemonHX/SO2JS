@@ -34,8 +34,11 @@ pub struct SetPrototype;
 impl SetPrototype {
     /// Properties of the Set Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-set-prototype-object)
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         // Create values function as it is referenced by multiple properties
         let values_function =
@@ -50,9 +53,21 @@ impl SetPrototype {
         object.intrinsic_func(cx, cx.names.for_each(), Self::for_each, 1, realm)?;
         object.intrinsic_func(cx, cx.names.has(), Self::has, 1, realm)?;
         object.intrinsic_func(cx, cx.names.intersection(), Self::intersection, 1, realm)?;
-        object.intrinsic_func(cx, cx.names.is_disjoint_from(), Self::is_disjoint_from, 1, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.is_disjoint_from(),
+            Self::is_disjoint_from,
+            1,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.is_subset_of(), Self::is_subset_of, 1, realm)?;
-        object.intrinsic_func(cx, cx.names.is_superset_of(), Self::is_superset_of, 1, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.is_superset_of(),
+            Self::is_superset_of,
+            1,
+            realm,
+        )?;
         object.intrinsic_data_prop(cx, cx.names.keys(), values_function)?;
         object.intrinsic_getter(cx, cx.names.size(), Self::size, realm)?;
         object.intrinsic_func(

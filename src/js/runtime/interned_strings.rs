@@ -39,7 +39,10 @@ impl InternedStrings {
     }
 
     pub fn uninit() -> InternedStrings {
-        InternedStrings { strings: HeapPtr::uninit(), generator_cache: HashMap::new() }
+        InternedStrings {
+            strings: HeapPtr::uninit(),
+            generator_cache: HashMap::new(),
+        }
     }
 
     pub fn strings(cx: Context) -> HeapPtr<InternedStringsSet> {

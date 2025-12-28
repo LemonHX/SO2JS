@@ -1,6 +1,8 @@
-use std::mem::size_of;
-
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
 use brimstone_macros::wrap_ordinary_object;
+use core::mem::size_of;
 
 use crate::{
     extend_object,
@@ -148,7 +150,12 @@ impl StringObject {
         let code_unit = string.code_unit_at(index)?;
         let char_string = FlatString::from_code_unit(cx, code_unit)?.as_string();
 
-        Ok(Some(PropertyDescriptor::data(char_string.into(), false, true, false)))
+        Ok(Some(PropertyDescriptor::data(
+            char_string.into(),
+            false,
+            true,
+            false,
+        )))
     }
 }
 
@@ -178,7 +185,12 @@ impl VirtualObject for Handle<StringObject> {
         let string_desc = self.string_get_own_property(cx, key)?;
         if string_desc.is_some() {
             let is_extensible = self.as_object().is_extensible_field();
-            Ok(is_compatible_property_descriptor(cx, is_extensible, desc, string_desc)?)
+            Ok(is_compatible_property_descriptor(
+                cx,
+                is_extensible,
+                desc,
+                string_desc,
+            )?)
         } else {
             ordinary_define_own_property(cx, self.as_object(), key, desc)
         }

@@ -1,6 +1,7 @@
-use std::mem::size_of;
-
+use alloc::vec;
+use alloc::vec::Vec;
 use brimstone_macros::wrap_ordinary_object;
+use core::mem::size_of;
 
 use crate::{
     extend_object, must, must_a,
@@ -66,7 +67,12 @@ impl VirtualObject for Handle<ArrayObject> {
                 return Ok(false);
             }
 
-            if !must!(ordinary_define_own_property(cx, self.as_object(), key, desc)) {
+            if !must!(ordinary_define_own_property(
+                cx,
+                self.as_object(),
+                key,
+                desc
+            )) {
                 return Ok(false);
             }
 
@@ -257,7 +263,12 @@ pub fn create_array_from_list(
     for (index, element) in elements.iter().enumerate() {
         // TODO: Handle keys out of u32 range
         key.replace(PropertyKey::array_index(cx, index as u32)?);
-        must_a!(create_data_property_or_throw(cx, array.into(), key, *element));
+        must_a!(create_data_property_or_throw(
+            cx,
+            array.into(),
+            key,
+            *element
+        ));
     }
 
     Ok(array)

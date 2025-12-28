@@ -15,24 +15,24 @@ clap = { workspace = true, features = ["derive"] }
 
 brimstone_core.workspace = true
 brimstone_serialized_heap.workspace = true
+parking_lot.workspace = true
+once_cell.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
 
 [features]
-default = ["alloc_error", "annex_b", "jemalloc"]
+default = ["alloc_error", "annex_b"]
 # Enable Annex B extensions by default
 annex_b = ["brimstone_core/annex_b"]
-# Run the garbage collector in stress test mode
-gc_stress_test = ["brimstone_core/gc_stress_test"]
 # Collect handle use statistics
 handle_stats = ["brimstone_core/handle_stats"]
-# Use the jemalloc allocator
-jemalloc = ["brimstone_core/jemalloc"]
-# Do not use the jemalloc allocator, overrides the `jemalloc` feature
-no_jemalloc = ["brimstone_core/no_jemalloc"]
 # Return allocation errors instead of panicking
 alloc_error = ["brimstone_core/alloc_error"]
+
+
+# Run the garbage collector in stress test mode
+gc_stress_test = ["brimstone_core/gc_stress_test"]
 
 [lints]
 workspace = true

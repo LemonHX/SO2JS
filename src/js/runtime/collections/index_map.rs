@@ -1,10 +1,3 @@
-use std::{
-    collections::hash_map::DefaultHasher,
-    hash::{Hash, Hasher},
-    mem::size_of,
-    slice,
-};
-
 use crate::{
     field_offset,
     runtime::{
@@ -15,6 +8,14 @@ use crate::{
     },
     set_uninit,
 };
+use alloc::string::String;
+use core::hash::BuildHasher;
+use core::{
+    hash::{Hash, Hasher},
+    mem::size_of,
+    slice,
+};
+use hashbrown::DefaultHashBuilder;
 
 use super::InlineArray;
 
@@ -90,7 +91,7 @@ impl<K: Eq + Hash + Clone, V: Clone> BsIndexMap<K, V> {
         let size = Self::calculate_size_in_bytes(map.capacity());
 
         let copied_map = cx.alloc_uninit_with_size::<Self>(size)?;
-        unsafe { std::ptr::copy(map.as_ptr(), copied_map.as_ptr(), size) };
+        unsafe { core::ptr::copy(map.as_ptr(), copied_map.as_ptr(), size) };
 
         Ok(copied_map)
     }
@@ -144,7 +145,9 @@ impl<K: Eq + Hash + Clone, V: Clone> BsIndexMap<K, V> {
             None => false,
             Some(entry_index) => {
                 let entry = self.get_entry_unchecked_mut(entry_index);
-                *entry = Entry::Deleted { chain: entry.as_occupied_mut().chain };
+                *entry = Entry::Deleted {
+                    chain: entry.as_occupied_mut().chain,
+                };
 
                 self.num_occupied -= 1;
                 self.num_deleted += 1;
@@ -222,7 +225,7 @@ impl<K: Eq + Hash + Clone, V: Clone> BsIndexMap<K, V> {
     #[inline]
     fn get_new_map_ptr_mut(&mut self) -> &mut HeapPtr<Self> {
         unsafe {
-            std::mem::transmute::<&mut usize, &mut HeapPtr<Self>>(self.get_index_unchecked_mut(0))
+            core::mem::transmute::<&mut usize, &mut HeapPtr<Self>>(self.get_index_unchecked_mut(0))
         }
     }
 
@@ -255,12 +258,14 @@ impl<K: Eq + Hash + Clone, V: Clone> BsIndexMap<K, V> {
 
     #[inline]
     fn entries_as_slice(&self) -> &[Entry<K, V>] {
-        unsafe { std::slice::from_raw_parts(self.entries_as_ptr(), self.capacity()) }
+        unsafe { core::slice::from_raw_parts(self.entries_as_ptr(), self.capacity()) }
     }
 
     #[inline]
     fn entries_as_slice_mut(&mut self) -> &mut [Entry<K, V>] {
-        unsafe { std::slice::from_raw_parts_mut(self.entries_as_ptr().cast_mut(), self.capacity()) }
+        unsafe {
+            core::slice::from_raw_parts_mut(self.entries_as_ptr().cast_mut(), self.capacity())
+        }
     }
 
     #[inline]
@@ -295,7 +300,7 @@ impl<K: Eq + Hash + Clone, V: Clone> BsIndexMap<K, V> {
 
     #[inline]
     fn key_hash_code(key: &K) -> usize {
-        let mut hasher = DefaultHasher::new();
+        let mut hasher = DefaultHashBuilder::default().build_hasher();
         key.hash(&mut hasher);
         hasher.finish() as usize
     }
@@ -386,7 +391,11 @@ impl<K: Eq + Hash + Clone, V: Clone> BsIndexMap<K, V> {
         // Add new entry to end of entries array
         self.set_entry_unchecked(
             next_empty_entry_index,
-            Entry::Occupied(OccupiedEntry { key, value, chain: EMPTY_INDEX }),
+            Entry::Occupied(OccupiedEntry {
+                key,
+                value,
+                chain: EMPTY_INDEX,
+            }),
         );
         self.num_occupied += 1;
 
@@ -593,12 +602,18 @@ pub struct GcSafeEntriesIter<K, V> {
 impl<K, V> GcSafeEntriesIter<K, V> {
     #[inline]
     pub fn new(map: Handle<BsIndexMap<K, V>>) -> Self {
-        GcSafeEntriesIter { map, next_entry_index: 0 }
+        GcSafeEntriesIter {
+            map,
+            next_entry_index: 0,
+        }
     }
 
     #[inline]
     pub fn from_parts(map: Handle<BsIndexMap<K, V>>, next_entry_index: usize) -> Self {
-        GcSafeEntriesIter { map, next_entry_index }
+        GcSafeEntriesIter {
+            map,
+            next_entry_index,
+        }
     }
 
     #[inline]

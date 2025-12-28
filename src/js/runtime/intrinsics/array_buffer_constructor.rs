@@ -1,5 +1,3 @@
-use std::mem::size_of;
-
 use crate::{
     extend_object,
     runtime::{
@@ -20,6 +18,8 @@ use crate::{
     },
     set_uninit,
 };
+use alloc::format;
+use core::mem::size_of;
 
 use super::{intrinsics::Intrinsic, rust_runtime::return_this};
 
@@ -67,7 +67,10 @@ impl ArrayBufferObject {
         set_uninit!(object.data, None);
 
         if byte_length > MAX_ARRAY_BUFFER_SIZE {
-            return range_error(cx, &format!("cannot allocate array buffer of size {byte_length}"));
+            return range_error(
+                cx,
+                &format!("cannot allocate array buffer of size {byte_length}"),
+            );
         }
 
         if let Some(max_byte_length) = max_byte_length {
@@ -100,7 +103,12 @@ impl ArrayBufferObject {
             }
         } else {
             // Initialize data block to all zeros
-            Some(BsArray::<u8>::new(cx, HeapItemKind::ByteArray, byte_length, 0)?)
+            Some(BsArray::<u8>::new(
+                cx,
+                HeapItemKind::ByteArray,
+                byte_length,
+                0,
+            )?)
         };
 
         Ok(object)

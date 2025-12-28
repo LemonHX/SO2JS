@@ -1,8 +1,3 @@
-use crate::{
-    field_offset, handle_scope, must_a, parser::scope_tree::REALM_SCOPE_SLOT_NAME,
-    runtime::alloc_error::AllocResult, set_uninit,
-};
-
 use super::{
     builtin_function::BuiltinFunction,
     bytecode::function::Closure,
@@ -23,6 +18,11 @@ use super::{
     string_value::FlatString,
     Context, EvalResult, PropertyKey, Value,
 };
+use crate::{
+    field_offset, handle_scope, must_a, parser::scope_tree::REALM_SCOPE_SLOT_NAME,
+    runtime::alloc_error::AllocResult, set_uninit,
+};
+use alloc::format;
 
 /// Realms (https://tc39.es/ecma262/#sec-code-realms)
 #[repr(C)]
@@ -62,7 +62,10 @@ impl Realm {
             let size = Self::calculate_size_in_bytes();
             let mut realm = cx.alloc_uninit_with_size::<Realm>(size)?;
 
-            set_uninit!(realm.descriptor, cx.base_descriptors.get(HeapItemKind::Realm));
+            set_uninit!(
+                realm.descriptor,
+                cx.base_descriptors.get(HeapItemKind::Realm)
+            );
             set_uninit!(realm.global_object, HeapPtr::uninit());
             set_uninit!(realm.global_scopes, HeapPtr::uninit());
             set_uninit!(realm.lexical_names, HeapPtr::uninit());
@@ -318,7 +321,10 @@ impl GlobalScopes {
         let size = Self::calculate_size_in_bytes(capacity);
         let mut global_scopes = cx.alloc_uninit_with_size::<GlobalScopes>(size)?;
 
-        set_uninit!(global_scopes.descriptor, cx.base_descriptors.get(HeapItemKind::GlobalScopes));
+        set_uninit!(
+            global_scopes.descriptor,
+            cx.base_descriptors.get(HeapItemKind::GlobalScopes)
+        );
         set_uninit!(global_scopes.len, 0);
 
         // Leave scopes array uninitialized
@@ -366,7 +372,7 @@ impl GlobalScopes {
 
         // Copy data from old array to new array
         unsafe {
-            std::ptr::copy_nonoverlapping(
+            core::ptr::copy_nonoverlapping(
                 old_global_scopes.scopes.data_ptr(),
                 new_global_scopes.scopes.data_mut_ptr(),
                 old_len,
@@ -412,7 +418,11 @@ pub struct LexicalNameLocation {
 
 impl LexicalNameLocation {
     pub fn new(global_scope_index: usize, slot_index: u32, is_immutable: bool) -> Self {
-        Self { global_scope_index, slot_index, is_immutable }
+        Self {
+            global_scope_index,
+            slot_index,
+            is_immutable,
+        }
     }
 
     pub fn is_immutable(&self) -> bool {

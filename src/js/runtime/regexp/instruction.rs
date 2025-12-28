@@ -1,9 +1,11 @@
-use std::{marker::PhantomData, mem::size_of};
-
 use crate::{
     common::{unicode::to_string_or_unicode_escape_sequence, unicode_property::UnicodeProperty},
     static_assert,
 };
+use alloc::string::String;
+use alloc::vec::Vec;
+use alloc::format;
+use core::{marker::PhantomData, mem::size_of};
 
 /// Instructions are encoded as a variable width sequence of 4-byte integers.
 #[derive(Clone, Copy, Debug)]
@@ -210,12 +212,12 @@ impl Instruction {
 
     #[inline]
     pub fn cast<T: TInstruction>(&self) -> &T {
-        unsafe { std::mem::transmute(self) }
+        unsafe { core::mem::transmute(self) }
     }
 
     #[inline]
     pub fn cast_mut<T: TInstruction>(&mut self) -> &mut T {
-        unsafe { std::mem::transmute(self) }
+        unsafe { core::mem::transmute(self) }
     }
 
     pub fn debug_print(&self) -> String {
@@ -331,7 +333,10 @@ nullary_regexp_bytcode_instruction!(AcceptInstruction, OpCode::Accept);
 nullary_regexp_bytcode_instruction!(FailInstruction, OpCode::Fail);
 nullary_regexp_bytcode_instruction!(AssertStartInstruction, OpCode::AssertStart);
 nullary_regexp_bytcode_instruction!(AssertEndInstruction, OpCode::AssertEnd);
-nullary_regexp_bytcode_instruction!(AssertStartOrNewlineInstruction, OpCode::AssertStartOrNewline);
+nullary_regexp_bytcode_instruction!(
+    AssertStartOrNewlineInstruction,
+    OpCode::AssertStartOrNewline
+);
 nullary_regexp_bytcode_instruction!(AssertEndOrNewlineInstruction, OpCode::AssertEndOrNewline);
 nullary_regexp_bytcode_instruction!(
     WordBoundaryMoveToPreviousInstruction,
@@ -707,7 +712,11 @@ impl<'a> InstructionIterator<'a> {
         let ptr = buf.as_ptr();
         let end = unsafe { ptr.add(buf.len()) };
 
-        Self { ptr, end, _marker: PhantomData }
+        Self {
+            ptr,
+            end,
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -742,7 +751,11 @@ impl<'a> InstructionIteratorMut<'a> {
         let ptr = buf.as_mut_ptr();
         let end = unsafe { ptr.add(buf.len()) };
 
-        Self { ptr, end, _marker: PhantomData }
+        Self {
+            ptr,
+            end,
+            _marker: PhantomData,
+        }
     }
 }
 

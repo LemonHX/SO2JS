@@ -1,4 +1,4 @@
-use std::mem::size_of;
+use core::mem::size_of;
 
 use crate::set_uninit;
 
@@ -39,7 +39,7 @@ impl<T> InlineArray<T> {
 
         // Set uninitialized memory
         unsafe {
-            std::ptr::copy_nonoverlapping(vec.as_ptr(), self.data_mut_ptr(), vec.len());
+            core::ptr::copy_nonoverlapping(vec.as_ptr(), self.data_mut_ptr(), vec.len());
         }
     }
 
@@ -65,12 +65,12 @@ impl<T> InlineArray<T> {
 
     #[inline]
     pub fn as_slice(&self) -> &[T] {
-        unsafe { std::slice::from_raw_parts(self.data_ptr(), self.len()) }
+        unsafe { core::slice::from_raw_parts(self.data_ptr(), self.len()) }
     }
 
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
-        unsafe { std::slice::from_raw_parts_mut(self.data_mut_ptr(), self.len()) }
+        unsafe { core::slice::from_raw_parts_mut(self.data_mut_ptr(), self.len()) }
     }
 
     #[inline]

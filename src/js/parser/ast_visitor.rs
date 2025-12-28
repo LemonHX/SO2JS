@@ -479,7 +479,9 @@ pub fn default_visit_function_param<'a, V: AstVisitor<'a>>(
     param: &mut FunctionParam<'a>,
 ) {
     match param {
-        FunctionParam::Pattern { ref mut pattern, .. } => visitor.visit_pattern(pattern),
+        FunctionParam::Pattern {
+            ref mut pattern, ..
+        } => visitor.visit_pattern(pattern),
         FunctionParam::Rest { ref mut rest, .. } => visitor.visit_rest_element(rest),
     }
 }

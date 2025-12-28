@@ -1,3 +1,5 @@
+use alloc::format;
+
 use crate::runtime::{
     abstract_operations::{construct, species_constructor},
     alloc_error::AllocResult,
@@ -23,8 +25,11 @@ pub struct ArrayBufferPrototype;
 impl ArrayBufferPrototype {
     /// Properties of the ArrayBuffer Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-prototype-object)
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         // Constructor property is added once ArrayBufferConstructor has been created
         object.intrinsic_getter(cx, cx.names.byte_length(), Self::get_byte_length, realm)?;
@@ -52,7 +57,12 @@ impl ArrayBufferPrototype {
         object.set_property(
             cx,
             to_string_tag_key,
-            Property::data(cx.names.array_buffer().as_string().into(), false, false, true),
+            Property::data(
+                cx.names.array_buffer().as_string().into(),
+                false,
+                false,
+                true,
+            ),
         )?;
 
         Ok(object)
@@ -134,7 +144,7 @@ impl ArrayBufferPrototype {
         let old_byte_length = array_buffer.byte_length();
 
         unsafe {
-            std::ptr::copy(
+            core::ptr::copy(
                 array_buffer.data().as_ptr(),
                 new_data.as_mut_slice().as_mut_ptr(),
                 old_byte_length.min(new_byte_length),
@@ -144,7 +154,7 @@ impl ArrayBufferPrototype {
         // Initialize rest of array to all zeros
         if new_byte_length > old_byte_length {
             unsafe {
-                std::ptr::write_bytes(
+                core::ptr::write_bytes(
                     new_data.as_mut_slice().as_mut_ptr().add(old_byte_length),
                     0,
                     new_byte_length - old_byte_length,
@@ -234,7 +244,7 @@ impl ArrayBufferPrototype {
             let source = array_buffer.data().as_ptr().add(start_index as usize);
             let target = new_array_buffer.data().as_mut_ptr();
 
-            std::ptr::copy_nonoverlapping(source, target, new_length as usize)
+            core::ptr::copy_nonoverlapping(source, target, new_length as usize)
         }
 
         Ok(new_array_buffer.as_value())
@@ -283,5 +293,8 @@ fn require_array_buffer(
         }
     }
 
-    type_error(cx, &format!("ArrayBuffer.prototype.{method_name} expected ArrayBuffer"))
+    type_error(
+        cx,
+        &format!("ArrayBuffer.prototype.{method_name} expected ArrayBuffer"),
+    )
 }

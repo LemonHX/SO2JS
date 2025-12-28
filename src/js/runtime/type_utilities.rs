@@ -1,5 +1,6 @@
-use std::cmp::Ordering;
-
+use alloc::string::String;
+use alloc::string::ToString;
+use core::cmp::Ordering;
 use num_bigint::{BigInt, ToBigInt};
 
 use crate::{
@@ -669,7 +670,10 @@ pub fn to_index(cx: Context, value_handle: Handle<Value>) -> EvalResult<usize> {
     if value.is_smi() {
         let smi = value.as_smi();
         if smi < 0 {
-            range_error(cx, &format!("{smi} is out of range for an array index"))
+            range_error(
+                cx,
+                &alloc::format!("{smi} is out of range for an array index"),
+            )
         } else {
             Ok(smi as usize)
         }
@@ -678,7 +682,10 @@ pub fn to_index(cx: Context, value_handle: Handle<Value>) -> EvalResult<usize> {
     } else {
         let integer = to_integer_or_infinity(cx, value_handle)?;
         if !(0.0..=MAX_SAFE_INTEGER_F64).contains(&integer) {
-            range_error(cx, &format!("{integer} is out of range for an array index"))
+            range_error(
+                cx,
+                &alloc::format!("{integer} is out of range for an array index"),
+            )
         } else {
             Ok(integer as usize)
         }

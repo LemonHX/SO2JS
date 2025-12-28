@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use alloc::collections::VecDeque;
 
 use crate::{
     completion_value, eval_err, handle_scope,
@@ -30,7 +30,9 @@ pub enum Task {
 
 impl TaskQueue {
     pub fn new() -> Self {
-        Self { tasks: VecDeque::new() }
+        Self {
+            tasks: VecDeque::new(),
+        }
     }
 
     pub fn enqueue(&mut self, task: Task) {
@@ -47,7 +49,9 @@ impl TaskQueue {
         generator: HeapPtr<ObjectValue>,
         result: Value,
     ) {
-        self.enqueue(Task::AwaitResume(AwaitResumeTask::new(kind, generator, result)));
+        self.enqueue(Task::AwaitResume(AwaitResumeTask::new(
+            kind, generator, result,
+        )));
     }
 
     pub fn enqueue_promise_then_reaction_task(
@@ -85,7 +89,9 @@ impl TaskQueue {
                     visitor.visit_value(func);
                     visitor.visit_value(arg);
                 }
-                Task::AwaitResume(AwaitResumeTask { generator, result, .. }) => {
+                Task::AwaitResume(AwaitResumeTask {
+                    generator, result, ..
+                }) => {
                     visitor.visit_pointer(generator);
                     visitor.visit_value(result);
                 }
@@ -175,7 +181,11 @@ pub struct AwaitResumeTask {
 
 impl AwaitResumeTask {
     fn new(kind: PromiseReactionKind, generator: HeapPtr<ObjectValue>, result: Value) -> Self {
-        Self { kind, generator, result }
+        Self {
+            kind,
+            generator,
+            result,
+        }
     }
 
     fn execute(&self, mut cx: Context) -> EvalResult<()> {
@@ -227,7 +237,13 @@ impl PromiseThenReactionTask {
         result: Value,
         realm: Option<HeapPtr<Realm>>,
     ) -> Self {
-        Self { kind, handler, capability, result, realm }
+        Self {
+            kind,
+            handler,
+            capability,
+            result,
+            realm,
+        }
     }
 
     fn execute(&self, mut cx: Context) -> EvalResult<()> {
@@ -292,7 +308,12 @@ impl PromiseThenSettleTask {
         promise: HeapPtr<PromiseObject>,
         realm: HeapPtr<Realm>,
     ) -> Self {
-        Self { then_function, resolution, promise, realm }
+        Self {
+            then_function,
+            resolution,
+            promise,
+            realm,
+        }
     }
 
     fn execute(&self, mut cx: Context) -> EvalResult<()> {

@@ -697,7 +697,10 @@ impl ScriptProperty {
         ICU.scripts
             .names
             .get_strict(str)
-            .map(|script| ScriptProperty { script, with_extensions })
+            .map(|script| ScriptProperty {
+                script,
+                with_extensions,
+            })
     }
 
     pub fn add_to_set(&self, set_builder: &mut CodePointInversionListBuilder) {

@@ -1,4 +1,6 @@
-use std::rc::Rc;
+use alloc::format;
+use alloc::rc::Rc;
+use alloc::string::ToString;
 
 use crate::{
     common::wtf_8::Wtf8String,

@@ -1,4 +1,8 @@
-use std::{borrow::Cow, fmt};
+use alloc::{
+    borrow::Cow,
+    fmt, format,
+    string::ToString,
+};
 
 use super::{ast::AstStr, loc::Loc};
 
@@ -158,16 +162,28 @@ impl Token<'_> {
             }
             Token::RegExpLiteral(RegExpToken { raw, .. }) => return Cow::Owned(raw.to_string()),
             Token::TemplatePart(TemplatePartToken {
-                raw, is_head: true, is_tail: true, ..
+                raw,
+                is_head: true,
+                is_tail: true,
+                ..
             }) => return Cow::Owned(format!("`{raw}`")),
             Token::TemplatePart(TemplatePartToken {
-                raw, is_head: true, is_tail: false, ..
+                raw,
+                is_head: true,
+                is_tail: false,
+                ..
             }) => return Cow::Owned(format!("`{raw}${{`")),
             Token::TemplatePart(TemplatePartToken {
-                raw, is_head: false, is_tail: true, ..
+                raw,
+                is_head: false,
+                is_tail: true,
+                ..
             }) => return Cow::Owned(format!("}}{raw}`")),
             Token::TemplatePart(TemplatePartToken {
-                raw, is_head: false, is_tail: false, ..
+                raw,
+                is_head: false,
+                is_tail: false,
+                ..
             }) => return Cow::Owned(format!("}}{raw}${{`")),
             Token::Plus => "+",
             Token::Minus => "-",

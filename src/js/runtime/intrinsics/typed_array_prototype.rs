@@ -1,5 +1,6 @@
-use std::cmp::Ordering;
-
+use alloc::string::ToString;
+use alloc::vec;
+use core::cmp::Ordering;
 use num_bigint::{BigUint, Sign};
 
 use crate::{
@@ -41,8 +42,11 @@ pub struct TypedArrayPrototype;
 impl TypedArrayPrototype {
     /// Properties of the %TypedArray% Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-%typedarrayprototype%-object)
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         // Constructor property is added once TypedArrayConstructor has been created
 
@@ -62,7 +66,13 @@ impl TypedArrayPrototype {
         object.intrinsic_func(cx, cx.names.find(), Self::find, 1, realm)?;
         object.intrinsic_func(cx, cx.names.find_index(), Self::find_index, 1, realm)?;
         object.intrinsic_func(cx, cx.names.find_last(), Self::find_last, 1, realm)?;
-        object.intrinsic_func(cx, cx.names.find_last_index(), Self::find_last_index, 1, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.find_last_index(),
+            Self::find_last_index,
+            1,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.for_each(), Self::for_each, 1, realm)?;
         object.intrinsic_func(cx, cx.names.includes(), Self::includes, 1, realm)?;
         object.intrinsic_func(cx, cx.names.index_of(), Self::index_of, 1, realm)?;
@@ -79,7 +89,13 @@ impl TypedArrayPrototype {
         object.intrinsic_func(cx, cx.names.some(), Self::some, 1, realm)?;
         object.intrinsic_func(cx, cx.names.sort(), Self::sort, 1, realm)?;
         object.intrinsic_func(cx, cx.names.subarray(), Self::subarray, 2, realm)?;
-        object.intrinsic_func(cx, cx.names.to_locale_string(), Self::to_locale_string, 0, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.to_locale_string(),
+            Self::to_locale_string,
+            0,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.to_reversed(), Self::to_reversed, 0, realm)?;
         object.intrinsic_func(cx, cx.names.to_sorted(), Self::to_sorted, 1, realm)?;
         // Use Array.prototype.toString directly
@@ -1651,7 +1667,7 @@ macro_rules! create_typed_array_prototype {
                 )?;
 
                 // Constructor property is added once TypedArrayConstructor has been created
-                let element_size_value = cx.smi(std::mem::size_of::<$element_type>() as i32);
+                let element_size_value = cx.smi(core::mem::size_of::<$element_type>() as i32);
                 object.intrinsic_frozen_property(
                     cx,
                     cx.names.bytes_per_element(),
@@ -1713,7 +1729,10 @@ fn typed_array_species_create(
     let result = typed_array_create_from_constructor(cx, constructor, arguments)?;
 
     if result.content_type() != exemplar.content_type() {
-        return type_error(cx, "typed arrays must both contain either numbers or BigInts");
+        return type_error(
+            cx,
+            "typed arrays must both contain either numbers or BigInts",
+        );
     }
 
     Ok(result)
@@ -1813,7 +1832,10 @@ pub fn make_typed_array_with_buffer_witness_record(
         Some(array_buffer.byte_length())
     };
 
-    TypedArrayWithBufferWitnessRecord { typed_array, cached_buffer_byte_length: byte_length }
+    TypedArrayWithBufferWitnessRecord {
+        typed_array,
+        cached_buffer_byte_length: byte_length,
+    }
 }
 
 /// TypedArrayByteLength (https://tc39.es/ecma262/#sec-typedarraybytelength)

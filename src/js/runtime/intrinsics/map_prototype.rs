@@ -24,8 +24,11 @@ pub struct MapPrototype;
 impl MapPrototype {
     /// Properties of the Map Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-map-prototype-object)
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         // Create values function as it is referenced by multiple properties
         let entries_function =

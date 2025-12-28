@@ -1,4 +1,4 @@
-use std::mem::size_of;
+use core::mem::size_of;
 
 use crate::{
     cast_from_value_fn, extend_object,
@@ -140,7 +140,13 @@ impl RegExpStringIteratorPrototype {
             let next_index =
                 advance_u64_string_index(target_string, last_index, regexp_iterator.is_unicode)?;
             let next_index_value = Value::from(next_index).to_handle(cx);
-            set(cx, regexp_object, cx.names.last_index(), next_index_value, true)?;
+            set(
+                cx,
+                regexp_object,
+                cx.names.last_index(),
+                next_index_value,
+                true,
+            )?;
         }
 
         Ok(create_iter_result_object(cx, match_result, false)?)

@@ -1,5 +1,3 @@
-use std::mem::size_of;
-
 use crate::{
     extend_object,
     runtime::{
@@ -22,6 +20,9 @@ use crate::{
         Context, Handle, HeapPtr, Value,
     },
 };
+use alloc::string::ToString;
+use alloc::format;
+use core::mem::size_of;
 
 extend_object! {
     pub struct ObjectPrototype {}
@@ -47,8 +48,20 @@ impl ObjectPrototype {
         object_ordinary_init(cx, *object, descriptor, None);
 
         // Constructor property is added once ObjectConstructor has been created
-        object.intrinsic_func(cx, cx.names.has_own_property(), Self::has_own_property, 1, realm)?;
-        object.intrinsic_func(cx, cx.names.is_prototype_of(), Self::is_prototype_of, 1, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.has_own_property(),
+            Self::has_own_property,
+            1,
+            realm,
+        )?;
+        object.intrinsic_func(
+            cx,
+            cx.names.is_prototype_of(),
+            Self::is_prototype_of,
+            1,
+            realm,
+        )?;
         object.intrinsic_func(
             cx,
             cx.names.property_is_enumerable(),
@@ -57,7 +70,13 @@ impl ObjectPrototype {
             realm,
         )?;
         object.intrinsic_func(cx, cx.names.value_of(), Self::value_of, 0, realm)?;
-        object.intrinsic_func(cx, cx.names.to_locale_string(), Self::to_locale_string, 0, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.to_locale_string(),
+            Self::to_locale_string,
+            0,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.to_string(), Self::to_string, 0, realm)?;
 
         object.intrinsic_getter_and_setter(
@@ -68,10 +87,34 @@ impl ObjectPrototype {
             realm,
         )?;
 
-        object.intrinsic_func(cx, cx.names.__define_getter__(), Self::define_getter, 2, realm)?;
-        object.intrinsic_func(cx, cx.names.__define_setter__(), Self::define_setter, 2, realm)?;
-        object.intrinsic_func(cx, cx.names.__lookup_getter__(), Self::lookup_getter, 1, realm)?;
-        object.intrinsic_func(cx, cx.names.__lookup_setter__(), Self::lookup_setter, 1, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.__define_getter__(),
+            Self::define_getter,
+            2,
+            realm,
+        )?;
+        object.intrinsic_func(
+            cx,
+            cx.names.__define_setter__(),
+            Self::define_setter,
+            2,
+            realm,
+        )?;
+        object.intrinsic_func(
+            cx,
+            cx.names.__lookup_getter__(),
+            Self::lookup_getter,
+            1,
+            realm,
+        )?;
+        object.intrinsic_func(
+            cx,
+            cx.names.__lookup_setter__(),
+            Self::lookup_setter,
+            1,
+            realm,
+        )?;
 
         Ok(())
     }

@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 use crate::{
     common::{
         icu::ICU,
@@ -39,6 +37,10 @@ use crate::{
         Context, Handle, HeapPtr, PropertyKey,
     },
 };
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::cmp::Ordering;
 
 use super::regexp_constructor::FlagsSource;
 
@@ -60,9 +62,21 @@ impl StringPrototype {
         object.intrinsic_func(cx, cx.names.ends_with(), Self::ends_with, 1, realm)?;
         object.intrinsic_func(cx, cx.names.includes(), Self::includes, 1, realm)?;
         object.intrinsic_func(cx, cx.names.index_of(), Self::index_of, 1, realm)?;
-        object.intrinsic_func(cx, cx.names.is_well_formed(), Self::is_well_formed, 0, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.is_well_formed(),
+            Self::is_well_formed,
+            0,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.last_index_of(), Self::last_index_of, 1, realm)?;
-        object.intrinsic_func(cx, cx.names.locale_compare(), Self::locale_compare, 1, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.locale_compare(),
+            Self::locale_compare,
+            1,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.match_(), Self::match_, 1, realm)?;
         object.intrinsic_func(cx, cx.names.match_all(), Self::match_all, 1, realm)?;
         object.intrinsic_func(cx, cx.names.normalize(), Self::normalize, 0, realm)?;
@@ -93,7 +107,13 @@ impl StringPrototype {
         )?;
         object.intrinsic_func(cx, cx.names.to_lower_case(), Self::to_lower_case, 0, realm)?;
         object.intrinsic_func(cx, cx.names.to_upper_case(), Self::to_upper_case, 0, realm)?;
-        object.intrinsic_func(cx, cx.names.to_well_formed(), Self::to_well_formed, 0, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.to_well_formed(),
+            Self::to_well_formed,
+            0,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.trim(), Self::trim, 0, realm)?;
         object.intrinsic_func(cx, cx.names.trim_end(), Self::trim_end, 0, realm)?;
         object.intrinsic_func(cx, cx.names.trim_start(), Self::trim_start, 0, realm)?;
@@ -320,7 +340,10 @@ impl StringPrototype {
 
         let search_string = get_argument(cx, arguments, 0);
         if is_regexp(cx, search_string)? {
-            return type_error(cx, "String.prototype.includes cannot take a regular expression");
+            return type_error(
+                cx,
+                "String.prototype.includes cannot take a regular expression",
+            );
         }
 
         let search_string = to_string(cx, search_string)?;
@@ -457,7 +480,12 @@ impl StringPrototype {
         let regexp_constructor = cx.get_intrinsic(Intrinsic::RegExpConstructor);
         let regexp_object = regexp_create(cx, regexp_source, regexp_constructor)?;
 
-        invoke(cx, regexp_object, cx.well_known_symbols.match_(), &[this_string.into()])
+        invoke(
+            cx,
+            regexp_object,
+            cx.well_known_symbols.match_(),
+            &[this_string.into()],
+        )
     }
 
     /// String.prototype.matchAll (https://tc39.es/ecma262/#sec-string.prototype.matchall)
@@ -508,7 +536,12 @@ impl StringPrototype {
         let regexp_constructor = cx.get_intrinsic(Intrinsic::RegExpConstructor);
         let regexp_object = regexp_create(cx, regexp_source, regexp_constructor)?;
 
-        invoke(cx, regexp_object, cx.well_known_symbols.match_all(), &[this_string.into()])
+        invoke(
+            cx,
+            regexp_object,
+            cx.well_known_symbols.match_all(),
+            &[this_string.into()],
+        )
     }
 
     /// String.prototype.normalize (https://tc39.es/ecma262/#sec-string.prototype.normalize)
@@ -730,11 +763,17 @@ impl StringPrototype {
             .substring(cx, 0, matched_position)?
             .as_string();
         let following_string = target_string
-            .substring(cx, matched_position + search_string.len(), target_string.len())?
+            .substring(
+                cx,
+                matched_position + search_string.len(),
+                target_string.len(),
+            )?
             .as_string();
 
-        let result_string =
-            StringValue::concat_all(cx, &[preceding_string, replacement_string, following_string])?;
+        let result_string = StringValue::concat_all(
+            cx,
+            &[preceding_string, replacement_string, following_string],
+        )?;
 
         Ok(result_string.as_value())
     }
@@ -880,7 +919,12 @@ impl StringPrototype {
         let regexp_constructor = cx.get_intrinsic(Intrinsic::RegExpConstructor);
         let regexp_object = regexp_create(cx, regexp_source, regexp_constructor)?;
 
-        invoke(cx, regexp_object, cx.well_known_symbols.search(), &[string.into()])
+        invoke(
+            cx,
+            regexp_object,
+            cx.well_known_symbols.search(),
+            &[string.into()],
+        )
     }
 
     /// String.prototype.slice (https://tc39.es/ecma262/#sec-string.prototype.slice)
@@ -1093,7 +1137,7 @@ impl StringPrototype {
         };
 
         if int_end < int_start {
-            std::mem::swap(&mut int_start, &mut int_end);
+            core::mem::swap(&mut int_start, &mut int_end);
         }
 
         Ok(string.substring(cx, int_start, int_end)?.as_value())
@@ -1487,7 +1531,10 @@ fn to_valid_string_parts(string: HeapPtr<FlatString>) -> Vec<StringPart> {
 
             // Flush the final valid range if one exists
             if i != start {
-                parts.push(StringPart::ValidRange(start as u32, code_units.len() as u32));
+                parts.push(StringPart::ValidRange(
+                    start as u32,
+                    code_units.len() as u32,
+                ));
             }
 
             parts
@@ -1627,8 +1674,10 @@ impl SubstitutionTemplateParser {
                     // Escaped `$` is represented as a range of length 1 pointing to the `$`
                     let dollar_sign_pos = self.pos + 1;
                     self.flush_range_and_skip(2);
-                    self.parts
-                        .push(SubstitutionPart::Range(dollar_sign_pos, dollar_sign_pos + 1));
+                    self.parts.push(SubstitutionPart::Range(
+                        dollar_sign_pos,
+                        dollar_sign_pos + 1,
+                    ));
                 } else if next_code_unit == '`' as u16 {
                     self.flush_range_and_skip(2);
                     self.parts.push(SubstitutionPart::BeforeMatch);
@@ -1699,7 +1748,10 @@ impl SubstitutionTemplateParser {
 
         self.flush_range_and_skip(0);
 
-        Ok(SubstitutionTemplate { parts: self.parts, template })
+        Ok(SubstitutionTemplate {
+            parts: self.parts,
+            template,
+        })
     }
 }
 
@@ -1733,8 +1785,10 @@ impl SubstitutionTemplate {
                 }
                 SubstitutionPart::AfterMatch => {
                     let target_string_length = target_string.len();
-                    let after_match_pos =
-                        u32::min(matched_position + matched_string.len(), target_string_length);
+                    let after_match_pos = u32::min(
+                        matched_position + matched_string.len(),
+                        target_string_length,
+                    );
 
                     let substring = target_string
                         .substring(cx, after_match_pos, target_string_length)?

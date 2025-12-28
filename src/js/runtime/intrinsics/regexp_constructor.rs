@@ -1,7 +1,8 @@
-use std::mem::size_of;
-
+use alloc::format;
 use brimstone_macros::match_u32;
 use bumpalo::Bump;
+use core::mem::size_of;
+use core::error::Error;
 
 use crate::{
     common::{
@@ -96,7 +97,13 @@ impl RegExpObject {
 
         // Initialize last index property
         let zero_value = cx.zero();
-        must!(set(cx, object.into(), cx.names.last_index(), zero_value, true));
+        must!(set(
+            cx,
+            object.into(),
+            cx.names.last_index(),
+            zero_value,
+            true
+        ));
 
         Ok(object)
     }
@@ -356,7 +363,13 @@ pub fn regexp_init(
 
     // Initialize last index property
     let zero_value = cx.zero();
-    set(cx, regexp_object.into(), cx.names.last_index(), zero_value, true)?;
+    set(
+        cx,
+        regexp_object.into(),
+        cx.names.last_index(),
+        zero_value,
+        true,
+    )?;
 
     Ok(regexp_object.as_value())
 }

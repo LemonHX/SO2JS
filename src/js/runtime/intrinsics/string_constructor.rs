@@ -16,6 +16,8 @@ use crate::{
         Context, Handle, PropertyKey, Value,
     },
 };
+use alloc::vec;
+use alloc::format;
 
 use super::{intrinsics::Intrinsic, symbol_prototype::symbol_descriptive_string};
 
@@ -39,8 +41,20 @@ impl StringConstructor {
             realm.get_intrinsic(Intrinsic::StringPrototype).into(),
         )?;
 
-        func.intrinsic_func(cx, cx.names.from_char_code(), Self::from_char_code, 1, realm)?;
-        func.intrinsic_func(cx, cx.names.from_code_point(), Self::from_code_point, 1, realm)?;
+        func.intrinsic_func(
+            cx,
+            cx.names.from_char_code(),
+            Self::from_char_code,
+            1,
+            realm,
+        )?;
+        func.intrinsic_func(
+            cx,
+            cx.names.from_code_point(),
+            Self::from_code_point,
+            1,
+            realm,
+        )?;
         func.intrinsic_func(cx, cx.names.raw(), Self::raw, 1, realm)?;
 
         Ok(func)

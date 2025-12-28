@@ -1,3 +1,13 @@
+use super::{
+    intrinsics::Intrinsic,
+    rust_runtime::return_this,
+    typed_array::DynTypedArray,
+    typed_array_prototype::{
+        is_typed_array_out_of_bounds, make_typed_array_with_buffer_witness_record,
+        typed_array_create_from_constructor, typed_array_create_from_constructor_object,
+        typed_array_length,
+    },
+};
 use crate::{
     must, must_a,
     runtime::{
@@ -18,17 +28,7 @@ use crate::{
         Context, Handle, PropertyKey, Realm,
     },
 };
-
-use super::{
-    intrinsics::Intrinsic,
-    rust_runtime::return_this,
-    typed_array::DynTypedArray,
-    typed_array_prototype::{
-        is_typed_array_out_of_bounds, make_typed_array_with_buffer_witness_record,
-        typed_array_create_from_constructor, typed_array_create_from_constructor_object,
-        typed_array_length,
-    },
-};
+use alloc::vec;
 
 /// The %TypedArray% Intrinsic Object (https://tc39.es/ecma262/#sec-%typedarray%-intrinsic-object)
 pub struct TypedArrayConstructor;
@@ -66,7 +66,10 @@ impl TypedArrayConstructor {
         _: Handle<Value>,
         _: &[Handle<Value>],
     ) -> EvalResult<Handle<Value>> {
-        type_error(cx, "TypedArray constructor is abstract and cannot be called")
+        type_error(
+            cx,
+            "TypedArray constructor is abstract and cannot be called",
+        )
     }
 
     /// %TypedArray%.from (https://tc39.es/ecma262/#sec-%typedarray%.from)
@@ -198,7 +201,7 @@ macro_rules! create_typed_array_constructor {
     ($typed_array:ident, $rust_name:ident, $element_type:ident, $content_type:expr, $prototype:ident, $constructor:ident, $to_element:ident, $from_element:ident) => {
         macro_rules! element_size {
             () => {
-                std::mem::size_of::<$element_type>()
+                core::mem::size_of::<$element_type>()
             };
         }
 

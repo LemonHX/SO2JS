@@ -15,8 +15,11 @@ pub struct IteratorHelperPrototype;
 
 impl IteratorHelperPrototype {
     pub fn new(mut cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::IteratorPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::IteratorPrototype)),
+            true,
+        )?;
 
         object.intrinsic_func(cx, cx.names.next(), Self::next, 0, realm)?;
         object.intrinsic_func(cx, cx.names.return_(), Self::return_, 1, realm)?;

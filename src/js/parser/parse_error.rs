@@ -1,8 +1,15 @@
-use std::error::Error;
-use std::rc::Rc;
-use std::{fmt, io};
+use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::rc::Rc;
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::error::Error;
+use core::fmt;
 
-use crate::common::error::{ErrorFormatter, FormatOptions, SourceInfo};
+use crate::common::error::{ErrorFormatter, SourceInfo};
 use crate::common::wtf_8::Wtf8String;
 use crate::parser::scope_tree::ANONYMOUS_DEFAULT_EXPORT_NAME;
 
@@ -15,7 +22,7 @@ use super::{
 
 #[derive(Debug)]
 pub enum ParseError {
-    Io(io::Error),
+    // Io(io::Error),
     #[allow(clippy::box_collection)]
     UnknownToken(Box<String>),
     #[allow(clippy::box_collection)]
@@ -178,10 +185,10 @@ impl ParseError {
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ParseError::Io(io_error) => {
-                f.write_str("Error: ")?;
-                io_error.fmt(f)
-            }
+            // ParseError::Io(io_error) => {
+            //     f.write_str("Error: ")?;
+            //     io_error.fmt(f)
+            // }
             ParseError::UnknownToken(token) => write!(f, "Unknown token {token}"),
             ParseError::UnexpectedToken(token) => write!(f, "Unexpected token {token}"),
             ParseError::ExpectedToken(payload) => {
@@ -201,7 +208,10 @@ impl fmt::Display for ParseError {
             ParseError::MalformedNumericLiteral => write!(f, "Malformed numeric literal"),
             ParseError::BigIntLeadingZero => write!(f, "BigInt cannot have a leading zero"),
             ParseError::InvalidNumericLiteralNextChar => {
-                write!(f, "This character cannot appear immediately after a numeric literal")
+                write!(
+                    f,
+                    "This character cannot appear immediately after a numeric literal"
+                )
             }
             ParseError::TrailingNumericSeparator => write!(
                 f,
@@ -214,10 +224,16 @@ impl fmt::Display for ParseError {
                 write!(f, "Rest element may not have a trailing comma")
             }
             ParseError::ThrowArgumentOnNewLine => {
-                write!(f, "No line break is allowed between 'throw' and its expression")
+                write!(
+                    f,
+                    "No line break is allowed between 'throw' and its expression"
+                )
             }
             ParseError::ArrowOnNewLine => {
-                write!(f, "No line break is allowed between arrow arguments and '=>'")
+                write!(
+                    f,
+                    "No line break is allowed between arrow arguments and '=>'"
+                )
             }
             ParseError::AmbiguousLetBracket => {
                 write!(f, "Expression cannot start with ambiguous `let [`")
@@ -256,10 +272,16 @@ impl fmt::Display for ParseError {
                 write!(f, "Tagged template cannot be used in optional chain")
             }
             ParseError::NullishCoalesceMixedWithLogical => {
-                write!(f, "Parentheses are required when mixing '??' with '&&' or '||' expressions")
+                write!(
+                    f,
+                    "Parentheses are required when mixing '??' with '&&' or '||' expressions"
+                )
             }
             ParseError::HashNotFollowedByIdentifier => {
-                write!(f, "Expected '#' to be immediately followed by an identifier")
+                write!(
+                    f,
+                    "Expected '#' to be immediately followed by an identifier"
+                )
             }
             ParseError::ForEachInitInvalidVarDecl => {
                 write!(f, "Variable declarations in the left hand side of a for each loop must contain a single declaration with no initializer")
@@ -290,7 +312,10 @@ impl fmt::Display for ParseError {
                 write!(f, "Octal escape sequences are not allowed in strict mode")
             }
             ParseError::LegacyNonOctalEscapeSequenceInStrictMode => {
-                write!(f, "\\8 and \\9 escape sequences are not allowed in strict mode")
+                write!(
+                    f,
+                    "\\8 and \\9 escape sequences are not allowed in strict mode"
+                )
             }
             ParseError::AssignEvalInStrictMode => {
                 write!(f, "Cannot assign to 'eval' in strict mode")
@@ -299,7 +324,10 @@ impl fmt::Display for ParseError {
                 write!(f, "Cannot assign to 'arguments' in strict mode")
             }
             ParseError::UseStrictFunctionNonSimpleParameterList => {
-                write!(f, "'use strict' only allowed in functions with simple parameter lists")
+                write!(
+                    f,
+                    "'use strict' only allowed in functions with simple parameter lists"
+                )
             }
             ParseError::InvalidDuplicateParameters(reason) => {
                 let reason_string = match reason {
@@ -367,7 +395,10 @@ impl fmt::Display for ParseError {
                 write!(f, "Super calls only allowed in derived constructors")
             }
             ParseError::DuplicateProtoProperty => {
-                write!(f, "Duplicate __proto__ properties are not allowed in object literals")
+                write!(
+                    f,
+                    "Duplicate __proto__ properties are not allowed in object literals"
+                )
             }
             ParseError::ConstWithoutInitializer => {
                 write!(f, "Const declarations must have an initializer")
@@ -394,7 +425,10 @@ impl fmt::Display for ParseError {
                 write!(f, "Exported name is not well formed")
             }
             ParseError::DirectExportNameIsString => {
-                write!(f, "String export names are only allowed when there is a `from` clause")
+                write!(
+                    f,
+                    "String export names are only allowed when there is a `from` clause"
+                )
             }
             ParseError::UnresolvedExport => {
                 write!(f, "Exported name is not defined in module")
@@ -454,7 +488,10 @@ impl fmt::Display for ParseError {
                 write!(f, "Quantifier too large in regular expression")
             }
             ParseError::NonQuantifiableAssertion => {
-                write!(f, "Quantifier on non-quantifiable assertion in regular expression")
+                write!(
+                    f,
+                    "Quantifier on non-quantifiable assertion in regular expression"
+                )
             }
             ParseError::InvalidUnicodeProperty => {
                 write!(f, "Invalid unicode property in regular expression")
@@ -469,7 +506,10 @@ impl fmt::Display for ParseError {
                 write!(f, "Inverted character class cannot contain strings")
             }
             ParseError::InvertedUnicodePropertyOfStrings => {
-                write!(f, "\\P character class cannot be used when class contains strings")
+                write!(
+                    f,
+                    "\\P character class cannot be used when class contains strings"
+                )
             }
             ParseError::UnicodePropertyOfStringsDisallowedInMode => {
                 write!(f, "Unicode character classes which contain strings are only allowed with `v` flag")
@@ -488,7 +528,10 @@ pub struct LocalizedParseError {
 
 impl LocalizedParseError {
     pub fn new_without_loc(error: ParseError) -> LocalizedParseError {
-        LocalizedParseError { error, source_loc: None }
+        LocalizedParseError {
+            error,
+            source_loc: None,
+        }
     }
 
     /// Format as a string to display to the user without the "SyntaxError:" prefix
@@ -503,11 +546,11 @@ impl LocalizedParseError {
         }
     }
 
-    pub fn format(&self, opts: &FormatOptions) -> String {
+    pub fn format(&self) -> String {
         let name = "SyntaxError".to_string();
         let message = self.error.to_string();
 
-        let mut formatter = ErrorFormatter::new(name, opts);
+        let mut formatter = ErrorFormatter::new(name);
         formatter.set_message(message);
 
         if let Some((loc, source)) = &self.source_loc {
@@ -532,11 +575,11 @@ impl fmt::Debug for LocalizedParseError {
     }
 }
 
-impl From<io::Error> for LocalizedParseError {
-    fn from(error: io::Error) -> LocalizedParseError {
-        LocalizedParseError::new_without_loc(ParseError::Io(error))
-    }
-}
+// impl From<io::Error> for LocalizedParseError {
+//     fn from(error: io::Error) -> LocalizedParseError {
+//         LocalizedParseError::new_without_loc(ParseError::Io(error))
+//     }
+// }
 
 pub struct LocalizedParseErrors {
     pub errors: Vec<LocalizedParseError>,
@@ -547,8 +590,8 @@ impl LocalizedParseErrors {
         LocalizedParseErrors { errors }
     }
 
-    pub fn format(&self, opts: &FormatOptions) -> String {
-        format_localized_parse_errors(&self.errors, opts)
+    pub fn format(&self) -> String {
+        format_localized_parse_errors(&self.errors)
     }
 }
 
@@ -556,7 +599,7 @@ impl Error for LocalizedParseErrors {}
 
 impl fmt::Display for LocalizedParseErrors {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", format_localized_parse_errors(&self.errors, &FormatOptions::default()))
+        write!(f, "{}", format_localized_parse_errors(&self.errors))
     }
 }
 
@@ -568,7 +611,7 @@ impl fmt::Debug for LocalizedParseErrors {
 
 pub type ParseResult<T> = Result<T, LocalizedParseError>;
 
-fn format_localized_parse_errors(errors: &[LocalizedParseError], opts: &FormatOptions) -> String {
+fn format_localized_parse_errors(errors: &[LocalizedParseError]) -> String {
     // Separate errors into those with and without locs
     let mut errors_without_loc = vec![];
     let mut errors_with_loc = vec![];
@@ -595,11 +638,11 @@ fn format_localized_parse_errors(errors: &[LocalizedParseError], opts: &FormatOp
 
     let mut error_messages = vec![];
     for error in errors_without_loc {
-        error_messages.push(error.format(opts));
+        error_messages.push(error.format());
     }
 
     for (error, _, _, _) in errors_with_loc {
-        error_messages.push(error.format(opts));
+        error_messages.push(error.format());
     }
 
     error_messages

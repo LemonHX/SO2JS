@@ -42,7 +42,10 @@ impl<W: Width> GenericCallInstruction<W> for CallInstruction<W> {
 
     #[inline]
     fn args(&self) -> GenericCallArgs<W> {
-        GenericCallArgs::Stack { argv: self.argv(), argc: self.argc() }
+        GenericCallArgs::Stack {
+            argv: self.argv(),
+            argc: self.argc(),
+        }
     }
 
     #[inline]
@@ -64,7 +67,10 @@ impl<W: Width> GenericCallInstruction<W> for CallWithReceiverInstruction<W> {
 
     #[inline]
     fn args(&self) -> GenericCallArgs<W> {
-        GenericCallArgs::Stack { argv: self.argv(), argc: self.argc() }
+        GenericCallArgs::Stack {
+            argv: self.argv(),
+            argc: self.argc(),
+        }
     }
 
     #[inline]
@@ -108,7 +114,10 @@ impl<W: Width> GenericCallInstruction<W> for CallMaybeEvalInstruction<W> {
 
     #[inline]
     fn args(&self) -> GenericCallArgs<W> {
-        GenericCallArgs::Stack { argv: self.argv(), argc: self.argc() }
+        GenericCallArgs::Stack {
+            argv: self.argv(),
+            argc: self.argc(),
+        }
     }
 
     #[inline]
@@ -160,7 +169,10 @@ impl<W: Width> GenericConstructInstruction<W> for ConstructInstruction<W> {
 
     #[inline]
     fn args(&self) -> GenericCallArgs<W> {
-        GenericCallArgs::Stack { argv: self.argv(), argc: self.argc() }
+        GenericCallArgs::Stack {
+            argv: self.argv(),
+            argc: self.argc(),
+        }
     }
 
     #[inline]

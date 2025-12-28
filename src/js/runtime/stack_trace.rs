@@ -1,7 +1,3 @@
-use crate::{
-    handle_scope_guard, parser::loc::find_line_col_for_pos, runtime::alloc_error::AllocResult,
-};
-
 use super::{
     bytecode::{function::BytecodeFunction, source_map::BytecodeSourceMap},
     collections::BsArray,
@@ -11,6 +7,14 @@ use super::{
     source_file::SourceFile,
     Context, Handle, HeapPtr,
 };
+use crate::{
+    handle_scope_guard, parser::loc::find_line_col_for_pos, runtime::alloc_error::AllocResult,
+};
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
+use alloc::format;
 
 /// An array of stack frame entries which contain the information necessary to construct a full
 /// stack trace later if desired.
@@ -78,7 +82,10 @@ fn gather_current_stack_frames(mut cx: Context, skip_current_frame: bool) -> Vec
             0
         };
 
-        frames.push(StackFrameInfo { function, bytecode_offset });
+        frames.push(StackFrameInfo {
+            function,
+            bytecode_offset,
+        });
 
         // Move to the parent stack frame
         pc = stack_frame.return_address();
@@ -179,7 +186,10 @@ pub fn create_stack_trace(
     let source_file_line_col =
         first_source_file_line_col.map(|(file, line, col)| (*file, line, col));
 
-    Ok(CachedStackTraceInfo { frames, source_file_line_col })
+    Ok(CachedStackTraceInfo {
+        frames,
+        source_file_line_col,
+    })
 }
 
 /// Prepare for a stack trace to be formatted. Perform any allocations that will be needed, such as

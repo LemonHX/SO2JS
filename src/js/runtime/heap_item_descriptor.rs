@@ -1,4 +1,6 @@
-use std::mem::size_of;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::mem::size_of;
 
 use bitflags::bitflags;
 
@@ -219,7 +221,9 @@ pub struct BaseDescriptors {
 
 impl BaseDescriptors {
     pub fn uninit_empty() -> Self {
-        BaseDescriptors { descriptors: vec![] }
+        BaseDescriptors {
+            descriptors: vec![],
+        }
     }
 
     pub fn uninit() -> Self {
@@ -276,7 +280,11 @@ impl BaseDescriptors {
 
         ordinary_object_descriptor!(HeapItemKind::BooleanObject);
         ordinary_object_descriptor!(HeapItemKind::NumberObject);
-        register_descriptor!(HeapItemKind::StringObject, StringObject, DescFlags::IS_OBJECT);
+        register_descriptor!(
+            HeapItemKind::StringObject,
+            StringObject,
+            DescFlags::IS_OBJECT
+        );
         ordinary_object_descriptor!(HeapItemKind::SymbolObject);
         ordinary_object_descriptor!(HeapItemKind::BigIntObject);
         register_descriptor!(HeapItemKind::ArrayObject, ArrayObject, DescFlags::IS_OBJECT);
@@ -308,11 +316,31 @@ impl BaseDescriptors {
         register_descriptor!(HeapItemKind::UInt16Array, UInt16Array, DescFlags::IS_OBJECT);
         register_descriptor!(HeapItemKind::Int32Array, Int32Array, DescFlags::IS_OBJECT);
         register_descriptor!(HeapItemKind::UInt32Array, UInt32Array, DescFlags::IS_OBJECT);
-        register_descriptor!(HeapItemKind::BigInt64Array, BigInt64Array, DescFlags::IS_OBJECT);
-        register_descriptor!(HeapItemKind::BigUInt64Array, BigUInt64Array, DescFlags::IS_OBJECT);
-        register_descriptor!(HeapItemKind::Float16Array, Float16Array, DescFlags::IS_OBJECT);
-        register_descriptor!(HeapItemKind::Float32Array, Float32Array, DescFlags::IS_OBJECT);
-        register_descriptor!(HeapItemKind::Float64Array, Float64Array, DescFlags::IS_OBJECT);
+        register_descriptor!(
+            HeapItemKind::BigInt64Array,
+            BigInt64Array,
+            DescFlags::IS_OBJECT
+        );
+        register_descriptor!(
+            HeapItemKind::BigUInt64Array,
+            BigUInt64Array,
+            DescFlags::IS_OBJECT
+        );
+        register_descriptor!(
+            HeapItemKind::Float16Array,
+            Float16Array,
+            DescFlags::IS_OBJECT
+        );
+        register_descriptor!(
+            HeapItemKind::Float32Array,
+            Float32Array,
+            DescFlags::IS_OBJECT
+        );
+        register_descriptor!(
+            HeapItemKind::Float64Array,
+            Float64Array,
+            DescFlags::IS_OBJECT
+        );
 
         ordinary_object_descriptor!(HeapItemKind::ArrayBufferObject);
         ordinary_object_descriptor!(HeapItemKind::DataViewObject);

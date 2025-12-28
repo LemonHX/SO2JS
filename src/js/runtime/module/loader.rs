@@ -1,8 +1,12 @@
-use std::{collections::HashSet, path::Path, rc::Rc};
+use alloc::rc::Rc;
+use alloc::string::String;
+use alloc::string::ToString;
+use hashbrown::HashSet;
 
+use crate::common::wtf_8::Wtf8String;
 use crate::{
     completion_value, must_a,
-    parser::{analyze::analyze, parse_module, print_program, source::Source, ParseContext},
+    parser::{analyze::analyze, parse_module, source::Source, ParseContext},
     runtime::{
         abstract_operations::call_object,
         alloc_error::AllocResult,
@@ -174,23 +178,31 @@ pub fn host_load_imported_module(
     module_request: ModuleRequest,
     realm: Handle<Realm>,
 ) -> EvalResult<DynModule> {
-    let source_file_path = Path::new(&source_file_path.to_string())
-        .canonicalize()
-        .unwrap();
-    let source_file_dir = source_file_path.parent().unwrap();
+    if cx.sys.is_none() {
+        return syntax_error(
+            cx,
+            "HostLoadImportedModule requires a host system interface",
+        );
+    }
+    let sys = cx.sys.as_ref().unwrap();
+    // let source_file_path = Path::new(&source_file_path.to_string())
+    //     .canonicalize()
+    //     .unwrap();
+    let source_file_dir = sys.file_get_parent_dir(&source_file_path.to_string());
 
     // Join source file path with specifier path so that relative specifiers will be applied to
     // source path and absolute specifiers will overwrite source path.
-    let new_module_path = source_file_dir
-        .join(Path::new(&module_request.specifier.to_string()))
-        .canonicalize();
+    // let new_module_path = source_file_dir
+    //     .join(Path::new(&module_request.specifier.to_string()))
+    //     .canonicalize();
+    let new_module_path_string =
+        sys.dir_concat(&source_file_dir, &module_request.specifier.to_string());
+    // let new_module_path = match new_module_path {
+    //     Ok(path) => path,
+    //     Err(error) => return syntax_error(cx, &error.to_string()),
+    // };
 
-    let new_module_path = match new_module_path {
-        Ok(path) => path,
-        Err(error) => return syntax_error(cx, &error.to_string()),
-    };
-
-    let new_module_path_string = new_module_path.to_str().unwrap().to_string();
+    // let new_module_path_string = new_module_path.to_str().unwrap().to_string();
 
     // Use the cached module if it has already been loaded
     {
@@ -205,7 +217,7 @@ pub fn host_load_imported_module(
     // Check if the module is a JSON module
     if let Some(attributes) = &module_request.attributes {
         if attributes.has_attribute_with_value("type", "json") {
-            let json_value = parse_json_file_at_path(cx, new_module_path.as_path())?;
+            let json_value = parse_json_file_at_path(cx, &new_module_path_string)?;
             let json_module = SyntheticModule::new_default_export(cx, realm, json_value)?;
 
             // Cache the JSON module
@@ -218,7 +230,15 @@ pub fn host_load_imported_module(
     }
 
     // Find the source file at the given path
-    let source = match Source::new_from_file(new_module_path.to_str().unwrap()) {
+    let source_code = sys.read_file(&new_module_path_string);
+    if source_code.is_none() {
+        return syntax_error(cx, "Failed to read source file");
+    }
+    let source_code = source_code.unwrap();
+    let source = match Source::new_for_string(
+        &new_module_path_string,
+        Wtf8String::from_bytes_unchecked(&source_code),
+    ) {
         Ok(source) => Rc::new(source),
         Err(error) => return syntax_parse_error(cx, &error),
     };
@@ -230,9 +250,9 @@ pub fn host_load_imported_module(
         Err(error) => return syntax_parse_error(cx, &error),
     };
 
-    if cx.options.print_ast {
-        println!("{}", print_program(&parse_result));
-    }
+    // if cx.options.print_ast {
+    //     println!("{}", print_program(&parse_result));
+    // }
 
     // Analyze AST
     let analyzed_result = match analyze(parse_result) {
@@ -259,12 +279,28 @@ pub fn host_load_imported_module(
     Ok(module.as_dyn_module())
 }
 
-fn parse_json_file_at_path(mut cx: Context, path: &Path) -> EvalResult<Handle<Value>> {
+fn parse_json_file_at_path(mut cx: Context, path: &str) -> EvalResult<Handle<Value>> {
+    match &cx.sys {
+        Some(sys) => {
+            let file_contents = sys.read_file(path);
+            if file_contents.is_none() {
+                return syntax_error(cx, "file could not found");
+            }
+            let file_contents = file_contents.unwrap();
+            let file_string = String::from_utf8(file_contents);
+            if let Ok(file_string) = file_string {
+                JSONObject::parse(
+                    cx,
+                    cx.undefined(),
+                    &[cx.alloc_string(&file_string)?.as_value()],
+                )
+            } else {
+                return syntax_error(cx, &file_string.unwrap_err().to_string());
+            }
+        }
+        None => EvalResult::Err(crate::runtime::eval_result::EvalError::Value(
+            Value::undefined().to_handle(cx),
+        )),
+    }
     // Read the contents of the file into the heap
-    let file_contents = match Source::new_from_file(path.to_str().unwrap()) {
-        Ok(source) => cx.alloc_wtf8_string(&source.contents)?,
-        Err(error) => return syntax_parse_error(cx, &error),
-    };
-
-    JSONObject::parse(cx, cx.undefined(), &[file_contents.as_value()])
 }

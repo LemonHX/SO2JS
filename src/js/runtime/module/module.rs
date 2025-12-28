@@ -1,7 +1,6 @@
-use std::{
-    collections::HashSet,
-    sync::{LazyLock, Mutex},
-};
+use alloc::vec::Vec;
+use core::sync::atomic::AtomicUsize;
+use hashbrown::HashSet;
 
 use crate::{
     heap_trait_object,
@@ -55,7 +54,10 @@ pub enum ModuleEnum {
 
 #[derive(Clone, Copy)]
 pub enum ResolveExportResult {
-    Resolved { name: ResolveExportName, module: DynModule },
+    Resolved {
+        name: ResolveExportName,
+        module: DynModule,
+    },
     Ambiguous,
     Circular,
     None,
@@ -66,10 +68,19 @@ pub enum ResolveExportName {
     /// No local name since this is a namespace import.
     Namespace,
     /// The local name of the binding in the module.
-    Local { name: HeapPtr<FlatString>, boxed_value: HeapPtr<BoxedValue> },
+    Local {
+        name: HeapPtr<FlatString>,
+        boxed_value: HeapPtr<BoxedValue>,
+    },
 }
 
-heap_trait_object!(Module, DynModule, HeapDynModule, into_dyn_module, extract_module_vtable);
+heap_trait_object!(
+    Module,
+    DynModule,
+    HeapDynModule,
+    into_dyn_module,
+    extract_module_vtable
+);
 
 impl DynModule {
     pub fn as_heap_item(self) -> Handle<AnyHeapItem> {
@@ -79,12 +90,9 @@ impl DynModule {
 
 pub type ModuleId = usize;
 
-static NEXT_MODULE_ID: LazyLock<Mutex<usize>> = LazyLock::new(|| Mutex::new(0));
+static NEXT_MODULE_ID: AtomicUsize = AtomicUsize::new(0);
 
 pub fn next_module_id() -> ModuleId {
-    let mut next_module_id = NEXT_MODULE_ID.lock().unwrap();
-    let module_id = *next_module_id;
-    *next_module_id += 1;
-
+    let module_id = NEXT_MODULE_ID.fetch_add(1, core::sync::atomic::Ordering::Acquire);
     module_id
 }

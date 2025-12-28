@@ -1,3 +1,8 @@
+use super::{
+    generator::GenRegister,
+    operand::{min_width_for_unsigned, Operand, Register},
+    width::{ExtraWide, WidthEnum},
+};
 use crate::{
     field_offset,
     runtime::{
@@ -10,12 +15,9 @@ use crate::{
     },
     set_uninit,
 };
-
-use super::{
-    generator::GenRegister,
-    operand::{min_width_for_unsigned, Operand, Register},
-    width::{ExtraWide, WidthEnum},
-};
+use alloc::format;
+use alloc::vec;
+use alloc::vec::Vec;
 
 pub struct ExceptionHandlerBuilder {
     /// Byte offset of the start of the instruction range that is covered (inclusive).
@@ -32,7 +34,12 @@ impl ExceptionHandlerBuilder {
     /// Create a new exception handler with start and end offsets. The handler offset and register
     /// index will be filled in later.
     pub fn new(start: usize, end: usize) -> Self {
-        Self { start, end, handler: 0, error_register: None }
+        Self {
+            start,
+            end,
+            handler: 0,
+            error_register: None,
+        }
     }
 }
 
@@ -45,7 +52,10 @@ pub struct ExceptionHandlersBuilder {
 
 impl ExceptionHandlersBuilder {
     pub fn new() -> Self {
-        Self { handlers: vec![], width: WidthEnum::Narrow }
+        Self {
+            handlers: vec![],
+            width: WidthEnum::Narrow,
+        }
     }
 
     pub fn add(&mut self, handler: ExceptionHandlerBuilder) {
@@ -117,7 +127,10 @@ impl ExceptionHandlers {
         let size = Self::calculate_size_in_bytes(handlers.len());
         let mut object = cx.alloc_uninit_with_size::<ExceptionHandlers>(size)?;
 
-        set_uninit!(object.descriptor, cx.base_descriptors.get(HeapItemKind::ExceptionHandlers));
+        set_uninit!(
+            object.descriptor,
+            cx.base_descriptors.get(HeapItemKind::ExceptionHandlers)
+        );
         set_uninit!(object.width, width);
         object.handlers.init_from_slice(&handlers);
 
@@ -133,7 +146,11 @@ impl ExceptionHandlers {
     /// A zero-copy GC-unsafe iterator over the exception handlers.
     pub fn iter(&self) -> ExceptionHandlersIterator {
         let range = self.handlers.as_slice().as_ptr_range();
-        ExceptionHandlersIterator { current: range.start, end: range.end, width: self.width }
+        ExceptionHandlersIterator {
+            current: range.start,
+            end: range.end,
+            width: self.width,
+        }
     }
 }
 
@@ -202,7 +219,10 @@ impl Iterator for ExceptionHandlersIterator {
         if self.current == self.end {
             None
         } else {
-            let view = ExceptionHandler { ptr: self.current, width: self.width };
+            let view = ExceptionHandler {
+                ptr: self.current,
+                width: self.width,
+            };
 
             let entry_size = match self.width {
                 WidthEnum::Narrow => 1,

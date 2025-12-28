@@ -1,8 +1,11 @@
-use std::{
-    collections::HashSet,
+use alloc::format;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::{
     mem::{transmute, MaybeUninit},
     ops::Deref,
 };
+use hashbrown::HashSet;
 
 use crate::{
     eval_err, handle_scope, handle_scope_guard, must,
@@ -179,13 +182,13 @@ impl VM {
     #[inline]
     pub fn pc(&self) -> *const u8 {
         // Volatile read needed since PC could be have been changed during a GC
-        unsafe { std::ptr::read_volatile(&self.pc as *const *const u8) }
+        unsafe { core::ptr::read_volatile(&self.pc as *const *const u8) }
     }
 
     #[inline]
     fn set_pc(&mut self, pc: *const u8) {
         // Volatile write needed since PC could be have been changed during a GC
-        unsafe { std::ptr::write_volatile(&mut self.pc as *mut *const u8, pc) }
+        unsafe { core::ptr::write_volatile(&mut self.pc as *mut *const u8, pc) }
     }
 
     #[inline]
@@ -247,9 +250,9 @@ impl VM {
 
         let mut vm = VM {
             cx,
-            pc: std::ptr::null(),
-            sp: std::ptr::null_mut(),
-            fp: std::ptr::null_mut(),
+            pc: core::ptr::null(),
+            sp: core::ptr::null_mut(),
+            fp: core::ptr::null_mut(),
             stack_trace_top: None,
             num_stack_frames: 0,
 
@@ -288,8 +291,12 @@ impl VM {
         let global_scope = realm.new_global_scope(self.cx(), global_names.scope_names())?;
 
         // Create program closure and execute in VM
-        let program_closure =
-            Closure::new_in_realm(self.cx(), bytecode_script.script_function, global_scope, realm)?;
+        let program_closure = Closure::new_in_realm(
+            self.cx(),
+            bytecode_script.script_function,
+            global_scope,
+            realm,
+        )?;
 
         // Evaluate with the global object as the receiver
         let receiver = program_closure.global_object().into();
@@ -378,7 +385,7 @@ impl VM {
         // Push the saved stack frame stored in generator onto the stack
         unsafe {
             self.set_sp(self.sp().sub(stack_frame_size));
-            std::ptr::copy_nonoverlapping(saved_stack_frame.as_ptr(), self.sp(), stack_frame_size);
+            core::ptr::copy_nonoverlapping(saved_stack_frame.as_ptr(), self.sp(), stack_frame_size);
         }
 
         // Restore the frame pointer
@@ -426,7 +433,7 @@ impl VM {
     fn reset_stack(&mut self) {
         // Reset stack
         self.set_sp(self.stack_ptr_end().cast_mut());
-        self.set_fp(std::ptr::null_mut());
+        self.set_fp(core::ptr::null_mut());
         self.num_stack_frames = 0;
     }
 
@@ -1961,7 +1968,10 @@ impl VM {
             }
         }
 
-        Ok(CallableObject::Error(type_error_value(self.cx(), "value is not a function")?))
+        Ok(CallableObject::Error(type_error_value(
+            self.cx(),
+            "value is not a function",
+        )?))
     }
 
     /// Check that a value is a constructor (either a closure or proxy object), returning the
@@ -2057,7 +2067,7 @@ impl VM {
 
         // Push the constant table
         let constant_table = unsafe {
-            std::mem::transmute::<Option<HeapPtr<ConstantTable>>, usize>(
+            core::mem::transmute::<Option<HeapPtr<ConstantTable>>, usize>(
                 bytecode_function.constant_table_ptr(),
             )
         };
@@ -2115,7 +2125,7 @@ impl VM {
             [].iter(),
             0,
             true,
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
         )
     }
 
@@ -2131,7 +2141,10 @@ impl VM {
     ) {
         if let Some(index) = function.new_target_index() {
             // Set the new.target register to the provided new target
-            self.write_register(Register::<ExtraWide>::local(index as usize), new_target.into());
+            self.write_register(
+                Register::<ExtraWide>::local(index as usize),
+                new_target.into(),
+            );
         }
     }
 
@@ -2147,7 +2160,7 @@ impl VM {
         let argv = self.register_address(argv);
 
         unsafe {
-            std::slice::from_raw_parts(argv.sub(argc.saturating_sub(1)) as *const Value, argc)
+            core::slice::from_raw_parts(argv.sub(argc.saturating_sub(1)) as *const Value, argc)
         }
     }
 
@@ -2163,7 +2176,7 @@ impl VM {
         let slice = &dense_properties.as_slice()[..(dense_properties.len() as usize)];
 
         // Break the lifetime since slice is over a slice of the managed heap
-        unsafe { std::mem::transmute(slice) }
+        unsafe { core::mem::transmute(slice) }
     }
 
     /// Find slice over the argument values given the generic call arguments.
@@ -2319,7 +2332,10 @@ impl VM {
             // Derived constructors can either return an object or undefined. The derived
             // constructor implementation will return `this` if the code syntactically returns
             // undefined, so if the return value wasn't an object we should error.
-            type_error(self.cx(), "derived constructor must return object or undefined")
+            type_error(
+                self.cx(),
+                "derived constructor must return object or undefined",
+            )
         }
     }
 
@@ -2328,7 +2344,7 @@ impl VM {
         let num_registers = num_registers as usize;
         self.set_sp(unsafe { self.sp().sub(num_registers) });
         let slice =
-            unsafe { std::slice::from_raw_parts_mut(self.sp() as *mut Value, num_registers) };
+            unsafe { core::slice::from_raw_parts_mut(self.sp() as *mut Value, num_registers) };
         slice.fill(Value::undefined());
     }
 
@@ -2352,7 +2368,7 @@ impl VM {
             /* arguments */ [].iter(),
             /* argc */ 0,
             /* return_to_rust_runtime */ true,
-            /* return value address */ std::ptr::null_mut(),
+            /* return value address */ core::ptr::null_mut(),
         )?;
 
         // Set the new target if this is a constructor call
@@ -3364,7 +3380,10 @@ impl VM {
             .get_intrinsic(Intrinsic::GeneratorFunctionPrototype);
         let closure = Closure::new_with_proto(self.cx(), func, scope, func_proto)?;
 
-        must!(GeneratorPrototype::install_on_generator_function(self.cx(), closure));
+        must!(GeneratorPrototype::install_on_generator_function(
+            self.cx(),
+            closure
+        ));
 
         self.write_register(dest, *closure.as_value());
 
@@ -4359,7 +4378,10 @@ impl VM {
         let name = self.get_constant(instr.name_constant_index()).as_string();
         let name_str = name.to_handle().format()?;
 
-        reference_error(self.cx(), &format!("can't access `{name_str}` before initialization"))
+        reference_error(
+            self.cx(),
+            &format!("can't access `{name_str}` before initialization"),
+        )
     }
 
     #[inline]

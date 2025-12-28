@@ -1,15 +1,15 @@
-use bitflags::bitflags;
-
-use std::{
-    collections::{HashMap, HashSet},
-    fmt,
-};
-
 use super::{
     operand::{ConstantIndex, Operand, OperandType, Register, SInt, UInt},
     width::{ExtraWide, Narrow, SignedWidthRepr, UnsignedWidthRepr, Wide, Width, WidthEnum},
     writer::BytecodeWriter,
 };
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
+use alloc::format;
+use bitflags::bitflags;
+use core::{error::Error, fmt};
+use hashbrown::{HashMap, HashSet};
 
 use crate::{count, replace_expr, runtime::debug_print::DebugPrinter};
 
@@ -1964,7 +1964,7 @@ bitflags! {
 impl OpCode {
     #[inline]
     fn from_u8(value: u8) -> OpCode {
-        unsafe { std::mem::transmute(value) }
+        unsafe { core::mem::transmute(value) }
     }
 }
 
@@ -1996,15 +1996,27 @@ pub fn decode_width_and_opcode_at_index(bytecode: &[u8], index: usize) -> Decode
             let opcode_index = wide_prefix_index_to_opcode_index(index);
             let opcode = OpCode::from_u8(bytecode[opcode_index]);
 
-            DecodeInfo { width: WidthEnum::Wide, opcode, opcode_index }
+            DecodeInfo {
+                width: WidthEnum::Wide,
+                opcode,
+                opcode_index,
+            }
         }
         OpCode::ExtraWidePrefix => {
             let opcode_index = extra_wide_prefix_index_to_opcode_index(index);
             let opcode = OpCode::from_u8(bytecode[opcode_index]);
 
-            DecodeInfo { width: WidthEnum::ExtraWide, opcode, opcode_index }
+            DecodeInfo {
+                width: WidthEnum::ExtraWide,
+                opcode,
+                opcode_index,
+            }
         }
-        opcode => DecodeInfo { width: WidthEnum::Narrow, opcode, opcode_index: index },
+        opcode => DecodeInfo {
+            width: WidthEnum::Narrow,
+            opcode,
+            opcode_index: index,
+        },
     }
 }
 

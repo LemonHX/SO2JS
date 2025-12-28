@@ -1,4 +1,8 @@
-use std::{mem::size_of, ops::Range};
+use alloc::borrow::ToOwned;
+use alloc::format;
+use alloc::vec::Vec;
+use core::mem::size_of;
+use core::ops::Range;
 
 use crate::{
     extend_object, field_offset, must_a,
@@ -171,10 +175,20 @@ impl Closure {
                     .to_handle();
 
             let desc = PropertyDescriptor::data(closure.into(), true, false, true);
-            must_a!(define_property_or_throw(cx, prototype, cx.names.constructor(), desc));
+            must_a!(define_property_or_throw(
+                cx,
+                prototype,
+                cx.names.constructor(),
+                desc
+            ));
 
             let desc = PropertyDescriptor::data(prototype.into(), true, false, false);
-            must_a!(define_property_or_throw(cx, closure.into(), cx.names.prototype(), desc));
+            must_a!(define_property_or_throw(
+                cx,
+                closure.into(),
+                cx.names.prototype(),
+                desc
+            ));
         }
 
         Ok(())
@@ -283,7 +297,10 @@ impl BytecodeFunction {
         let size = Self::calculate_size_in_bytes(bytecode.len());
         let mut object = cx.alloc_uninit_with_size::<BytecodeFunction>(size)?;
 
-        set_uninit!(object.descriptor, cx.base_descriptors.get(HeapItemKind::BytecodeFunction));
+        set_uninit!(
+            object.descriptor,
+            cx.base_descriptors.get(HeapItemKind::BytecodeFunction)
+        );
         set_uninit!(object.constant_table, constant_table.map(|c| *c));
         set_uninit!(object.exception_handlers, exception_handlers.map(|h| *h));
         set_uninit!(object.realm, *realm);
@@ -327,7 +344,10 @@ impl BytecodeFunction {
             new_target_index = Some(0);
         }
 
-        set_uninit!(object.descriptor, cx.base_descriptors.get(HeapItemKind::BytecodeFunction));
+        set_uninit!(
+            object.descriptor,
+            cx.base_descriptors.get(HeapItemKind::BytecodeFunction)
+        );
         set_uninit!(object.constant_table, None);
         set_uninit!(object.exception_handlers, None);
         set_uninit!(object.realm, *realm);

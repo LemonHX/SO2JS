@@ -1,4 +1,4 @@
-use std::sync::OnceLock;
+use once_cell::sync::OnceCell;
 
 /// A serialized version of the heap containing enough information to initialize a new heap from.
 ///
@@ -22,7 +22,7 @@ pub struct SerializedSemispace<'a> {
     pub start_offset: usize,
 }
 
-static DEFAULT_SERIALIZED_HEAP: OnceLock<Option<SerializedHeap<'static>>> = OnceLock::new();
+static DEFAULT_SERIALIZED_HEAP: OnceCell<Option<SerializedHeap<'static>>> = OnceCell::new();
 
 /// Get the current default serialized heap, if it has been set.
 pub fn get_default_serialized_heap() -> Option<&'static SerializedHeap<'static>> {

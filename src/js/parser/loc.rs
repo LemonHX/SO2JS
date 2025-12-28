@@ -1,5 +1,6 @@
-use std::ops::Range;
-
+use alloc::vec;
+use alloc::vec::Vec;
+use core::ops::Range;
 /// Start and end positions are byte offsets in the source file.
 pub type Pos = usize;
 

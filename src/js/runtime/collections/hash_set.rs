@@ -1,4 +1,4 @@
-use std::hash::Hash;
+use core::hash::Hash;
 
 use crate::runtime::{
     alloc_error::AllocResult,

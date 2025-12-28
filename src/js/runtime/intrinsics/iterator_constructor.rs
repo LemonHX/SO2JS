@@ -80,8 +80,11 @@ impl IteratorConstructor {
         let iterator = get_iterator_flattenable(cx, value, /* reject_primitives */ false)?;
 
         let iterator_constructor = cx.get_intrinsic(Intrinsic::IteratorConstructor);
-        if ordinary_has_instance(cx, iterator_constructor.as_value(), iterator.iterator.as_value())?
-        {
+        if ordinary_has_instance(
+            cx,
+            iterator_constructor.as_value(),
+            iterator.iterator.as_value(),
+        )? {
             return Ok(iterator.iterator.as_value());
         }
 
@@ -170,7 +173,10 @@ impl WrapForValidIteratorPrototype {
             }
         }
 
-        type_error(cx, "%WrappedValidIterator%.prototype.next called on incompatible object")
+        type_error(
+            cx,
+            "%WrappedValidIterator%.prototype.next called on incompatible object",
+        )
     }
 
     /// %WrapForValidIteratorPrototype%.next (https://tc39.es/ecma262/#sec-%wrapforvaliditeratorprototype%.next)
@@ -191,6 +197,9 @@ impl WrapForValidIteratorPrototype {
             }
         }
 
-        type_error(cx, "%WrappedValidIterator%.prototype.return called on incompatible object")
+        type_error(
+            cx,
+            "%WrappedValidIterator%.prototype.return called on incompatible object",
+        )
     }
 }

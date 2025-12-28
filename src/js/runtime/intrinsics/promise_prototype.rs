@@ -22,8 +22,11 @@ pub struct PromisePrototype;
 impl PromisePrototype {
     /// Properties of the Promise Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-promise-prototype-object)
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         // Constructor property is added once PromiseConstructor has been created
 
@@ -49,7 +52,12 @@ impl PromisePrototype {
         arguments: &[Handle<Value>],
     ) -> EvalResult<Handle<Value>> {
         let on_rejected = get_argument(cx, arguments, 0);
-        invoke(cx, this_value, cx.names.then(), &[cx.undefined(), on_rejected])
+        invoke(
+            cx,
+            this_value,
+            cx.names.then(),
+            &[cx.undefined(), on_rejected],
+        )
     }
 
     /// Promise.prototype.finally (https://tc39.es/ecma262/#sec-promise.prototype.finally)
@@ -105,7 +113,12 @@ impl PromisePrototype {
             catch_finally = finally_catch.into();
         }
 
-        invoke(cx, promise.into(), cx.names.then(), &[then_finally, catch_finally])
+        invoke(
+            cx,
+            promise.into(),
+            cx.names.then(),
+            &[then_finally, catch_finally],
+        )
     }
 
     fn get_constructor(cx: Context, function: Handle<ObjectValue>) -> Handle<ObjectValue> {
@@ -181,7 +194,12 @@ impl PromisePrototype {
         let value = get_argument(cx, arguments, 0);
         Self::set_value(cx, continue_function, value)?;
 
-        invoke(cx, promise.into(), cx.names.then(), &[continue_function.into()])
+        invoke(
+            cx,
+            promise.into(),
+            cx.names.then(),
+            &[continue_function.into()],
+        )
     }
 
     pub fn finally_then_continue(
@@ -219,7 +237,12 @@ impl PromisePrototype {
         let value = get_argument(cx, arguments, 0);
         Self::set_value(cx, continue_function, value)?;
 
-        invoke(cx, promise.into(), cx.names.then(), &[continue_function.into()])
+        invoke(
+            cx,
+            promise.into(),
+            cx.names.then(),
+            &[continue_function.into()],
+        )
     }
 
     pub fn finally_catch_continue(
@@ -250,7 +273,13 @@ impl PromisePrototype {
         let on_fulfilled = get_argument(cx, arguments, 0);
         let on_rejected = get_argument(cx, arguments, 1);
 
-        Ok(perform_promise_then(cx, promise, on_fulfilled, on_rejected, Some(capability))?)
+        Ok(perform_promise_then(
+            cx,
+            promise,
+            on_fulfilled,
+            on_rejected,
+            Some(capability),
+        )?)
     }
 }
 

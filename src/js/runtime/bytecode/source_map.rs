@@ -1,4 +1,4 @@
-use std::ops::Range;
+use core::ops::Range;
 
 use crate::{
     common::varint::decode_varint,
@@ -40,6 +40,7 @@ impl BytecodeSourceMap {
     /// Look up the source position for the given bytecode offset.
     ///
     /// Return if the bytecode offset could not be mapped to any values (i.e. the map is empty)
+    // TODO: debugger
     pub fn get_source_position(
         source_map: HeapPtr<ByteArray>,
         bytecode_offset: usize,
@@ -79,7 +80,10 @@ struct SourceMapEntry {
 
 impl<'a> SourceMapIter<'a> {
     fn new(source_map: &'a [u8]) -> Self {
-        let mut iter = Self { source_map, offset: 0 };
+        let mut iter = Self {
+            source_map,
+            offset: 0,
+        };
 
         // Skip the first entry, which is the source range of the entire function
         iter.next();
@@ -102,6 +106,9 @@ impl Iterator for SourceMapIter<'_> {
         let (source_position, num_bytes) = decode_varint(&self.source_map[self.offset..]);
         self.offset += num_bytes;
 
-        Some(SourceMapEntry { bytecode_offset, source_position })
+        Some(SourceMapEntry {
+            bytecode_offset,
+            source_position,
+        })
     }
 }

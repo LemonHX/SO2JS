@@ -1,4 +1,6 @@
-use std::{collections::HashMap, hash};
+use alloc::vec;
+use alloc::vec::Vec;
+use hashbrown::HashMap;
 
 use crate::runtime::{
     alloc_error::AllocResult, gc::AnyHeapItem, string_value::FlatString, Context, Handle, Value,
@@ -16,7 +18,10 @@ enum ConstantTableEntry {
     /// Interned string such as an identifier or string literal.
     String(Handle<FlatString>),
     /// Generic heap items - not deduplicated, so keep a unique incremented index as a unique id.
-    HeapItem { item: Handle<AnyHeapItem>, key: ConstantTableIndex },
+    HeapItem {
+        item: Handle<AnyHeapItem>,
+        key: ConstantTableIndex,
+    },
     /// Double encoded as a value.
     Double(Value),
     /// Jump offset in bytes, not encoded as a value.
@@ -75,8 +80,8 @@ impl PartialEq for ConstantTableEntry {
 
 impl Eq for ConstantTableEntry {}
 
-impl hash::Hash for ConstantTableEntry {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+impl core::hash::Hash for ConstantTableEntry {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         match self {
             ConstantTableEntry::String(string) => string.hash(state),
             // Heap items are not deduplicated, so use the unique key

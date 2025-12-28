@@ -1,5 +1,3 @@
-use std::sync::LazyLock;
-
 use super::{
     arguments_object::MappedArgumentsObject,
     array_object::ArrayObject,
@@ -16,6 +14,8 @@ use super::{
     proxy_object::ProxyObject,
     string_object::StringObject,
 };
+use alloc::vec::Vec;
+use once_cell::sync::Lazy;
 
 /// Every Rust trait vtable that can appear in the heap.
 ///
@@ -104,23 +104,24 @@ const RUST_VTABLES: [*const (); RustVtable::Last as usize] = [
     BigUInt64Array::TYPED_ARRAY_VTABLE,
 ];
 
-thread_local! {
-    /// Array of (vtable, enum) pairs sorted by vtable pointer. This is used to look up the enum for a
-    /// particular vtable pointer in O(log n) time.
-    static RUST_VTABLES_SORTED_BY_POINTER: LazyLock<Vec<(*const (), RustVtable)>> =
-        LazyLock::new(|| {
-            let mut vtables = Vec::with_capacity(RustVtable::Last as usize);
+pub struct VtablePtr(*const (), RustVtable);
+unsafe impl Send for VtablePtr {}
+unsafe impl Sync for VtablePtr {}
 
-            for (i, &vtable) in RUST_VTABLES.iter().enumerate() {
-                let enum_value = unsafe { std::mem::transmute::<u8, RustVtable>(i as u8) };
-                vtables.push((vtable, enum_value));
-            }
+/// Array of (vtable, enum) pairs sorted by vtable pointer. This is used to look up the enum for a
+/// particular vtable pointer in O(log n) time.
+pub static RUST_VTABLES_SORTED_BY_POINTER: Lazy<Vec<VtablePtr>> = Lazy::new(|| {
+    let mut vtables = Vec::with_capacity(RustVtable::Last as usize);
 
-            vtables.sort_by_key(|&(ptr, _)| ptr);
+    for (i, &vtable) in RUST_VTABLES.iter().enumerate() {
+        let enum_value = unsafe { core::mem::transmute::<u8, RustVtable>(i as u8) };
+        vtables.push(VtablePtr(vtable, enum_value));
+    }
 
-            vtables
-        });
-}
+    vtables.sort_by_key(|&VtablePtr(ptr, _)| ptr);
+
+    vtables
+});
 
 /// Return the vtable pointer for a particular type.
 #[allow(unused)]
@@ -132,13 +133,11 @@ pub const fn get_vtable(vtable: RustVtable) -> *const () {
 /// registered then return None.
 #[allow(unused)]
 pub fn lookup_vtable_enum(vtable: *const ()) -> Option<RustVtable> {
-    RUST_VTABLES_SORTED_BY_POINTER.with(|vtables_sorted_by_pointer| {
-        let index = vtables_sorted_by_pointer
-            .binary_search_by_key(&vtable, |&(ptr, _)| ptr)
-            .ok()?;
+    let index = RUST_VTABLES_SORTED_BY_POINTER
+        .binary_search_by_key(&vtable, |&VtablePtr(ptr, _)| ptr)
+        .ok()?;
 
-        Some(vtables_sorted_by_pointer[index].1)
-    })
+    Some(RUST_VTABLES_SORTED_BY_POINTER[index].1)
 }
 
 /// Rust representation of a fat pointer. Used to extract vtable pointer.
@@ -158,9 +157,10 @@ macro_rules! extract_vtable_function {
         {
             unsafe {
                 let example_ptr: *const $crate::runtime::Handle<T> =
-                    std::ptr::NonNull::dangling().as_ptr();
+                    core::ptr::NonNull::dangling().as_ptr();
                 let example_fat_ptr: *const dyn $trait = example_ptr;
-                let fat_ptr = std::mem::transmute::<*const dyn $trait, FatPointer>(example_fat_ptr);
+                let fat_ptr =
+                    core::mem::transmute::<*const dyn $trait, FatPointer>(example_fat_ptr);
 
                 fat_ptr.vtable
             }

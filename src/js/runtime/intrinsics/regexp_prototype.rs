@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::{
     common::unicode::{needs_surrogate_pair, CodePoint},
     must,
@@ -34,6 +32,11 @@ use crate::{
         Context, Handle, PropertyKey, Value,
     },
 };
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::vec;
+use core::error::Error;
+use hashbrown::HashSet;
 
 use super::{
     intrinsics::Intrinsic,
@@ -46,8 +49,11 @@ pub struct RegExpPrototype;
 impl RegExpPrototype {
     /// Properties of the RegExp Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-regexp-prototype-object)
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         // Constructor property is added once RegExpConstructor has been created
         object.intrinsic_func(cx, cx.names.exec(), Self::exec, 1, realm)?;
@@ -57,7 +63,13 @@ impl RegExpPrototype {
         object.intrinsic_getter(cx, cx.names.has_indices(), Self::has_indices, realm)?;
         object.intrinsic_getter(cx, cx.names.ignore_case(), Self::ignore_case, realm)?;
         object.intrinsic_func(cx, cx.well_known_symbols.match_(), Self::match_, 1, realm)?;
-        object.intrinsic_func(cx, cx.well_known_symbols.match_all(), Self::match_all, 1, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.well_known_symbols.match_all(),
+            Self::match_all,
+            1,
+            realm,
+        )?;
         object.intrinsic_getter(cx, cx.names.multiline(), Self::multiline, realm)?;
         object.intrinsic_func(cx, cx.well_known_symbols.replace(), Self::replace, 2, realm)?;
         object.intrinsic_func(cx, cx.well_known_symbols.search(), Self::search, 1, realm)?;
@@ -92,7 +104,10 @@ impl RegExpPrototype {
         let regexp_object = if let Some(regexp_object) = as_regexp_object(this_value) {
             regexp_object
         } else {
-            return type_error(cx, "RegExp.prototype.exec must be called on a regular expression");
+            return type_error(
+                cx,
+                "RegExp.prototype.exec must be called on a regular expression",
+            );
         };
 
         let string_arg = get_argument(cx, arguments, 0);
@@ -264,7 +279,13 @@ impl RegExpPrototype {
 
                 let next_index = advance_u64_string_index(string_value, last_index, is_unicode)?;
                 let next_index_value = Value::from(next_index).to_handle(cx);
-                set(cx, regexp_object, cx.names.last_index(), next_index_value, true)?;
+                set(
+                    cx,
+                    regexp_object,
+                    cx.names.last_index(),
+                    next_index_value,
+                    true,
+                )?;
             }
 
             n += 1;
@@ -291,8 +312,12 @@ impl RegExpPrototype {
         let flags_string = get(cx, regexp_object, cx.names.flags())?;
         let flags_string = to_string(cx, flags_string)?;
 
-        let matcher =
-            construct(cx, constructor, &[regexp_object.into(), flags_string.into()], None)?;
+        let matcher = construct(
+            cx,
+            constructor,
+            &[regexp_object.into(), flags_string.into()],
+            None,
+        )?;
 
         let last_index = get(cx, regexp_object, cx.names.last_index())?;
         let last_index = to_length(cx, last_index)?;
@@ -390,7 +415,13 @@ impl RegExpPrototype {
 
                 let next_index = advance_u64_string_index(target_string, this_index, is_unicode)?;
                 let next_index_value = Value::from(next_index).to_handle(cx);
-                set(cx, regexp_object, cx.names.last_index(), next_index_value, true)?;
+                set(
+                    cx,
+                    regexp_object,
+                    cx.names.last_index(),
+                    next_index_value,
+                    true,
+                )?;
             }
         }
 
@@ -534,7 +565,13 @@ impl RegExpPrototype {
         // Restore original last index
         let current_last_index = get(cx, regexp_object, cx.names.last_index())?;
         if !same_value(current_last_index, previous_last_index)? {
-            set(cx, regexp_object, cx.names.last_index(), previous_last_index, true)?;
+            set(
+                cx,
+                regexp_object,
+                cx.names.last_index(),
+                previous_last_index,
+                true,
+            )?;
         }
 
         if result.is_null() {
@@ -602,8 +639,12 @@ impl RegExpPrototype {
             flags_string = StringValue::concat(cx, flags_string, y_string)?;
         }
 
-        let splitter =
-            construct(cx, constructor, &[regexp_object.into(), flags_string.into()], None)?;
+        let splitter = construct(
+            cx,
+            constructor,
+            &[regexp_object.into(), flags_string.into()],
+            None,
+        )?;
 
         let result_array = array_create(cx, 0, None)?.as_object();
 
@@ -827,8 +868,10 @@ fn regexp_has_flag(
         if let Some(regexp_object) = this_object.as_regexp_object() {
             let has_flag = regexp_object.flags().contains(flag);
             return Ok(cx.bool(has_flag));
-        } else if same_object_value(*this_object, cx.get_intrinsic_ptr(Intrinsic::RegExpPrototype))
-        {
+        } else if same_object_value(
+            *this_object,
+            cx.get_intrinsic_ptr(Intrinsic::RegExpPrototype),
+        ) {
             return Ok(cx.undefined());
         }
     }
@@ -893,7 +936,13 @@ fn regexp_builtin_exec(
     if last_index > string_length as u64 {
         if is_global || is_sticky {
             let zero_value = cx.zero();
-            set(cx, regexp_object.into(), cx.names.last_index(), zero_value, true)?;
+            set(
+                cx,
+                regexp_object.into(),
+                cx.names.last_index(),
+                zero_value,
+                true,
+            )?;
         }
 
         return Ok(cx.null());
@@ -907,7 +956,13 @@ fn regexp_builtin_exec(
     if match_.is_none() {
         if is_global || is_sticky {
             let zero_value = cx.zero();
-            set(cx, regexp_object.into(), cx.names.last_index(), zero_value, true)?;
+            set(
+                cx,
+                regexp_object.into(),
+                cx.names.last_index(),
+                zero_value,
+                true,
+            )?;
         }
 
         return Ok(cx.null());
@@ -921,7 +976,13 @@ fn regexp_builtin_exec(
     // Update last index to point past end of capture
     if is_global || is_sticky {
         let last_index_value = Value::from(full_capture.end).to_handle(cx);
-        set(cx, regexp_object.into(), cx.names.last_index(), last_index_value, true)?;
+        set(
+            cx,
+            regexp_object.into(),
+            cx.names.last_index(),
+            last_index_value,
+            true,
+        )?;
     }
 
     // Build result array of matches
@@ -929,7 +990,12 @@ fn regexp_builtin_exec(
 
     // Mark the start of the full match
     let index_value = Value::from(full_capture.start).to_handle(cx);
-    must!(create_data_property_or_throw(cx, result_array, cx.names.index(), index_value));
+    must!(create_data_property_or_throw(
+        cx,
+        result_array,
+        cx.names.index(),
+        index_value
+    ));
 
     // Include the input string in the result
     must!(create_data_property_or_throw(
@@ -996,7 +1062,12 @@ fn regexp_builtin_exec(
         };
 
         let index_key = PropertyKey::from_u64_handle(cx, i as u64)?;
-        must!(create_data_property_or_throw(cx, result_array, index_key, captured_value));
+        must!(create_data_property_or_throw(
+            cx,
+            result_array,
+            index_key,
+            captured_value
+        ));
 
         // Add capture indices to indices array if present
         let match_index_pair = if let Some((indices_array, indices_groups)) = indices_result {
@@ -1008,7 +1079,12 @@ fn regexp_builtin_exec(
                 cx.undefined()
             };
 
-            must!(create_data_property_or_throw(cx, indices_array, index_key, match_index_pair));
+            must!(create_data_property_or_throw(
+                cx,
+                indices_array,
+                index_key,
+                match_index_pair
+            ));
             Some((match_index_pair, indices_groups))
         } else {
             None

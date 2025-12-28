@@ -1,7 +1,8 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use crate::runtime::Context;
 
-pub fn get_current_unix_time() -> f64 {
-    let now = SystemTime::now();
-    let unix_time = now.duration_since(UNIX_EPOCH).unwrap();
-    unix_time.as_secs_f64() * 1000.0
+pub fn get_current_unix_time(ctx: &Context) -> f64 {
+    ctx.sys
+        .as_ref()
+        .map(|sys| sys.current_time_millis())
+        .unwrap_or(0.0)
 }

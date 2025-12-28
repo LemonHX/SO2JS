@@ -21,7 +21,6 @@ use crate::{
 
 use brimstone_core::{
     common::{
-        error::FormatOptions,
         options::{Options, OptionsBuilder},
         wtf_8::Wtf8String,
     },
@@ -277,9 +276,10 @@ fn run_single_test(
                 let duration = start_timestamp.elapsed().unwrap();
 
                 return match test.expected_result {
-                    ExpectedResult::Negative { phase: TestPhase::Parse, .. } if is_parse_error => {
-                        TestResult::success(test, duration)
-                    }
+                    ExpectedResult::Negative {
+                        phase: TestPhase::Parse,
+                        ..
+                    } if is_parse_error => TestResult::success(test, duration),
                     _ => TestResult::failure(
                         test,
                         format!("Unexpected error during parsing:\n{err}"),
@@ -299,9 +299,10 @@ fn run_single_test(
                 let duration = start_timestamp.elapsed().unwrap();
 
                 return match test.expected_result {
-                    ExpectedResult::Negative { phase: TestPhase::Parse, .. } => {
-                        TestResult::success(test, duration)
-                    }
+                    ExpectedResult::Negative {
+                        phase: TestPhase::Parse,
+                        ..
+                    } => TestResult::success(test, duration),
                     _ => TestResult::failure(
                         test,
                         format!("Unexpected error during analysis:\n{err}"),
@@ -384,7 +385,11 @@ fn parse_file<'a>(
     options: Rc<Options>,
     test: Option<&Test>,
 ) -> parser::ParseResult<parser::parser::ParseProgramResult<'a>> {
-    if let Some(Test { mode: TestMode::Module, .. }) = test {
+    if let Some(Test {
+        mode: TestMode::Module,
+        ..
+    }) = test
+    {
         parser::parse_module(pcx, options)
     } else {
         parser::parse_script(pcx, options)
@@ -415,7 +420,10 @@ fn load_harness_test_file(cx: Context, test262_root: &str, file: &str) {
 
     let eval_result = execute_script_as_bytecode(cx, &analyzed_result.unwrap());
     if eval_result.is_err() {
-        panic!("Failed to evaluate test harness file {}", full_path.display())
+        panic!(
+            "Failed to evaluate test harness file {}",
+            full_path.display()
+        )
     }
 }
 
@@ -604,7 +612,7 @@ fn to_console_string_test262(cx: Context, value: Handle<Value>) -> String {
     }
 
     // Default to empty string on OOM instead of crashing
-    to_console_string(cx, value, &FormatOptions::default()).unwrap_or_default()
+    to_console_string(cx, value).unwrap_or_default()
 }
 
 struct TestResult {

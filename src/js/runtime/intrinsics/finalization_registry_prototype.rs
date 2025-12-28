@@ -16,8 +16,11 @@ pub struct FinalizationRegistryPrototype;
 impl FinalizationRegistryPrototype {
     /// Properties of the FinalizationRegistry Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-finalization-registry-prototype-object)
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         // Constructor property is added once FinalizationRegistryConstructor has been created
         object.intrinsic_func(cx, cx.names.register(), Self::register, 2, realm)?;
@@ -28,7 +31,12 @@ impl FinalizationRegistryPrototype {
         object.set_property(
             cx,
             to_string_tag_key,
-            Property::data(cx.names.finalization_registry().as_string().into(), false, false, true),
+            Property::data(
+                cx.names.finalization_registry().as_string().into(),
+                false,
+                false,
+                true,
+            ),
         )?;
 
         Ok(object)
@@ -52,7 +60,10 @@ impl FinalizationRegistryPrototype {
         let unregister_token = get_argument(cx, arguments, 2);
 
         if !can_be_held_weakly(cx, *target) {
-            return type_error(cx, "FinalizationRegistry targets must be objects or symbols");
+            return type_error(
+                cx,
+                "FinalizationRegistry targets must be objects or symbols",
+            );
         }
 
         if same_value(target, held_value)? {
@@ -93,7 +104,10 @@ impl FinalizationRegistryPrototype {
             if let Some(registry_object) = this_finalization_registry_value(this_value) {
                 registry_object
             } else {
-                return type_error(cx, "unregister method must be called on FinalizationRegistry");
+                return type_error(
+                    cx,
+                    "unregister method must be called on FinalizationRegistry",
+                );
             };
 
         let unregister_token = get_argument(cx, arguments, 0);

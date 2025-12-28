@@ -1,63 +1,24 @@
 use crate::{
-    common::{
-        error::{ErrorFormatter, FormatOptions, SourceInfo},
-        terminal::stdout_should_use_colors,
-    },
+    common::error::{ErrorFormatter, SourceInfo},
     runtime::alloc_error::AllocResult,
 };
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::{borrow::ToOwned, format};
 
 use super::{
-    eval_result::EvalResult,
     heap_item_descriptor::HeapItemKind,
     intrinsics::{
         error_constructor::{CachedStackTraceInfo, ErrorObject},
         error_prototype::{error_message, error_name},
-        intrinsics::Intrinsic,
     },
-    object_value::ObjectValue,
-    realm::Realm,
     type_utilities::number_to_string,
     value::{BOOL_TAG, NULL_TAG, UNDEFINED_TAG},
     Context, Handle, Value,
 };
 
-pub struct ConsoleObject;
-
-impl ConsoleObject {
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
-
-        object.intrinsic_func(cx, cx.names.log(), Self::log, 0, realm)?;
-
-        Ok(object.to_handle())
-    }
-
-    pub fn log(
-        cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
-        let use_colors = stdout_should_use_colors(&cx.options);
-        let opts = FormatOptions::new(use_colors);
-
-        let mut formatted = vec![];
-        for argument in arguments.iter() {
-            formatted.push(to_console_string(cx, *argument, &opts)?);
-        }
-
-        println!("{}", formatted.join(" "));
-
-        Ok(cx.undefined())
-    }
-}
-
 /// Format for printing value to console
-pub fn to_console_string(
-    cx: Context,
-    value: Handle<Value>,
-    opts: &FormatOptions,
-) -> AllocResult<String> {
+pub fn to_console_string(cx: Context, value: Handle<Value>) -> AllocResult<String> {
     let result = if value.is_pointer() {
         match value.as_pointer().descriptor().kind() {
             HeapItemKind::String => value.as_string().format()?,
@@ -71,7 +32,7 @@ pub fn to_console_string(
                 let object = value.as_object();
 
                 if let Some(error) = object.as_error() {
-                    error_to_console_string(cx, error, opts)?
+                    error_to_console_string(cx, error)?
                 } else if object.is_callable() {
                     "[Function]".to_owned()
                 } else {
@@ -98,13 +59,9 @@ pub fn to_console_string(
     Ok(result)
 }
 
-fn error_to_console_string(
-    cx: Context,
-    mut error: Handle<ErrorObject>,
-    opts: &FormatOptions,
-) -> AllocResult<String> {
+fn error_to_console_string(cx: Context, mut error: Handle<ErrorObject>) -> AllocResult<String> {
     let name = error_name(cx, error).format()?;
-    let mut formatter = ErrorFormatter::new(name, opts);
+    let mut formatter = ErrorFormatter::new(name);
 
     if let Some(message) = error_message(cx, error)? {
         formatter.set_message(message);

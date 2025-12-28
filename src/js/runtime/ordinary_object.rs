@@ -1,5 +1,3 @@
-use crate::{extend_object_without_conversions, must, runtime::alloc_error::AllocResult};
-
 use super::{
     abstract_operations::{call_object, create_data_property, get, get_function_realm},
     accessor::Accessor,
@@ -16,6 +14,10 @@ use super::{
     value::Value,
     Context,
 };
+use crate::{extend_object_without_conversions, must, runtime::alloc_error::AllocResult};
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
 
 // An ordinary object is used to create the vtable for a generic object. Must be a separate type
 // from ObjectValue so that the same methods can appear on ObjectValue but perform dynamic dispatch.
@@ -27,7 +29,7 @@ extend_object_without_conversions! {
 
 impl From<OrdinaryObject> for ObjectValue {
     fn from(value: OrdinaryObject) -> Self {
-        unsafe { std::mem::transmute::<OrdinaryObject, ObjectValue>(value) }
+        unsafe { core::mem::transmute::<OrdinaryObject, ObjectValue>(value) }
     }
 }
 
@@ -430,9 +432,9 @@ pub fn ordinary_get(
         }
         Some(desc) if desc.is_data_descriptor() => Ok(desc.value.unwrap()),
         Some(PropertyDescriptor { get: None, .. }) => Ok(cx.undefined()),
-        Some(PropertyDescriptor { get: Some(getter), .. }) => {
-            call_object(cx, getter, receiver, &[])
-        }
+        Some(PropertyDescriptor {
+            get: Some(getter), ..
+        }) => call_object(cx, getter, receiver, &[]),
     }
 }
 
@@ -471,7 +473,10 @@ pub fn ordinary_set(
         match existing_descriptor {
             None => create_data_property(cx, receiver, key, value),
             Some(existing_descriptor) if existing_descriptor.is_accessor_descriptor() => Ok(false),
-            Some(PropertyDescriptor { is_writable: Some(false), .. }) => Ok(false),
+            Some(PropertyDescriptor {
+                is_writable: Some(false),
+                ..
+            }) => Ok(false),
             Some(_) => {
                 let value_desc = PropertyDescriptor::data_value_only(value);
                 receiver.define_own_property(cx, key, value_desc)

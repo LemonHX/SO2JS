@@ -1,4 +1,4 @@
-use std::sync::LazyLock;
+use once_cell::sync::Lazy;
 
 use icu_casemap::{CaseMapper, CaseMapperBorrowed};
 use icu_collator::{options::CollatorOptions, Collator};
@@ -180,17 +180,16 @@ pub struct PropertiesOfStrings {
     pub rgi_emoji: CodePointInversionListAndStringList<'static>,
 }
 
-pub static ICU: LazyLock<ICU> = LazyLock::new(|| {
+pub static ICU: Lazy<ICU> = Lazy::new(|| {
     // General categories
-    static GENERAL_CATEGORIES_MAP: LazyLock<CodePointMapData<GeneralCategory>> =
-        LazyLock::new(|| {
-            CodePointMapData::<GeneralCategory>::try_new_unstable(&BakedDataProvider).unwrap()
-        });
+    static GENERAL_CATEGORIES_MAP: Lazy<CodePointMapData<GeneralCategory>> = Lazy::new(|| {
+        CodePointMapData::<GeneralCategory>::try_new_unstable(&BakedDataProvider).unwrap()
+    });
 
     // Binary property sets
     macro_rules! binary_property_static {
         ($static_name:ident, $property:ident) => {
-            static $static_name: LazyLock<CodePointSetData> = LazyLock::new(|| {
+            static $static_name: Lazy<CodePointSetData> = Lazy::new(|| {
                 CodePointSetData::try_new_unstable::<$property>(&BakedDataProvider).unwrap()
             });
         };
@@ -248,33 +247,35 @@ pub static ICU: LazyLock<ICU> = LazyLock::new(|| {
     binary_property_static!(XID_START_SET, XidStart);
 
     // Binary properties of strings
-    static BASIC_EMOJI: LazyLock<EmojiSetData> =
-        LazyLock::new(|| EmojiSetData::try_new_unstable::<BasicEmoji>(&BakedDataProvider).unwrap());
+    static BASIC_EMOJI: Lazy<EmojiSetData> =
+        Lazy::new(|| EmojiSetData::try_new_unstable::<BasicEmoji>(&BakedDataProvider).unwrap());
 
     // Scripts
-    static SCRIPT_MAP: LazyLock<CodePointMapData<Script>> =
-        LazyLock::new(|| CodePointMapData::<Script>::try_new_unstable(&BakedDataProvider).unwrap());
-    static SCRIPT_WITH_EXTENSIONS_CLASSIFIER: LazyLock<ScriptWithExtensions> =
-        LazyLock::new(|| ScriptWithExtensions::try_new_unstable(&BakedDataProvider).unwrap());
-    static SCRIPT_NAMES: LazyLock<PropertyParser<Script>> =
-        LazyLock::new(|| PropertyParser::try_new_unstable(&BakedDataProvider).unwrap());
+    static SCRIPT_MAP: Lazy<CodePointMapData<Script>> =
+        Lazy::new(|| CodePointMapData::<Script>::try_new_unstable(&BakedDataProvider).unwrap());
+    static SCRIPT_WITH_EXTENSIONS_CLASSIFIER: Lazy<ScriptWithExtensions> =
+        Lazy::new(|| ScriptWithExtensions::try_new_unstable(&BakedDataProvider).unwrap());
+    static SCRIPT_NAMES: Lazy<PropertyParser<Script>> =
+        Lazy::new(|| PropertyParser::try_new_unstable(&BakedDataProvider).unwrap());
 
     // Normalizers
-    static NFC: LazyLock<ComposingNormalizer> =
-        LazyLock::new(|| ComposingNormalizer::try_new_nfc_unstable(&BakedDataProvider).unwrap());
-    static NFD: LazyLock<DecomposingNormalizer> =
-        LazyLock::new(|| DecomposingNormalizer::try_new_nfd_unstable(&BakedDataProvider).unwrap());
-    static NFKC: LazyLock<ComposingNormalizer> =
-        LazyLock::new(|| ComposingNormalizer::try_new_nfkc_unstable(&BakedDataProvider).unwrap());
-    static NFKD: LazyLock<DecomposingNormalizer> =
-        LazyLock::new(|| DecomposingNormalizer::try_new_nfkd_unstable(&BakedDataProvider).unwrap());
+    static NFC: Lazy<ComposingNormalizer> =
+        Lazy::new(|| ComposingNormalizer::try_new_nfc_unstable(&BakedDataProvider).unwrap());
+    static NFD: Lazy<DecomposingNormalizer> =
+        Lazy::new(|| DecomposingNormalizer::try_new_nfd_unstable(&BakedDataProvider).unwrap());
+    static NFKC: Lazy<ComposingNormalizer> =
+        Lazy::new(|| ComposingNormalizer::try_new_nfkc_unstable(&BakedDataProvider).unwrap());
+    static NFKD: Lazy<DecomposingNormalizer> =
+        Lazy::new(|| DecomposingNormalizer::try_new_nfkd_unstable(&BakedDataProvider).unwrap());
 
     // Case mapper
-    static CASE_MAPPER: LazyLock<CaseMapper> =
-        LazyLock::new(|| CaseMapper::try_new_unstable(&BakedDataProvider).unwrap());
+    static CASE_MAPPER: Lazy<CaseMapper> =
+        Lazy::new(|| CaseMapper::try_new_unstable(&BakedDataProvider).unwrap());
 
     ICU {
-        general_categories: GeneralCategories { classifier: GENERAL_CATEGORIES_MAP.as_borrowed() },
+        general_categories: GeneralCategories {
+            classifier: GENERAL_CATEGORIES_MAP.as_borrowed(),
+        },
         scripts: Scripts {
             script_classifier: SCRIPT_MAP.as_borrowed(),
             script_with_extension_classifier: SCRIPT_WITH_EXTENSIONS_CLASSIFIER.as_borrowed(),

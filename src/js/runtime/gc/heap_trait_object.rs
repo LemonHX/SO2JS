@@ -31,7 +31,10 @@ macro_rules! heap_trait_object {
                 Self: Sized,
             {
                 let vtable = $extract_vtable();
-                $stack_object { data: self.cast(), vtable }
+                $stack_object {
+                    data: self.cast(),
+                    vtable,
+                }
             }
         }
 
@@ -40,7 +43,7 @@ macro_rules! heap_trait_object {
             pub fn uninit() -> $heap_object {
                 $heap_object {
                     data: $crate::runtime::HeapPtr::uninit(),
-                    vtable: std::ptr::null(),
+                    vtable: core::ptr::null(),
                 }
             }
 
@@ -60,7 +63,10 @@ macro_rules! heap_trait_object {
             #[allow(dead_code)]
             #[inline]
             pub fn to_heap(self) -> $heap_object {
-                $heap_object { data: *self.data, vtable: self.vtable }
+                $heap_object {
+                    data: *self.data,
+                    vtable: self.vtable,
+                }
             }
 
             #[allow(dead_code)]
@@ -81,21 +87,27 @@ macro_rules! heap_trait_object {
 
         // Implicitly deref to a true rust trait object by constructing a true trait object with a pointer
         // to the receiver value, with the same vtable.
-        impl std::ops::Deref for $stack_object {
+        impl core::ops::Deref for $stack_object {
             type Target = dyn $trait;
 
             fn deref(&self) -> &Self::Target {
                 let data = &self.data as *const _ as *const ();
-                let trait_object = RustTraitObject { data, vtable: self.vtable };
-                unsafe { std::mem::transmute::<RustTraitObject, &dyn $trait>(trait_object) }
+                let trait_object = RustTraitObject {
+                    data,
+                    vtable: self.vtable,
+                };
+                unsafe { core::mem::transmute::<RustTraitObject, &dyn $trait>(trait_object) }
             }
         }
 
-        impl std::ops::DerefMut for $stack_object {
+        impl core::ops::DerefMut for $stack_object {
             fn deref_mut(&mut self) -> &mut Self::Target {
                 let data = &self.data as *const _ as *const ();
-                let trait_object = RustTraitObject { data, vtable: self.vtable };
-                unsafe { std::mem::transmute::<RustTraitObject, &mut dyn $trait>(trait_object) }
+                let trait_object = RustTraitObject {
+                    data,
+                    vtable: self.vtable,
+                };
+                unsafe { core::mem::transmute::<RustTraitObject, &mut dyn $trait>(trait_object) }
             }
         }
     };

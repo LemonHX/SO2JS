@@ -1,4 +1,7 @@
-use std::{collections::HashSet, mem::size_of};
+use alloc::vec;
+use alloc::vec::Vec;
+use alloc::format;
+use hashbrown::HashSet;
 
 use crate::{extend_object, must, runtime::alloc_error::AllocResult, set_uninit};
 
@@ -153,7 +156,11 @@ impl VirtualObject for Handle<ProxyObject> {
         }
 
         if let Some(false) = result_desc.is_configurable {
-            if let None | Some(PropertyDescriptor { is_configurable: Some(true), .. }) = target_desc
+            if let None
+            | Some(PropertyDescriptor {
+                is_configurable: Some(true),
+                ..
+            }) = target_desc
             {
                 return type_error(cx, &format!("proxy can't report existing configurable property '{}' as non-configurable", key.format()?));
             } else if let Some(false) = result_desc.is_writable {
@@ -498,7 +505,11 @@ impl VirtualObject for Handle<ProxyObject> {
             let property_key = must!(PropertyKey::from_value(cx, key)).to_handle(cx);
             let desc = target.get_own_property(cx, property_key)?;
 
-            if let Some(PropertyDescriptor { is_configurable: Some(false), .. }) = desc {
+            if let Some(PropertyDescriptor {
+                is_configurable: Some(false),
+                ..
+            }) = desc
+            {
                 target_non_configurable_keys.push(property_key);
             } else {
                 target_configurable_keys.push(property_key);
@@ -513,7 +524,10 @@ impl VirtualObject for Handle<ProxyObject> {
             if !unchecked_result_keys.remove(&key) {
                 return type_error(
                     cx,
-                    &format!("proxy can't skip a non-configurable property '{}'", key.format()?),
+                    &format!(
+                        "proxy can't skip a non-configurable property '{}'",
+                        key.format()?
+                    ),
                 );
             }
         }
@@ -631,7 +645,10 @@ impl ProxyObject {
         } else if handler_proto.is_null() {
             None
         } else {
-            return type_error(cx, "proxy getPrototypeOf handler must return object or null");
+            return type_error(
+                cx,
+                "proxy getPrototypeOf handler must return object or null",
+            );
         };
 
         if is_extensible_(cx, target)? {
@@ -746,7 +763,10 @@ impl ProxyObject {
         let trap_result = to_boolean(*trap_result);
 
         if trap_result && is_extensible_(cx, target)? {
-            return type_error(cx, "proxy can't report an extensible object as non-extensible");
+            return type_error(
+                cx,
+                "proxy can't report an extensible object as non-extensible",
+            );
         }
 
         Ok(trap_result)

@@ -1,3 +1,11 @@
+use super::{
+    date_object::{
+        date_from_time, hour_from_time, local_time, make_day, millisecond_from_time,
+        minute_from_time, month_from_time, second_from_time, time_within_day, utc, week_day,
+        year_from_time, DateObject, MS_PER_MINUTE,
+    },
+    intrinsics::Intrinsic,
+};
 use crate::{
     must_a,
     runtime::{
@@ -17,30 +25,33 @@ use crate::{
         Context, EvalResult, Handle, PropertyKey, Realm, Value,
     },
 };
-
-use super::{
-    date_object::{
-        date_from_time, hour_from_time, local_time, make_day, millisecond_from_time,
-        minute_from_time, month_from_time, second_from_time, time_within_day, utc, week_day,
-        year_from_time, DateObject, MS_PER_MINUTE,
-    },
-    intrinsics::Intrinsic,
-};
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::format;
 
 pub struct DatePrototype;
 
 impl DatePrototype {
     /// Properties of the Date Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-date-prototype-object)
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         // Constructor property is added once DateConstructor has been created
         object.intrinsic_func(cx, cx.names.get_date(), Self::get_date, 0, realm)?;
         object.intrinsic_func(cx, cx.names.get_day(), Self::get_day, 0, realm)?;
         object.intrinsic_func(cx, cx.names.get_full_year(), Self::get_full_year, 0, realm)?;
         object.intrinsic_func(cx, cx.names.get_hours(), Self::get_hours, 0, realm)?;
-        object.intrinsic_func(cx, cx.names.get_milliseconds(), Self::get_milliseconds, 0, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.get_milliseconds(),
+            Self::get_milliseconds,
+            0,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.get_minutes(), Self::get_minutes, 0, realm)?;
         object.intrinsic_func(cx, cx.names.get_month(), Self::get_month, 0, realm)?;
         object.intrinsic_func(cx, cx.names.get_seconds(), Self::get_seconds, 0, realm)?;
@@ -69,13 +80,31 @@ impl DatePrototype {
             0,
             realm,
         )?;
-        object.intrinsic_func(cx, cx.names.get_utc_minutes(), Self::get_utc_minutes, 0, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.get_utc_minutes(),
+            Self::get_utc_minutes,
+            0,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.get_utc_month(), Self::get_utc_month, 0, realm)?;
-        object.intrinsic_func(cx, cx.names.get_utc_seconds(), Self::get_utc_seconds, 0, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.get_utc_seconds(),
+            Self::get_utc_seconds,
+            0,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.set_date(), Self::set_date, 1, realm)?;
         object.intrinsic_func(cx, cx.names.set_full_year(), Self::set_full_year, 3, realm)?;
         object.intrinsic_func(cx, cx.names.set_hours(), Self::set_hours, 4, realm)?;
-        object.intrinsic_func(cx, cx.names.set_milliseconds(), Self::set_milliseconds, 1, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.set_milliseconds(),
+            Self::set_milliseconds,
+            1,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.set_minutes(), Self::set_minutes, 3, realm)?;
         object.intrinsic_func(cx, cx.names.set_month(), Self::set_month, 2, realm)?;
         object.intrinsic_func(cx, cx.names.set_seconds(), Self::set_seconds, 2, realm)?;
@@ -96,10 +125,28 @@ impl DatePrototype {
             1,
             realm,
         )?;
-        object.intrinsic_func(cx, cx.names.set_utc_minutes(), Self::set_utc_minutes, 3, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.set_utc_minutes(),
+            Self::set_utc_minutes,
+            3,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.set_utc_month(), Self::set_utc_month, 2, realm)?;
-        object.intrinsic_func(cx, cx.names.set_utc_seconds(), Self::set_utc_seconds, 2, realm)?;
-        object.intrinsic_func(cx, cx.names.to_date_string(), Self::to_date_string, 0, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.set_utc_seconds(),
+            Self::set_utc_seconds,
+            2,
+            realm,
+        )?;
+        object.intrinsic_func(
+            cx,
+            cx.names.to_date_string(),
+            Self::to_date_string,
+            0,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.to_iso_string(), Self::to_iso_string, 0, realm)?;
         object.intrinsic_func(cx, cx.names.to_json(), Self::to_json, 1, realm)?;
         object.intrinsic_func(
@@ -109,7 +156,13 @@ impl DatePrototype {
             0,
             realm,
         )?;
-        object.intrinsic_func(cx, cx.names.to_locale_string(), Self::to_locale_string, 0, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.to_locale_string(),
+            Self::to_locale_string,
+            0,
+            realm,
+        )?;
         object.intrinsic_func(
             cx,
             cx.names.to_locale_time_string(),
@@ -117,7 +170,13 @@ impl DatePrototype {
             0,
             realm,
         )?;
-        object.intrinsic_func(cx, cx.names.to_time_string(), Self::to_time_string, 0, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.to_time_string(),
+            Self::to_time_string,
+            0,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.to_string(), Self::to_string, 0, realm)?;
         object.intrinsic_func(cx, cx.names.to_utc_string(), Self::to_utc_string, 0, realm)?;
         object.intrinsic_func(cx, cx.names.value_of(), Self::value_of, 0, realm)?;
@@ -169,7 +228,10 @@ impl DatePrototype {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
-            return type_error(cx, "Date.prototype.getDate method must be called on Date object");
+            return type_error(
+                cx,
+                "Date.prototype.getDate method must be called on Date object",
+            );
         };
 
         if date_value.is_nan() {
@@ -190,7 +252,10 @@ impl DatePrototype {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
-            return type_error(cx, "Date.prototype.getDay method must be called on Date object");
+            return type_error(
+                cx,
+                "Date.prototype.getDay method must be called on Date object",
+            );
         };
 
         if date_value.is_nan() {
@@ -235,7 +300,10 @@ impl DatePrototype {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
-            return type_error(cx, "Date.prototype.getHours method must be called on Date object");
+            return type_error(
+                cx,
+                "Date.prototype.getHours method must be called on Date object",
+            );
         };
 
         if date_value.is_nan() {
@@ -304,7 +372,10 @@ impl DatePrototype {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
-            return type_error(cx, "Date.prototype.getMonth method must be called on Date object");
+            return type_error(
+                cx,
+                "Date.prototype.getMonth method must be called on Date object",
+            );
         };
 
         if date_value.is_nan() {
@@ -383,7 +454,10 @@ impl DatePrototype {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
-            return type_error(cx, "Date.prototype.getUTCDate must be called on Date object");
+            return type_error(
+                cx,
+                "Date.prototype.getUTCDate must be called on Date object",
+            );
         };
 
         if date_value.is_nan() {
@@ -425,7 +499,10 @@ impl DatePrototype {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
-            return type_error(cx, "Date.prototype.getUTCFullYear must be called on Date object");
+            return type_error(
+                cx,
+                "Date.prototype.getUTCFullYear must be called on Date object",
+            );
         };
 
         if date_value.is_nan() {
@@ -446,7 +523,10 @@ impl DatePrototype {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
-            return type_error(cx, "Date.prototype.getUTCHours must be called on Date object");
+            return type_error(
+                cx,
+                "Date.prototype.getUTCHours must be called on Date object",
+            );
         };
 
         if date_value.is_nan() {
@@ -563,7 +643,10 @@ impl DatePrototype {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
-            return type_error(cx, "Date.prototype.setDate method must be called on Date object");
+            return type_error(
+                cx,
+                "Date.prototype.setDate method must be called on Date object",
+            );
         };
 
         let date_arg = get_argument(cx, arguments, 0);
@@ -576,7 +659,11 @@ impl DatePrototype {
         let date_value = local_time(date_value);
 
         let new_date = time_clip(utc(make_date(
-            make_day(year_from_time(date_value), month_from_time(date_value), date),
+            make_day(
+                year_from_time(date_value),
+                month_from_time(date_value),
+                date,
+            ),
             time_within_day(date_value),
         )));
 
@@ -623,8 +710,10 @@ impl DatePrototype {
             date_from_time(date_value)
         };
 
-        let new_date =
-            time_clip(utc(make_date(make_day(year, month, date), time_within_day(date_value))));
+        let new_date = time_clip(utc(make_date(
+            make_day(year, month, date),
+            time_within_day(date_value),
+        )));
 
         set_date_value(this_value, new_date);
 
@@ -640,7 +729,10 @@ impl DatePrototype {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
-            return type_error(cx, "Date.prototype.setHours method must be called on Date object");
+            return type_error(
+                cx,
+                "Date.prototype.setHours method must be called on Date object",
+            );
         };
 
         let hours_arg = get_argument(cx, arguments, 0);
@@ -804,7 +896,10 @@ impl DatePrototype {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
-            return type_error(cx, "Date.prototype.setMonth method must be called on Date object");
+            return type_error(
+                cx,
+                "Date.prototype.setMonth method must be called on Date object",
+            );
         };
 
         let month_arg = get_argument(cx, arguments, 0);
@@ -896,7 +991,10 @@ impl DatePrototype {
         arguments: &[Handle<Value>],
     ) -> EvalResult<Handle<Value>> {
         if this_date_value(this_value).is_none() {
-            return type_error(cx, "Date.prototype.setTime method must be called on Date object");
+            return type_error(
+                cx,
+                "Date.prototype.setTime method must be called on Date object",
+            );
         };
 
         let time_arg = get_argument(cx, arguments, 0);
@@ -930,7 +1028,11 @@ impl DatePrototype {
         }
 
         let new_date = time_clip(make_date(
-            make_day(year_from_time(date_value), month_from_time(date_value), date),
+            make_day(
+                year_from_time(date_value),
+                month_from_time(date_value),
+                date,
+            ),
             time_within_day(date_value),
         ));
 
@@ -975,8 +1077,10 @@ impl DatePrototype {
             date_from_time(date_value)
         };
 
-        let new_date =
-            time_clip(make_date(make_day(year, month, date), time_within_day(date_value)));
+        let new_date = time_clip(make_date(
+            make_day(year, month, date),
+            time_within_day(date_value),
+        ));
 
         set_date_value(this_value, new_date);
 
@@ -1041,8 +1145,10 @@ impl DatePrototype {
             milliseconds = millisecond_from_time(date_value);
         }
 
-        let new_date =
-            time_clip(make_date(day(date_value), make_time(hours, minutes, seconds, milliseconds)));
+        let new_date = time_clip(make_date(
+            day(date_value),
+            make_time(hours, minutes, seconds, milliseconds),
+        ));
 
         set_date_value(this_value, new_date);
 
@@ -1388,7 +1494,10 @@ impl DatePrototype {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
-            return type_error(cx, "Date.prototype.toString method must be called on Date object");
+            return type_error(
+                cx,
+                "Date.prototype.toString method must be called on Date object",
+            );
         };
 
         Ok(to_date_string(cx, date_value)?.as_value())
@@ -1472,7 +1581,10 @@ impl DatePrototype {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
-            return type_error(cx, "Date.prototype.valueOf method must be called on Date object");
+            return type_error(
+                cx,
+                "Date.prototype.valueOf method must be called on Date object",
+            );
         };
 
         Ok(Value::from(date_value).to_handle(cx))
@@ -1520,7 +1632,10 @@ impl DatePrototype {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
-            return type_error(cx, "Date.prototype.getYear method must be called on Date object");
+            return type_error(
+                cx,
+                "Date.prototype.getYear method must be called on Date object",
+            );
         };
 
         if date_value.is_nan() {
@@ -1541,7 +1656,10 @@ impl DatePrototype {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
-            return type_error(cx, "Date.prototype.setYear method must be called on Date object");
+            return type_error(
+                cx,
+                "Date.prototype.setYear method must be called on Date object",
+            );
         };
 
         let year_arg = get_argument(cx, arguments, 0);

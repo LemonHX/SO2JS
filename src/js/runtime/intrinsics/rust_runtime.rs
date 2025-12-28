@@ -1,13 +1,15 @@
-use std::cell::RefCell;
-
 use crate::{
     runtime::{
-        async_generator_object, bound_function_object::BoundFunctionObject, console::ConsoleObject,
+        async_generator_object, bound_function_object::BoundFunctionObject, context::ContextCell,
         gc_object::GcObject, global_names, module, promise_object::PromiseCapability,
         test_262_object::Test262Object, Context, EvalResult, Handle, Value,
     },
     static_assert,
 };
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::error::Error;
 
 use super::{
     aggregate_error_constructor::AggregateErrorConstructor,
@@ -87,6 +89,8 @@ use super::{
 /// Collection of all functions in the Rust runtime that can be called with a CallRustRuntime
 /// instruction.
 pub struct RustRuntimeFunctionRegistry {
+    pub(crate) cx_ptr: *mut ContextCell,
+
     /// Lookup table from runtime function id to the function pointer itself
     id_to_function: Vec<RustRuntimeFunction>,
 
@@ -113,20 +117,15 @@ impl RustRuntimeFunctionRegistry {
     }
 
     pub fn get_id(&mut self, function: RustRuntimeFunction) -> Option<RustRuntimeFunctionId> {
-        // Lazily rebuild sorted functions when needed
+        let cx_cell = unsafe { self.cx_ptr.as_mut() };
+        let sorted_functions = &mut cx_cell?.RUST_RUNTIME_FUNCTIONS_SORTED_BY_POINTER;
         if self.should_rebuild_sorted_functions {
-            RUST_RUNTIME_FUNCTIONS_SORTED_BY_POINTER.with_borrow_mut(|sorted_functions| {
-                *sorted_functions = self.build_sorted_functions();
-            });
+            *sorted_functions = self.build_sorted_functions();
         }
-
-        RUST_RUNTIME_FUNCTIONS_SORTED_BY_POINTER.with_borrow_mut(|sorted_functions| {
-            let index = sorted_functions
-                .binary_search_by_key(&function, |&(ptr, _)| ptr)
-                .ok()?;
-
-            Some(sorted_functions[index].1)
-        })
+        let index = sorted_functions
+            .binary_search_by_key(&function, |&(ptr, _)| ptr)
+            .ok()?;
+        Some(sorted_functions[index].1)
     }
 
     fn build_sorted_functions(&self) -> Vec<(RustRuntimeFunction, RustRuntimeFunctionId)> {
@@ -145,7 +144,6 @@ impl RustRuntimeFunctionRegistry {
     pub fn register(&mut self, function: RustRuntimeFunction) -> RustRuntimeFunctionId {
         let id = self.id_to_function.len() as RustRuntimeFunctionId;
         self.id_to_function.push(function);
-
         // Invalidate sorted functions so they are rebuilt on next access
         self.should_rebuild_sorted_functions = true;
 
@@ -162,6 +160,7 @@ macro_rules! rust_runtime_functions {
         impl RustRuntimeFunctionRegistry {
             pub fn new() -> Self {
                 Self {
+                    cx_ptr: core::ptr::null_mut(),
                     id_to_function: vec![
                         $($rust_function,)*
                     ],
@@ -685,7 +684,6 @@ rust_runtime_functions!(
     WrapForValidIteratorPrototype::next,
     WrapForValidIteratorPrototype::return_,
     // Non-standard functions
-    ConsoleObject::log,
     GcObject::run,
     Test262Object::create_realm,
     Test262Object::detach_array_buffer,
@@ -714,10 +712,4 @@ pub fn return_undefined(
     _: &[Handle<Value>],
 ) -> EvalResult<Handle<Value>> {
     Ok(cx.undefined())
-}
-
-thread_local! {
-    /// Array of (function, index) pairs sorted by function pointer. This is used to look up the
-    /// index of a runtime function the register in O(log n) time.
-    static RUST_RUNTIME_FUNCTIONS_SORTED_BY_POINTER: RefCell<Vec<(RustRuntimeFunction, RustRuntimeFunctionId)>> = RefCell::new(vec![]);
 }

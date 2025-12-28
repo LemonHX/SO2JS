@@ -1,7 +1,3 @@
-use std::{collections::HashSet, hash::Hash, num::NonZeroUsize};
-
-use indexmap_allocator_api::IndexSet;
-
 use crate::{
     field_offset, handle_scope,
     runtime::{
@@ -24,6 +20,12 @@ use crate::{
     },
     set_uninit,
 };
+use alloc::vec;
+use alloc::vec::Vec;
+use core::hash::Hash;
+use core::num::NonZeroUsize;
+use hashbrown::HashSet;
+use indexmap_allocator_api::IndexSet;
 
 use super::{
     linker::link,
@@ -134,9 +136,13 @@ impl SourceTextModule {
             *dst = src.to_heap();
         }
 
-        let loaded_modules =
-            BsArray::new(cx, HeapItemKind::ModuleOptionArray, requested_modules.len(), None)?
-                .to_handle();
+        let loaded_modules = BsArray::new(
+            cx,
+            HeapItemKind::ModuleOptionArray,
+            requested_modules.len(),
+            None,
+        )?
+        .to_handle();
 
         // Then create the uninitialized module object
         let num_entries =
@@ -144,7 +150,10 @@ impl SourceTextModule {
         let size = Self::calculate_size_in_bytes(num_entries);
         let mut object = cx.alloc_uninit_with_size::<SourceTextModule>(size)?;
 
-        set_uninit!(object.descriptor, cx.base_descriptors.get(HeapItemKind::SourceTextModule));
+        set_uninit!(
+            object.descriptor,
+            cx.base_descriptors.get(HeapItemKind::SourceTextModule)
+        );
         set_uninit!(object.id, next_module_id());
         set_uninit!(object.state, ModuleState::New);
         set_uninit!(object.has_top_level_await, has_top_level_await);
@@ -540,7 +549,10 @@ impl Module for Handle<SourceTextModule> {
                     let boxed_value = self.module_scope.get_module_slot(entry.slot_index);
 
                     return Ok(ResolveExportResult::Resolved {
-                        name: ResolveExportName::Local { name: entry.local_name, boxed_value },
+                        name: ResolveExportName::Local {
+                            name: entry.local_name,
+                            boxed_value,
+                        },
                         module: self.to_handle().as_dyn_module(),
                     });
                 }
@@ -785,7 +797,7 @@ impl PartialEq for ModuleRequest {
 impl Eq for ModuleRequest {}
 
 impl Hash for ModuleRequest {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         // Ignore attributes for hashing
         self.specifier.hash(state);
     }
@@ -919,7 +931,9 @@ pub struct DirectReExportEntry {
 
 impl DirectReExportEntry {
     fn to_heap(&self) -> HeapDirectReExportEntry {
-        HeapDirectReExportEntry { module_request: self.module_request.to_heap() }
+        HeapDirectReExportEntry {
+            module_request: self.module_request.to_heap(),
+        }
     }
 }
 

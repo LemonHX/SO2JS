@@ -1,13 +1,17 @@
-use std::{
+use alloc::boxed::Box;
+use alloc::rc::Rc;
+use alloc::string::String;
+use alloc::vec::Vec;
+use core::{
     hash::{Hash, Hasher},
     num::NonZeroUsize,
     ops::{Deref, DerefMut},
     ptr::NonNull,
-    rc::Rc,
 };
-
 use rand::{rngs::StdRng, SeedableRng};
 
+use crate::runtime::intrinsics::rust_runtime::RustRuntimeFunction;
+use crate::runtime::intrinsics::rust_runtime::RustRuntimeFunctionId;
 use crate::{
     common::{
         options::Options,
@@ -15,9 +19,7 @@ use crate::{
         wtf_8::{Wtf8Str, Wtf8String},
     },
     eval_err, handle_scope,
-    parser::{
-        analyze::analyze, parse_module, parse_script, print_program, source::Source, ParseContext,
-    },
+    parser::{analyze::analyze, parse_module, parse_script, source::Source, ParseContext},
     runtime::{alloc_error::AllocResult, annex_b::init_annex_b_methods, gc::GarbageCollector},
 };
 
@@ -67,6 +69,7 @@ pub struct Context {
 }
 
 pub struct ContextCell {
+    pub sys: Option<Box<dyn crate::sys::Sys>>,
     pub heap: Heap,
     global_symbol_registry: HeapPtr<GlobalSymbolRegistry>,
     pub names: BuiltinNames,
@@ -118,18 +121,23 @@ pub struct ContextCell {
 
     /// Random number generator used within this context.
     pub rand: StdRng,
+
+    // ===
+    pub RUST_RUNTIME_FUNCTIONS_SORTED_BY_POINTER: Vec<(RustRuntimeFunction, RustRuntimeFunctionId)>,
 }
 
 type GlobalSymbolRegistry = BsHashMap<HeapPtr<FlatString>, HeapPtr<SymbolValue>>;
 
 impl Context {
-    fn new(options: Rc<Options>) -> AllocResult<Context> {
+    fn new(options: Rc<Options>, sys: Option<Box<dyn crate::sys::Sys>>) -> AllocResult<Context> {
         let cx_cell = Box::new(ContextCell {
+            sys,
             heap: Heap::new(options.heap_size),
             global_symbol_registry: HeapPtr::uninit(),
             names: BuiltinNames::uninit(),
             well_known_symbols: BuiltinSymbols::uninit(),
             base_descriptors: BaseDescriptors::uninit_empty(),
+            // pass this ptr later
             rust_runtime_functions: RustRuntimeFunctionRegistry::new(),
             vm: None,
             initial_realm: HeapPtr::uninit(),
@@ -153,10 +161,13 @@ impl Context {
             // We want the initial heap generation to be deterministic so use seeded PRNG. After
             // initial heap has been set up switch to a PRNG seeded from a random source.
             rand: StdRng::from_seed([0; 32]),
+            // ===
+            RUST_RUNTIME_FUNCTIONS_SORTED_BY_POINTER: Vec::new(),
         });
 
         let mut cx = unsafe { Context::from_ptr(NonNull::new_unchecked(Box::leak(cx_cell))) };
-
+        // pass it here
+        cx.rust_runtime_functions.cx_ptr = cx.ptr.as_ptr();
         cx.heap.info().set_context(cx);
         cx.vm = Some(Box::new(VM::new(cx)));
 
@@ -167,7 +178,7 @@ impl Context {
         }
 
         // Stop using deterministic PRNG
-        cx.rand = StdRng::from_entropy();
+        cx.rand = StdRng::from_rng(&mut rand::rng());
 
         // Annex B methods may not be included in the serialized heap so they must be initialized
         // separately.
@@ -261,13 +272,13 @@ impl Context {
         let pcx = ParseContext::new(source);
         let parse_result = parse_script(&pcx, self.options.clone())?;
 
-        if self.options.print_ast {
-            println!("{}", print_program(&parse_result));
-        }
+        // if self.options.print_ast {
+        //     println!("{}", print_program(&parse_result));
+        // }
 
-        if self.options.parse_stats {
-            println!("{:#?}", pcx.stats());
-        }
+        // if self.options.parse_stats {
+        //     println!("{:#?}", pcx.stats());
+        // }
 
         let analyzed_result = analyze(parse_result)?;
 
@@ -289,13 +300,13 @@ impl Context {
         let pcx = ParseContext::new(source);
         let parse_result = parse_module(&pcx, self.options.clone())?;
 
-        if self.options.print_ast {
-            println!("{}", print_program(&parse_result));
-        }
+        // if self.options.print_ast {
+        //     println!("{}", print_program(&parse_result));
+        // }
 
-        if self.options.parse_stats {
-            println!("{:#?}", pcx.stats());
-        }
+        // if self.options.parse_stats {
+        //     println!("{:#?}", pcx.stats());
+        // }
 
         let analyzed_result = analyze(parse_result)?;
 
@@ -351,7 +362,10 @@ impl Context {
         self.vm().debug_assert_stack_empty();
 
         let push_frame_result = self.vm().push_initial_realm_stack_frame(realm);
-        assert!(push_frame_result.is_ok(), "Initial realm frame overflowed stack");
+        assert!(
+            push_frame_result.is_ok(),
+            "Initial realm frame overflowed stack"
+        );
 
         // Always mark the top of the stack trace under the initial realm frame
         self.vm().mark_stack_trace_top();
@@ -444,7 +458,7 @@ impl Context {
 
             buffer.push_str(str);
         } else {
-            println!("{str}");
+            // println!("{str}");
         }
     }
 
@@ -605,11 +619,20 @@ impl DerefMut for Context {
 
 pub struct ContextBuilder {
     options: Option<Rc<Options>>,
+    sys: Option<Box<dyn crate::sys::Sys>>,
 }
 
 impl ContextBuilder {
     pub fn new() -> Self {
-        Self { options: None }
+        Self {
+            options: None,
+            sys: None,
+        }
+    }
+
+    pub fn set_sys(mut self, sys: Box<dyn crate::sys::Sys>) -> Self {
+        self.sys = Some(sys);
+        self
     }
 
     pub fn build(self) -> AllocResult<Context> {
@@ -617,7 +640,7 @@ impl ContextBuilder {
         let options = self.options.unwrap_or_else(|| Rc::new(Options::default()));
 
         // Create default realm if one was not provided
-        Context::new(options)
+        Context::new(options, self.sys)
     }
 
     pub fn set_options(mut self, options: Rc<Options>) -> Self {

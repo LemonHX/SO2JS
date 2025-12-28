@@ -78,7 +78,10 @@ impl ClassNames {
         let size = Self::calculate_size_in_bytes(num_methods);
         let mut class_names = cx.alloc_uninit_with_size::<ClassNames>(size)?;
 
-        set_uninit!(class_names.descriptor, cx.base_descriptors.get(HeapItemKind::ClassNames));
+        set_uninit!(
+            class_names.descriptor,
+            cx.base_descriptors.get(HeapItemKind::ClassNames)
+        );
         set_uninit!(class_names.home_object, home_object);
         set_uninit!(class_names.static_home_object, static_home_object);
 
@@ -205,7 +208,12 @@ pub fn new_class(
 
     // Define a `constructor` property on the prototype
     let desc = PropertyDescriptor::data(constructor.into(), true, false, true);
-    must!(define_property_or_throw(cx, prototype, cx.names.constructor(), desc));
+    must!(define_property_or_throw(
+        cx,
+        prototype,
+        cx.names.constructor(),
+        desc
+    ));
 
     // Define a `prototype` property on the constructor
     let desc = PropertyDescriptor::data(prototype.into(), false, false, false);

@@ -11,8 +11,11 @@ pub struct SymbolPrototype;
 impl SymbolPrototype {
     /// Properties of the Symbol Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-symbol-prototype-object)
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         // Constructor property is added once SymbolConstructor has been created
         object.intrinsic_getter(cx, cx.names.description(), Self::get_description, realm)?;

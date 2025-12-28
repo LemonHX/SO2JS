@@ -2,7 +2,7 @@
 #[macro_export]
 macro_rules! static_assert {
     ($expr:expr) => {
-        const _: () = std::assert!($expr);
+        const _: () = core::assert!($expr);
     };
 }
 

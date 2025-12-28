@@ -1,4 +1,4 @@
-use brimstone_core::common::terminal::RESET;
+const RESET: &str = "\x1b[0m";
 
 /// A cell in a table with associated formatting properties.
 pub struct TableCell {
@@ -24,11 +24,19 @@ impl TableCell {
         modifiers: Option<Vec<&'static str>>,
         alignment: CellAlignment,
     ) -> TableCell {
-        TableCell { value, modifiers, alignment }
+        TableCell {
+            value,
+            modifiers,
+            alignment,
+        }
     }
 
     pub fn simple(value: String) -> TableCell {
-        TableCell { value, modifiers: None, alignment: CellAlignment::default() }
+        TableCell {
+            value,
+            modifiers: None,
+            alignment: CellAlignment::default(),
+        }
     }
 
     pub fn with_modifiers(value: String, modifiers: Vec<&'static str>) -> TableCell {
@@ -79,7 +87,11 @@ impl TableFormatter {
             }
         }
 
-        TableFormatter { rows, max_column_length, num_columns }
+        TableFormatter {
+            rows,
+            max_column_length,
+            num_columns,
+        }
     }
 
     /// Format a table formed from a list of rows.

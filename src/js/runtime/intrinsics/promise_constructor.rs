@@ -72,7 +72,13 @@ impl PromiseConstructor {
         func.intrinsic_func(cx, cx.names.reject(), Self::reject, 1, realm)?;
         func.intrinsic_func(cx, cx.names.resolve(), Self::resolve, 1, realm)?;
         func.intrinsic_func(cx, cx.names.try_(), Self::try_, 1, realm)?;
-        func.intrinsic_func(cx, cx.names.with_resolvers(), Self::with_resolvers, 0, realm)?;
+        func.intrinsic_func(
+            cx,
+            cx.names.with_resolvers(),
+            Self::with_resolvers,
+            0,
+            realm,
+        )?;
 
         // get Promise [ @@species ] (https://tc39.es/ecma262/#sec-get-promise-%symbol.species%)
         let species_key = cx.well_known_symbols.species();
@@ -176,7 +182,11 @@ impl PromiseConstructor {
     }
 
     fn set_index(cx: Context, mut function: Handle<ObjectValue>, value: Value) -> AllocResult<()> {
-        function.private_element_set(cx, cx.well_known_symbols.index().cast(), value.to_handle(cx))
+        function.private_element_set(
+            cx,
+            cx.well_known_symbols.index().cast(),
+            value.to_handle(cx),
+        )
     }
 
     fn get_values(cx: Context, function: Handle<ObjectValue>) -> Handle<ArrayObject> {
@@ -325,7 +335,12 @@ impl PromiseConstructor {
         let values = Self::get_values(cx, function);
 
         let key = PropertyKey::from_value(cx, index)?.to_handle(cx);
-        must!(create_data_property_or_throw(cx, values.into(), key, resolved_value));
+        must!(create_data_property_or_throw(
+            cx,
+            values.into(),
+            key,
+            resolved_value
+        ));
 
         // Decrement the number of remaining elements
         let mut remaining_elements = Self::get_remaining_elements(cx, function);
@@ -472,7 +487,12 @@ impl PromiseConstructor {
         let values = Self::get_values(cx, function);
 
         let key = PropertyKey::from_value(cx, index)?.to_handle(cx);
-        must!(create_data_property_or_throw(cx, values.into(), key, result_object.into()));
+        must!(create_data_property_or_throw(
+            cx,
+            values.into(),
+            key,
+            result_object.into()
+        ));
 
         // Decrement the number of remaining elements
         let mut remaining_elements = Self::get_remaining_elements(cx, function);
@@ -525,7 +545,12 @@ impl PromiseConstructor {
         let values = Self::get_values(cx, function);
 
         let key = PropertyKey::from_value(cx, index)?.to_handle(cx);
-        must!(create_data_property_or_throw(cx, values.into(), key, result_object.into()));
+        must!(create_data_property_or_throw(
+            cx,
+            values.into(),
+            key,
+            result_object.into()
+        ));
 
         // Decrement the number of remaining elements
         let mut remaining_elements = Self::get_remaining_elements(cx, function);
@@ -634,7 +659,12 @@ impl PromiseConstructor {
         let errors = Self::get_values(cx, function);
 
         let key = PropertyKey::from_value(cx, index)?.to_handle(cx);
-        must!(create_data_property_or_throw(cx, errors.into(), key, rejected_value));
+        must!(create_data_property_or_throw(
+            cx,
+            errors.into(),
+            key,
+            rejected_value
+        ));
 
         // Decrement the number of remaining elements
         let mut remaining_elements = Self::get_remaining_elements(cx, function);
@@ -780,8 +810,12 @@ pub fn execute_then(
 
     promise.set_already_resolved(false);
 
-    let completion =
-        call_object(cx, executor, this_value, &[resolve_function.into(), reject_function.into()]);
+    let completion = call_object(
+        cx,
+        executor,
+        this_value,
+        &[resolve_function.into(), reject_function.into()],
+    );
 
     // Reject if the executor function throws
     if let Err(error) = completion_value!(completion) {
@@ -810,8 +844,14 @@ fn create_settle_function(
     promise: Handle<PromiseObject>,
     func: RustRuntimeFunction,
 ) -> AllocResult<Handle<ObjectValue>> {
-    let mut function =
-        BuiltinFunction::create(cx, func, 1, cx.names.empty_string(), cx.current_realm(), None)?;
+    let mut function = BuiltinFunction::create(
+        cx,
+        func,
+        1,
+        cx.names.empty_string(),
+        cx.current_realm(),
+        None,
+    )?;
 
     function.private_element_set(cx, cx.well_known_symbols.promise().cast(), promise.into())?;
 

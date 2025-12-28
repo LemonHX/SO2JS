@@ -1,3 +1,6 @@
+use super::{
+    intrinsics::Intrinsic, iterator_helper_object::IteratorHelperObject, rust_runtime::return_this,
+};
 use crate::{
     eval_err, must,
     runtime::{
@@ -13,18 +16,18 @@ use crate::{
         Context, EvalResult, Handle, Value,
     },
 };
-
-use super::{
-    intrinsics::Intrinsic, iterator_helper_object::IteratorHelperObject, rust_runtime::return_this,
-};
+use alloc::vec;
 
 /// The %IteratorPrototype% Object (https://tc39.es/ecma262/#sec-%iteratorprototype%-object)
 pub struct IteratorPrototype;
 
 impl IteratorPrototype {
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         // Iterator.prototype.constructor (https://tc39.es/ecma262/#sec-iterator.prototype.constructor)
         object.intrinsic_getter_and_setter(
@@ -383,8 +386,12 @@ impl IteratorPrototype {
 
             // Pass accumulator, value, and counter to the predicate function
             counter_handle.replace(Value::from(counter));
-            let result =
-                call_object(cx, callback, cx.undefined(), &[accumulator, value, counter_handle]);
+            let result = call_object(
+                cx,
+                callback,
+                cx.undefined(),
+                &[accumulator, value, counter_handle],
+            );
 
             // Finish iterating if callback threw, otherwise update the accumulator
             match result {

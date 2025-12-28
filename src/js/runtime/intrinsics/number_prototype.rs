@@ -11,6 +11,10 @@ use crate::runtime::{
     value::Value,
     Context, Handle,
 };
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::{borrow::ToOwned, format};
 
 use super::{intrinsics::Intrinsic, number_constructor::NumberObject};
 
@@ -23,9 +27,21 @@ impl NumberPrototype {
         let mut object = NumberObject::new_with_proto(cx, object_proto, 0.0)?.as_object();
 
         // Constructor property is added once NumberConstructor has been created
-        object.intrinsic_func(cx, cx.names.to_exponential(), Self::to_exponential, 1, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.to_exponential(),
+            Self::to_exponential,
+            1,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.to_fixed(), Self::to_fixed, 1, realm)?;
-        object.intrinsic_func(cx, cx.names.to_locale_string(), Self::to_locale_string, 0, realm)?;
+        object.intrinsic_func(
+            cx,
+            cx.names.to_locale_string(),
+            Self::to_locale_string,
+            0,
+            realm,
+        )?;
         object.intrinsic_func(cx, cx.names.to_precision(), Self::to_precision, 1, realm)?;
         object.intrinsic_func(cx, cx.names.to_string(), Self::to_string, 1, realm)?;
         object.intrinsic_func(cx, cx.names.value_of(), Self::value_of, 0, realm)?;

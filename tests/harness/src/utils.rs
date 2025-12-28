@@ -1,4 +1,4 @@
-use std::error::Error;
+use core::error::Error;
 
 pub type GenericError = Box<dyn Error>;
 

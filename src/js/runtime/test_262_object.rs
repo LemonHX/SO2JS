@@ -1,10 +1,10 @@
-use std::rc::Rc;
-
 use crate::{
     handle_scope, must_a,
     parser::{analyze::analyze, parse_script, source::Source, ParseContext},
     runtime::{alloc_error::AllocResult, bytecode::generator::BytecodeProgramGenerator, get},
 };
+use alloc::rc::Rc;
+use alloc::string::ToString;
 
 use super::{
     abstract_operations::set,
@@ -23,8 +23,11 @@ pub struct Test262Object;
 
 impl Test262Object {
     fn new(mut cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         let create_realm_string = cx.alloc_string("createRealm")?.as_string();
         let create_realm_key = PropertyKey::string_handle(cx, create_realm_string)?;
@@ -40,7 +43,13 @@ impl Test262Object {
 
         let detach_array_buffer_string = cx.alloc_string("detachArrayBuffer")?.as_string();
         let detach_array_buffer_key = PropertyKey::string_handle(cx, detach_array_buffer_string)?;
-        object.intrinsic_func(cx, detach_array_buffer_key, Self::detach_array_buffer, 1, realm)?;
+        object.intrinsic_func(
+            cx,
+            detach_array_buffer_key,
+            Self::detach_array_buffer,
+            1,
+            realm,
+        )?;
 
         object.intrinsic_func(cx, cx.names.gc(), GcObject::run, 0, realm)?;
 
@@ -99,7 +108,13 @@ impl Test262Object {
         global_object: Handle<ObjectValue>,
         print_log: Handle<StringValue>,
     ) -> EvalResult<()> {
-        set(cx, global_object, Self::print_log_key(cx)?, print_log.into(), true)
+        set(
+            cx,
+            global_object,
+            Self::print_log_key(cx)?,
+            print_log.into(),
+            true,
+        )
     }
 
     /// Adds strings to a running print log stored on the global object.

@@ -1,3 +1,16 @@
+use super::{
+    compiled_regexp::CompiledRegExpObject,
+    instruction::{
+        AssertEndInstruction, AssertEndOrNewlineInstruction, AssertNotWordBoundaryInstruction,
+        AssertStartInstruction, AssertStartOrNewlineInstruction, AssertWordBoundaryInstruction,
+        BackreferenceInstruction, BranchInstruction, ClearCaptureInstruction,
+        CompareBetweenInstruction, CompareEqualsInstruction, ConsumeIfFalseInstruction,
+        ConsumeIfTrueInstruction, Instruction, JumpInstruction, LiteralInstruction,
+        LookaroundInstruction, LoopInstruction, MarkCapturePointInstruction, ProgressInstruction,
+        TInstruction, WildcardInstruction, WildcardNoNewlineInstruction,
+        WordBoundaryMoveToPreviousInstruction,
+    },
+};
 use crate::{
     common::{
         icu::ICU,
@@ -13,20 +26,8 @@ use crate::{
         HeapPtr,
     },
 };
-
-use super::{
-    compiled_regexp::CompiledRegExpObject,
-    instruction::{
-        AssertEndInstruction, AssertEndOrNewlineInstruction, AssertNotWordBoundaryInstruction,
-        AssertStartInstruction, AssertStartOrNewlineInstruction, AssertWordBoundaryInstruction,
-        BackreferenceInstruction, BranchInstruction, ClearCaptureInstruction,
-        CompareBetweenInstruction, CompareEqualsInstruction, ConsumeIfFalseInstruction,
-        ConsumeIfTrueInstruction, Instruction, JumpInstruction, LiteralInstruction,
-        LookaroundInstruction, LoopInstruction, MarkCapturePointInstruction, ProgressInstruction,
-        TInstruction, WildcardInstruction, WildcardNoNewlineInstruction,
-        WordBoundaryMoveToPreviousInstruction,
-    },
-};
+use alloc::vec;
+use alloc::vec::Vec;
 
 pub struct MatchEngine<T: LexerStream> {
     // Lexer over the target string with a current position
@@ -118,7 +119,10 @@ impl<T: LexerStream> MatchEngine<T> {
 
     fn push_backtrack_restore_state(&mut self, instruction_index: usize) {
         let saved_string_state = self.string_lexer.save();
-        let restore_state = BacktrackRestoreState { instruction_index, saved_string_state };
+        let restore_state = BacktrackRestoreState {
+            instruction_index,
+            saved_string_state,
+        };
 
         self.backtrack_stack
             .push(BacktrackEntry::RestoreState(restore_state));
@@ -476,7 +480,9 @@ impl<T: LexerStream> MatchEngine<T> {
                     // undoing the captures in the future when backtracking.
                     if is_match {
                         self.backtrack_stack
-                            .push(BacktrackEntry::RestoreBacktrackStack(old_backtrack_stack_size))
+                            .push(BacktrackEntry::RestoreBacktrackStack(
+                                old_backtrack_stack_size,
+                            ))
                     } else {
                         // If did not match then backtrack stack must have been popped back to
                         // the old size.
@@ -563,8 +569,10 @@ impl<T: LexerStream> MatchEngine<T> {
     fn push_progress_point(&mut self, progress_point_index: u32, string_index: u32) {
         // Save old progress point on backtrack stack
         let old_string_index = self.get_progress_point(progress_point_index);
-        self.backtrack_stack
-            .push(BacktrackEntry::ProgressPoint(progress_point_index, old_string_index));
+        self.backtrack_stack.push(BacktrackEntry::ProgressPoint(
+            progress_point_index,
+            old_string_index,
+        ));
 
         self.set_progress_point(progress_point_index, string_index);
     }

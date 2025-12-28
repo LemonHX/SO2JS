@@ -62,7 +62,7 @@ impl AsyncFromSyncIterator {
 
 impl HeapItem for HeapPtr<AsyncFromSyncIterator> {
     fn byte_size(&self) -> usize {
-        std::mem::size_of::<AsyncFromSyncIterator>()
+        core::mem::size_of::<AsyncFromSyncIterator>()
     }
 
     fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
@@ -108,8 +108,12 @@ impl AsyncFromSyncIteratorPrototype {
             Some(get_argument(cx, arguments, 0))
         };
 
-        let iter_result_completion =
-            iterator_next(cx, async_iterator.iterator(), async_iterator.next_method(cx), value);
+        let iter_result_completion = iterator_next(
+            cx,
+            async_iterator.iterator(),
+            async_iterator.next_method(cx),
+            value,
+        );
 
         let iter_result = if_abrupt_reject_promise!(cx, iter_result_completion, capability);
 
@@ -141,7 +145,12 @@ impl AsyncFromSyncIteratorPrototype {
         if return_method.is_none() {
             let value = get_argument(cx, arguments, 0);
             let iter_result = create_iter_result_object(cx, value, true)?;
-            must!(call_object(cx, capability.resolve(), cx.undefined(), &[iter_result]));
+            must!(call_object(
+                cx,
+                capability.resolve(),
+                cx.undefined(),
+                &[iter_result]
+            ));
 
             return Ok(capability.promise().as_value());
         }
@@ -159,7 +168,12 @@ impl AsyncFromSyncIteratorPrototype {
         let return_result = if_abrupt_reject_promise!(cx, return_result_completion, capability);
         if !return_result.is_object() {
             let error = type_error_value(cx, "return method must return an object")?;
-            must!(call_object(cx, capability.reject(), cx.undefined(), &[error]));
+            must!(call_object(
+                cx,
+                capability.reject(),
+                cx.undefined(),
+                &[error]
+            ));
 
             return Ok(capability.promise().as_value());
         }
@@ -196,7 +210,12 @@ impl AsyncFromSyncIteratorPrototype {
 
             // Reject the promise with a new TypeError
             let error = type_error_value(cx, "throw method is not present")?;
-            must!(call_object(cx, capability.reject(), cx.undefined(), &[error]));
+            must!(call_object(
+                cx,
+                capability.reject(),
+                cx.undefined(),
+                &[error]
+            ));
 
             return Ok(capability.promise().as_value());
         }
@@ -214,7 +233,12 @@ impl AsyncFromSyncIteratorPrototype {
         let throw_result = if_abrupt_reject_promise!(cx, throw_result_completion, capability);
         if !throw_result.is_object() {
             let error = type_error_value(cx, "throw method must return an object")?;
-            must!(call_object(cx, capability.reject(), cx.undefined(), &[error]));
+            must!(call_object(
+                cx,
+                capability.reject(),
+                cx.undefined(),
+                &[error]
+            ));
 
             return Ok(capability.promise().as_value());
         }
@@ -288,7 +312,13 @@ fn async_from_sync_iterator_continuation(
         on_reject.as_value()
     };
 
-    perform_promise_then(cx, value_promise, on_fulfilled.into(), on_reject, Some(capability))?;
+    perform_promise_then(
+        cx,
+        value_promise,
+        on_fulfilled.into(),
+        on_reject,
+        Some(capability),
+    )?;
 
     Ok(capability.promise().as_value())
 }
@@ -299,7 +329,9 @@ pub fn create_continuing_iter_result_object(
     arguments: &[Handle<Value>],
 ) -> EvalResult<Handle<Value>> {
     let value = get_argument(cx, arguments, 0);
-    Ok(create_iter_result_object(cx, value, /* is_done */ false)?)
+    Ok(create_iter_result_object(
+        cx, value, /* is_done */ false,
+    )?)
 }
 
 pub fn create_done_iter_result_object(
@@ -308,7 +340,9 @@ pub fn create_done_iter_result_object(
     arguments: &[Handle<Value>],
 ) -> EvalResult<Handle<Value>> {
     let value = get_argument(cx, arguments, 0);
-    Ok(create_iter_result_object(cx, value, /* is_done */ true)?)
+    Ok(create_iter_result_object(
+        cx, value, /* is_done */ true,
+    )?)
 }
 
 pub fn async_from_sync_iterator_continuation_on_reject(

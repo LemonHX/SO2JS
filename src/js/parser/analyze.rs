@@ -1,15 +1,15 @@
-use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
-    rc::Rc,
-};
+use alloc::boxed::Box;
+use alloc::rc::Rc;
 
+use alloc::vec;
+use alloc::vec::Vec;
 use allocator_api2::alloc::Global;
+use hashbrown::hash_map::{Entry, HashMap};
+use hashbrown::HashSet;
 
+use crate::common::options::Options;
 use crate::{
-    common::{
-        options::Options,
-        wtf_8::{Wtf8Cow, Wtf8Str},
-    },
+    common::wtf_8::{Wtf8Cow, Wtf8Str},
     parser::{
         parse_error::InvalidDuplicateParametersReason,
         scope_tree::{VMLocation, ARGUMENTS_NAME},
@@ -136,7 +136,11 @@ pub struct PrivateNameUsage {
 impl PrivateNameUsage {
     // A generic usage marking that a private name was used
     pub fn used() -> PrivateNameUsage {
-        PrivateNameUsage { is_static: false, has_getter: true, has_setter: true }
+        PrivateNameUsage {
+            is_static: false,
+            has_getter: true,
+            has_setter: true,
+        }
     }
 }
 
@@ -255,7 +259,7 @@ impl<'a> Analyzer<'a> {
             has_assign_expr: self.has_assign_expr,
         };
 
-        std::mem::swap(&mut self.labels, &mut state.labels);
+        core::mem::swap(&mut self.labels, &mut state.labels);
         self.label_depth = 0;
         self.breakable_depth = 0;
         self.iterable_depth = 0;
@@ -265,7 +269,7 @@ impl<'a> Analyzer<'a> {
 
     // Restore state after visiting a function or class
     fn restore_state(&mut self, mut state: AnalyzerSavedState<'a>) {
-        std::mem::swap(&mut self.labels, &mut state.labels);
+        core::mem::swap(&mut self.labels, &mut state.labels);
         self.label_depth = state.label_depth;
         self.breakable_depth = state.breakable_depth;
         self.iterable_depth = state.iterable_depth;
@@ -354,13 +358,19 @@ impl<'a> AstVisitor<'a> for Analyzer<'a> {
 
     fn visit_function_param(&mut self, param: &mut FunctionParam<'a>) {
         match param {
-            FunctionParam::Pattern { pattern, has_assign_expr } => {
+            FunctionParam::Pattern {
+                pattern,
+                has_assign_expr,
+            } => {
                 // Pattern is in its own "has assignment expression" context
                 self.enter_has_assign_expr_context();
                 self.visit_pattern(pattern);
                 *has_assign_expr = self.exit_has_assign_expr_context();
             }
-            FunctionParam::Rest { rest, has_assign_expr } => {
+            FunctionParam::Rest {
+                rest,
+                has_assign_expr,
+            } => {
                 // Rest element is in its own "has_assignment_expression context"
                 self.enter_has_assign_expr_context();
                 self.visit_rest_element(rest);
@@ -466,7 +476,10 @@ impl<'a> AstVisitor<'a> for Analyzer<'a> {
         // may be implicitly returned.
         if matches!(
             self.current_function(),
-            Some(FunctionStackEntry { is_derived_constructor: true, .. })
+            Some(FunctionStackEntry {
+                is_derived_constructor: true,
+                ..
+            })
         ) {
             self.resolve_this_use(stmt.loc, |scope| stmt.this_scope = Some(scope));
         }
@@ -562,7 +575,10 @@ impl<'a> AstVisitor<'a> for Analyzer<'a> {
 
     fn visit_for_each_init(&mut self, init: &mut ForEachInit<'a>) {
         match init {
-            ForEachInit::Pattern { pattern, has_assign_expr } => {
+            ForEachInit::Pattern {
+                pattern,
+                has_assign_expr,
+            } => {
                 // Pattern is in its own "has assignment expression" context
                 self.enter_has_assign_expr_context();
                 self.visit_pattern(pattern);
@@ -719,8 +735,10 @@ impl<'a> AstVisitor<'a> for Analyzer<'a> {
 
         if let Some(true) = self.in_parameters_stack.last() {
             self.emit_error(expr.loc, ParseError::AwaitInParameters)
-        } else if let Some(FunctionStackEntry { is_static_initializer: true, .. }) =
-            self.current_function()
+        } else if let Some(FunctionStackEntry {
+            is_static_initializer: true,
+            ..
+        }) = self.current_function()
         {
             self.emit_error(expr.loc, ParseError::AwaitInStaticInitializer)
         }
@@ -756,7 +774,10 @@ impl<'a> AstVisitor<'a> for Analyzer<'a> {
 
     fn visit_super_call_expression(&mut self, expr: &mut SuperCallExpression<'a>) {
         match self.enclosing_non_arrow_function() {
-            Some(FunctionStackEntry { is_derived_constructor: true, .. }) => {
+            Some(FunctionStackEntry {
+                is_derived_constructor: true,
+                ..
+            }) => {
                 // A super call implicitly uses the current derived constructor, new.target, and
                 // this, so resolve them.
                 self.resolve_derived_constructor_use(&mut expr.constructor_scope, expr.loc);
@@ -870,8 +891,10 @@ impl<'a> AstVisitor<'a> for Analyzer<'a> {
         let private_names = self.collect_class_private_names(class);
         let num_private_names = private_names.len();
 
-        self.class_stack
-            .push(ClassStackEntry { private_names, is_derived: class.super_class.is_some() });
+        self.class_stack.push(ClassStackEntry {
+            private_names,
+            is_derived: class.super_class.is_some(),
+        });
 
         // Mark the constructor if it is found, erroring if multiple are found
         let mut constructor = None;
@@ -1113,8 +1136,14 @@ impl<'a> Analyzer<'a> {
         for (param_index, param) in func.params.iter_mut().enumerate() {
             // Check if this is a top level id pattern, optionally with a default
             let toplevel_id = match param {
-                FunctionParam::Pattern { pattern: Pattern::Id(id), .. } => Some(id.as_mut()),
-                FunctionParam::Pattern { pattern: Pattern::Assign(assign), .. } => {
+                FunctionParam::Pattern {
+                    pattern: Pattern::Id(id),
+                    ..
+                } => Some(id.as_mut()),
+                FunctionParam::Pattern {
+                    pattern: Pattern::Assign(assign),
+                    ..
+                } => {
                     if let Pattern::Id(id) = &mut assign.left {
                         Some(id.as_mut())
                     } else {
@@ -1141,7 +1170,10 @@ impl<'a> Analyzer<'a> {
 
         // Functions with an explicit "use strict" in their body must have a simple parameter list
         if func.has_use_strict_directive() && !func.has_simple_parameter_list() {
-            self.emit_error(func.loc, ParseError::UseStrictFunctionNonSimpleParameterList);
+            self.emit_error(
+                func.loc,
+                ParseError::UseStrictFunctionNonSimpleParameterList,
+            );
         }
 
         // Duplicate parameters are not allowed in certain contexts
@@ -1159,7 +1191,10 @@ impl<'a> Analyzer<'a> {
             };
 
             if let Some(invalid_reason) = invalid_reason {
-                self.emit_error(func.loc, ParseError::InvalidDuplicateParameters(invalid_reason));
+                self.emit_error(
+                    func.loc,
+                    ParseError::InvalidDuplicateParameters(invalid_reason),
+                );
             }
         }
 
@@ -1228,7 +1263,11 @@ impl<'a> Analyzer<'a> {
 
         for element in class.body.iter_mut() {
             let private_id = match element {
-                ClassElement::Property(ClassProperty { is_private: true, key, .. }) => {
+                ClassElement::Property(ClassProperty {
+                    is_private: true,
+                    key,
+                    ..
+                }) => {
                     let private_id = key.expr.to_id_mut();
                     let private_names_key = Wtf8Cow::Borrowed(private_id.name);
 
@@ -1269,11 +1308,23 @@ impl<'a> Analyzer<'a> {
                         None => {
                             let is_static = *is_static;
                             let usage = if *kind == ClassMethodKind::Get {
-                                PrivateNameUsage { is_static, has_getter: true, has_setter: false }
+                                PrivateNameUsage {
+                                    is_static,
+                                    has_getter: true,
+                                    has_setter: false,
+                                }
                             } else if *kind == ClassMethodKind::Set {
-                                PrivateNameUsage { is_static, has_getter: false, has_setter: true }
+                                PrivateNameUsage {
+                                    is_static,
+                                    has_getter: false,
+                                    has_setter: true,
+                                }
                             } else {
-                                PrivateNameUsage { is_static, has_getter: true, has_setter: true }
+                                PrivateNameUsage {
+                                    is_static,
+                                    has_getter: true,
+                                    has_setter: true,
+                                }
                             };
 
                             private_names.insert(private_id_key, usage);
@@ -1437,7 +1488,9 @@ impl<'a> Analyzer<'a> {
         }
 
         self.allow_super_member_stack
-            .push(AllowSuperStackEntry::Allow { is_static: prop.is_static });
+            .push(AllowSuperStackEntry::Allow {
+                is_static: prop.is_static,
+            });
         self.function_stack.push(FunctionStackEntry {
             is_arrow_function: false,
             is_method: true,
@@ -1543,8 +1596,13 @@ impl<'a> Analyzer<'a> {
         if is_duplicate {
             self.emit_error(stmt.label.loc, ParseError::DuplicateLabel);
         } else {
-            self.labels
-                .insert(label_name, LabelInfo { label_id, is_continue_target: false });
+            self.labels.insert(
+                label_name,
+                LabelInfo {
+                    label_id,
+                    is_continue_target: false,
+                },
+            );
         }
 
         stmt.label.id = label_id;
@@ -1613,7 +1671,10 @@ impl<'a> Analyzer<'a> {
 
             if !is_defined {
                 let private_name = id.name.to_owned_in(Global);
-                self.emit_error(id.loc, ParseError::new_private_name_not_defined(private_name));
+                self.emit_error(
+                    id.loc,
+                    ParseError::new_private_name_not_defined(private_name),
+                );
             }
         }
     }
@@ -1662,7 +1723,10 @@ impl<'a> Analyzer<'a> {
         // constructor.
         let is_derived_constructor_this = matches!(
             self.enclosing_non_arrow_function(),
-            Some(FunctionStackEntry { is_derived_constructor: true, .. })
+            Some(FunctionStackEntry {
+                is_derived_constructor: true,
+                ..
+            })
         );
 
         if is_capture || is_derived_constructor_this {
@@ -1686,14 +1750,23 @@ impl<'a> Analyzer<'a> {
 pub fn analyze(
     parse_result: ParseProgramResult,
 ) -> Result<AnalyzedProgramResult, LocalizedParseErrors> {
-    let ParseProgramResult { mut program, scope_tree, source, options } = parse_result;
+    let ParseProgramResult {
+        mut program,
+        scope_tree,
+        source,
+        options,
+    } = parse_result;
 
     let mut analyzer = Analyzer::new(source.clone(), scope_tree, options);
     analyzer.visit_program(&mut program);
 
     if analyzer.errors.is_empty() {
         let scope_tree = analyzer.finish();
-        Ok(AnalyzedProgramResult { program, scope_tree, source })
+        Ok(AnalyzedProgramResult {
+            program,
+            scope_tree,
+            source,
+        })
     } else {
         Err(LocalizedParseErrors::new(analyzer.errors))
     }
@@ -1710,16 +1783,22 @@ pub fn analyze_for_eval<'a>(
     in_static_initializer: bool,
     in_class_field_initializer: bool,
 ) -> Result<AnalyzedProgramResult<'a>, LocalizedParseErrors> {
-    let ParseProgramResult { mut program, scope_tree, options, .. } = parse_result;
+    let ParseProgramResult {
+        mut program,
+        scope_tree,
+        options,
+        ..
+    } = parse_result;
 
     let source = pcx.source().clone();
     let mut analyzer = Analyzer::new(source.clone(), scope_tree, options);
 
     // Initialize private names from surrounding context if supplied
     if let Some(private_names) = private_names {
-        analyzer
-            .class_stack
-            .push(ClassStackEntry { private_names, is_derived: false });
+        analyzer.class_stack.push(ClassStackEntry {
+            private_names,
+            is_derived: false,
+        });
     }
 
     // If in function add a synthetic function entry
@@ -1736,7 +1815,9 @@ pub fn analyze_for_eval<'a>(
         if in_method || in_class_field_initializer {
             analyzer
                 .allow_super_member_stack
-                .push(AllowSuperStackEntry::Allow { is_static: in_static });
+                .push(AllowSuperStackEntry::Allow {
+                    is_static: in_static,
+                });
         }
     }
 
@@ -1749,7 +1830,11 @@ pub fn analyze_for_eval<'a>(
 
     if analyzer.errors.is_empty() {
         let scope_tree = analyzer.finish();
-        Ok(AnalyzedProgramResult { program, scope_tree, source })
+        Ok(AnalyzedProgramResult {
+            program,
+            scope_tree,
+            source,
+        })
     } else {
         Err(LocalizedParseErrors::new(analyzer.errors))
     }
@@ -1759,7 +1844,12 @@ pub fn analyze_function_for_function_constructor<'a>(
     pcx: &'a ParseContext,
     parse_result: ParseFunctionResult<'a>,
 ) -> Result<AnalyzedFunctionResult<'a>, LocalizedParseErrors> {
-    let ParseFunctionResult { mut function, scope_tree, options, .. } = parse_result;
+    let ParseFunctionResult {
+        mut function,
+        scope_tree,
+        options,
+        ..
+    } = parse_result;
 
     let source = pcx.source().clone();
     let mut analyzer = Analyzer::new(source.clone(), scope_tree, options);
@@ -1767,7 +1857,11 @@ pub fn analyze_function_for_function_constructor<'a>(
 
     if analyzer.errors.is_empty() {
         let scope_tree = analyzer.finish();
-        Ok(AnalyzedFunctionResult { function, scope_tree, source })
+        Ok(AnalyzedFunctionResult {
+            function,
+            scope_tree,
+            source,
+        })
     } else {
         Err(LocalizedParseErrors::new(analyzer.errors))
     }

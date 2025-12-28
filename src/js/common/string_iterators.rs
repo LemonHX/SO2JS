@@ -21,7 +21,11 @@ pub struct CodeUnitIterator {
 
 impl CodeUnitIterator {
     pub fn new_one_byte(ptr: *const u8, end: *const u8) -> Self {
-        CodeUnitIterator { ptr, end, width: StringWidth::OneByte }
+        CodeUnitIterator {
+            ptr,
+            end,
+            width: StringWidth::OneByte,
+        }
     }
 
     pub fn new_two_byte(ptr: *const u16, end: *const u16) -> Self {
@@ -44,7 +48,7 @@ impl CodeUnitIterator {
 
     #[inline]
     pub fn is_end(&self) -> bool {
-        std::ptr::eq(self.ptr, self.end)
+        core::ptr::eq(self.ptr, self.end)
     }
 
     pub fn ptr(&self) -> *const u8 {

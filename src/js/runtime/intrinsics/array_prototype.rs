@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 use crate::{
     must, must_a,
     runtime::{
@@ -29,6 +27,9 @@ use crate::{
         Context, EvalResult, Handle, Value,
     },
 };
+use alloc::vec;
+use alloc::vec::Vec;
+use core::cmp::Ordering;
 
 use super::{
     array_iterator::{ArrayIterator, ArrayIteratorKind},
@@ -59,7 +60,13 @@ impl ArrayPrototype {
         array.intrinsic_func(cx, cx.names.find(), Self::find, 1, realm)?;
         array.intrinsic_func(cx, cx.names.find_index(), Self::find_index, 1, realm)?;
         array.intrinsic_func(cx, cx.names.find_last(), Self::find_last, 1, realm)?;
-        array.intrinsic_func(cx, cx.names.find_last_index(), Self::find_last_index, 1, realm)?;
+        array.intrinsic_func(
+            cx,
+            cx.names.find_last_index(),
+            Self::find_last_index,
+            1,
+            realm,
+        )?;
         array.intrinsic_func(cx, cx.names.flat(), Self::flat, 0, realm)?;
         array.intrinsic_func(cx, cx.names.flat_map(), Self::flat_map, 1, realm)?;
         array.intrinsic_func(cx, cx.names.for_each(), Self::for_each, 1, realm)?;
@@ -79,7 +86,13 @@ impl ArrayPrototype {
         array.intrinsic_func(cx, cx.names.some(), Self::some, 1, realm)?;
         array.intrinsic_func(cx, cx.names.sort(), Self::sort, 1, realm)?;
         array.intrinsic_func(cx, cx.names.splice(), Self::splice, 2, realm)?;
-        array.intrinsic_func(cx, cx.names.to_locale_string(), Self::to_locale_string, 0, realm)?;
+        array.intrinsic_func(
+            cx,
+            cx.names.to_locale_string(),
+            Self::to_locale_string,
+            0,
+            realm,
+        )?;
         array.intrinsic_func(cx, cx.names.to_reversed(), Self::to_reversed, 0, realm)?;
         array.intrinsic_func(cx, cx.names.to_sorted(), Self::to_sorted, 1, realm)?;
         array.intrinsic_func(cx, cx.names.to_spliced(), Self::to_spliced, 2, realm)?;
@@ -90,7 +103,11 @@ impl ArrayPrototype {
 
         // Array.prototype [ @@iterator ] (https://tc39.es/ecma262/#sec-array.prototype-%symbol.iterator%)
         let iterator_key = cx.well_known_symbols.iterator();
-        array.set_property(cx, iterator_key, Property::data(values_function, true, false, true))?;
+        array.set_property(
+            cx,
+            iterator_key,
+            Property::data(values_function, true, false, true),
+        )?;
 
         // Array.prototype [ @@unscopables ] (https://tc39.es/ecma262/#sec-array.prototype-%symbol.unscopables%)
         let unscopables_key = cx.well_known_symbols.unscopables();
@@ -158,8 +175,11 @@ impl ArrayPrototype {
             return Ok(false);
         }
 
-        let is_spreadable =
-            get(cx, object.as_object(), cx.well_known_symbols.is_concat_spreadable())?;
+        let is_spreadable = get(
+            cx,
+            object.as_object(),
+            cx.well_known_symbols.is_concat_spreadable(),
+        )?;
 
         if !is_spreadable.is_undefined() {
             return Ok(to_boolean(*is_spreadable));
@@ -265,8 +285,10 @@ impl ArrayPrototype {
             length
         };
 
-        let count =
-            i64::min(from_end_index as i64 - from_index as i64, length as i64 - to_index as i64);
+        let count = i64::min(
+            from_end_index as i64 - from_index as i64,
+            length as i64 - to_index as i64,
+        );
 
         if count <= 0 {
             return Ok(object.as_value());
@@ -1435,7 +1457,13 @@ impl ArrayPrototype {
         }
 
         let actual_delete_count_value = Value::from(actual_delete_count).to_handle(cx);
-        set(cx, array, cx.names.length(), actual_delete_count_value, true)?;
+        set(
+            cx,
+            array,
+            cx.names.length(),
+            actual_delete_count_value,
+            true,
+        )?;
 
         // Move existing items in array to make space for inserted items
         if insert_count < actual_delete_count {
@@ -1535,7 +1563,12 @@ impl ArrayPrototype {
             to_key.replace(PropertyKey::from_u64(cx, i)?);
 
             let value = get(cx, object, from_key)?;
-            must!(create_data_property_or_throw(cx, array.into(), to_key, value));
+            must!(create_data_property_or_throw(
+                cx,
+                array.into(),
+                to_key,
+                value
+            ));
         }
 
         Ok(array.as_value())
@@ -1608,13 +1641,19 @@ impl ArrayPrototype {
         } else {
             let skip_count_arg = get_argument(cx, arguments, 1);
             let skip_count = to_integer_or_infinity(cx, skip_count_arg)?;
-            f64::min(f64::max(skip_count, 0.0), (length - actual_start_index) as f64) as u64
+            f64::min(
+                f64::max(skip_count, 0.0),
+                (length - actual_start_index) as f64,
+            ) as u64
         };
 
         // Determine length of new array and make sure it is in range
         let new_length = length + insert_count - actual_skip_count;
         if new_length > MAX_SAFE_INTEGER_U64 {
-            return type_error(cx, "TypedArray.prototype.toSpliced result array is too large");
+            return type_error(
+                cx,
+                "TypedArray.prototype.toSpliced result array is too large",
+            );
         }
 
         let array = array_create(cx, new_length, None)?;
@@ -1627,7 +1666,12 @@ impl ArrayPrototype {
         for i in 0..actual_start_index {
             from_key.replace(PropertyKey::from_u64(cx, i)?);
             let value = get(cx, object, from_key)?;
-            must!(create_data_property_or_throw(cx, array.into(), from_key, value));
+            must!(create_data_property_or_throw(
+                cx,
+                array.into(),
+                from_key,
+                value
+            ));
         }
 
         // Insert every element of provided items
@@ -1639,10 +1683,18 @@ impl ArrayPrototype {
         // All remaining elements after the skip count are copied
         for i in (actual_start_index + insert_count)..new_length {
             to_key.replace(PropertyKey::from_u64(cx, i)?);
-            from_key.replace(PropertyKey::from_u64(cx, i - insert_count + actual_skip_count)?);
+            from_key.replace(PropertyKey::from_u64(
+                cx,
+                i - insert_count + actual_skip_count,
+            )?);
 
             let value = get(cx, object, from_key)?;
-            must!(create_data_property_or_throw(cx, array.into(), to_key, value));
+            must!(create_data_property_or_throw(
+                cx,
+                array.into(),
+                to_key,
+                value
+            ));
         }
 
         Ok(array.as_value())
@@ -1780,22 +1832,102 @@ impl ArrayPrototype {
 
         let true_value = cx.bool(true);
 
-        must_a!(create_data_property_or_throw(cx, list, cx.names.at(), true_value));
-        must_a!(create_data_property_or_throw(cx, list, cx.names.copy_within(), true_value));
-        must_a!(create_data_property_or_throw(cx, list, cx.names.entries(), true_value));
-        must_a!(create_data_property_or_throw(cx, list, cx.names.fill(), true_value));
-        must_a!(create_data_property_or_throw(cx, list, cx.names.find(), true_value));
-        must_a!(create_data_property_or_throw(cx, list, cx.names.find_index(), true_value));
-        must_a!(create_data_property_or_throw(cx, list, cx.names.find_last(), true_value));
-        must_a!(create_data_property_or_throw(cx, list, cx.names.find_last_index(), true_value));
-        must_a!(create_data_property_or_throw(cx, list, cx.names.flat(), true_value));
-        must_a!(create_data_property_or_throw(cx, list, cx.names.flat_map(), true_value));
-        must_a!(create_data_property_or_throw(cx, list, cx.names.includes(), true_value));
-        must_a!(create_data_property_or_throw(cx, list, cx.names.keys(), true_value));
-        must_a!(create_data_property_or_throw(cx, list, cx.names.to_reversed(), true_value));
-        must_a!(create_data_property_or_throw(cx, list, cx.names.to_sorted(), true_value));
-        must_a!(create_data_property_or_throw(cx, list, cx.names.to_spliced(), true_value));
-        must_a!(create_data_property_or_throw(cx, list, cx.names.values(), true_value));
+        must_a!(create_data_property_or_throw(
+            cx,
+            list,
+            cx.names.at(),
+            true_value
+        ));
+        must_a!(create_data_property_or_throw(
+            cx,
+            list,
+            cx.names.copy_within(),
+            true_value
+        ));
+        must_a!(create_data_property_or_throw(
+            cx,
+            list,
+            cx.names.entries(),
+            true_value
+        ));
+        must_a!(create_data_property_or_throw(
+            cx,
+            list,
+            cx.names.fill(),
+            true_value
+        ));
+        must_a!(create_data_property_or_throw(
+            cx,
+            list,
+            cx.names.find(),
+            true_value
+        ));
+        must_a!(create_data_property_or_throw(
+            cx,
+            list,
+            cx.names.find_index(),
+            true_value
+        ));
+        must_a!(create_data_property_or_throw(
+            cx,
+            list,
+            cx.names.find_last(),
+            true_value
+        ));
+        must_a!(create_data_property_or_throw(
+            cx,
+            list,
+            cx.names.find_last_index(),
+            true_value
+        ));
+        must_a!(create_data_property_or_throw(
+            cx,
+            list,
+            cx.names.flat(),
+            true_value
+        ));
+        must_a!(create_data_property_or_throw(
+            cx,
+            list,
+            cx.names.flat_map(),
+            true_value
+        ));
+        must_a!(create_data_property_or_throw(
+            cx,
+            list,
+            cx.names.includes(),
+            true_value
+        ));
+        must_a!(create_data_property_or_throw(
+            cx,
+            list,
+            cx.names.keys(),
+            true_value
+        ));
+        must_a!(create_data_property_or_throw(
+            cx,
+            list,
+            cx.names.to_reversed(),
+            true_value
+        ));
+        must_a!(create_data_property_or_throw(
+            cx,
+            list,
+            cx.names.to_sorted(),
+            true_value
+        ));
+        must_a!(create_data_property_or_throw(
+            cx,
+            list,
+            cx.names.to_spliced(),
+            true_value
+        ));
+        must_a!(create_data_property_or_throw(
+            cx,
+            list,
+            cx.names.values(),
+            true_value
+        ));
 
         Ok(list)
     }

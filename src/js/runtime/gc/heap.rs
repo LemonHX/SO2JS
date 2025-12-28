@@ -1,4 +1,4 @@
-use std::{alloc::Layout, mem::size_of, ops::Range, ptr::NonNull};
+use core::{alloc::Layout, mem::size_of, ops::Range, ptr::NonNull};
 
 use crate::{
     common::{constants::MAX_HEAP_SIZE, serialized_heap::SerializedHeap},
@@ -54,14 +54,14 @@ const HEAP_ALIGNMENT: usize = 1024 * 1024 * 1024;
 
 /// All heap items are aligned to 8-byte boundaries
 type HeapItemAlignmentType = u64;
-const HEAP_ITEM_ALIGNMENT: usize = std::mem::size_of::<HeapItemAlignmentType>();
+const HEAP_ITEM_ALIGNMENT: usize = core::mem::size_of::<HeapItemAlignmentType>();
 
 impl Heap {
     pub fn new(initial_size: usize) -> Heap {
         // Create uninitialized buffer of memory for heap
         unsafe {
             let layout = Layout::from_size_align(initial_size, HEAP_ALIGNMENT).unwrap();
-            let heap_start = std::alloc::alloc(layout);
+            let heap_start = alloc::alloc::alloc(layout);
             let heap_end = heap_start.add(initial_size);
 
             let semispace_size = (initial_size - size_of::<HeapInfo>()) / 2;
@@ -153,7 +153,7 @@ impl Heap {
 
         // Copy the old HeapInfo into the new heap
         unsafe {
-            std::ptr::copy_nonoverlapping(
+            core::ptr::copy_nonoverlapping(
                 prev_heap.heap_start,
                 new_heap.heap_start.cast_mut(),
                 size_of::<HeapInfo>(),
@@ -251,7 +251,12 @@ impl Heap {
 
                 // Resize the heap
                 if cx.heap.heap_size() < MAX_HEAP_SIZE {
-                    Self::run_gc(cx, GcType::Grow { alloc_size: Some(alloc_size) });
+                    Self::run_gc(
+                        cx,
+                        GcType::Grow {
+                            alloc_size: Some(alloc_size),
+                        },
+                    );
                 } else {
                     Self::run_gc(cx, GcType::Normal);
                 }
@@ -311,13 +316,13 @@ impl Heap {
 
     pub fn permanent_heap(&self) -> &[u8] {
         unsafe {
-            std::slice::from_raw_parts(self.permanent_start, self.permanent_bytes_allocated())
+            core::slice::from_raw_parts(self.permanent_start, self.permanent_bytes_allocated())
         }
     }
 
     pub fn permanent_heap_mut(&mut self) -> &mut [u8] {
         unsafe {
-            std::slice::from_raw_parts_mut(
+            core::slice::from_raw_parts_mut(
                 self.permanent_start.cast_mut(),
                 self.permanent_bytes_allocated(),
             )
@@ -329,11 +334,11 @@ impl Heap {
     }
 
     pub fn current_used_heap(&self) -> &[u8] {
-        unsafe { std::slice::from_raw_parts(self.start, self.bytes_allocated()) }
+        unsafe { core::slice::from_raw_parts(self.start, self.bytes_allocated()) }
     }
 
     pub fn current_used_heap_mut(&mut self) -> &mut [u8] {
-        unsafe { std::slice::from_raw_parts_mut(self.start.cast_mut(), self.bytes_allocated()) }
+        unsafe { core::slice::from_raw_parts_mut(self.start.cast_mut(), self.bytes_allocated()) }
     }
 
     pub fn bytes_allocated(&self) -> usize {
@@ -387,7 +392,7 @@ impl Heap {
         } else {
             let bytes_allocated = self.bytes_allocated();
             unsafe {
-                std::ptr::copy_nonoverlapping(
+                core::ptr::copy_nonoverlapping(
                     self.start,
                     self.next_heap_start.cast_mut(),
                     bytes_allocated,
@@ -427,7 +432,7 @@ impl Heap {
 
 impl Drop for Heap {
     fn drop(&mut self) {
-        unsafe { std::alloc::dealloc(self.heap_start as *mut u8, self.layout) };
+        unsafe { alloc::alloc::dealloc(self.heap_start as *mut u8, self.layout) };
     }
 }
 

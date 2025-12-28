@@ -1,4 +1,4 @@
-use std::{
+use core::{
     ops::{Deref, DerefMut},
     ptr::NonNull,
 };
@@ -20,7 +20,11 @@ impl<T> HeapPtr<T> {
     #[inline]
     #[allow(clippy::not_unsafe_ptr_arg_deref)]
     pub const fn from_ptr(ptr: *mut T) -> HeapPtr<T> {
-        unsafe { HeapPtr { ptr: NonNull::new_unchecked(ptr) } }
+        unsafe {
+            HeapPtr {
+                ptr: NonNull::new_unchecked(ptr),
+            }
+        }
     }
 
     #[inline]
@@ -35,12 +39,14 @@ impl<T> HeapPtr<T> {
 
     #[inline]
     pub fn cast_mut<U>(&mut self) -> &mut HeapPtr<U> {
-        unsafe { std::mem::transmute(self) }
+        unsafe { core::mem::transmute(self) }
     }
 
     #[inline]
     pub const fn uninit() -> HeapPtr<T> {
-        HeapPtr { ptr: NonNull::dangling() }
+        HeapPtr {
+            ptr: NonNull::dangling(),
+        }
     }
 }
 

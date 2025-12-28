@@ -75,8 +75,18 @@ impl ProxyConstructor {
 
         let result = ordinary_object_create(cx)?;
 
-        must!(create_data_property_or_throw(cx, result, cx.names.proxy_(), proxy.into()));
-        must!(create_data_property_or_throw(cx, result, cx.names.revoke(), revoker.into()));
+        must!(create_data_property_or_throw(
+            cx,
+            result,
+            cx.names.proxy_(),
+            proxy.into()
+        ));
+        must!(create_data_property_or_throw(
+            cx,
+            result,
+            cx.names.revoke(),
+            revoker.into()
+        ));
 
         Ok(result.as_value())
     }

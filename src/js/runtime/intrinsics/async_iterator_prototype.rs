@@ -9,8 +9,11 @@ pub struct AsyncIteratorPrototype;
 
 impl AsyncIteratorPrototype {
     pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
-        let mut object =
-            ObjectValue::new(cx, Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)), true)?;
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
 
         // %AsyncIteratorPrototype% [ @@asyncIterator ] (https://tc39.es/ecma262/#sec-%asynciteratorprototype%-%symbol.asynciterator%)
         let async_iterator_key = cx.well_known_symbols.async_iterator();
