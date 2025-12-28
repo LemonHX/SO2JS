@@ -1,5 +1,5 @@
 [package]
-name = "brimstone_core"
+name = "so2js_core"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -25,8 +25,8 @@ oxc = { workspace = true, features = [] }
 once_cell.workspace = true
 
 # Internal crates
-brimstone_icu_collections.workspace = true
-brimstone_macros.workspace = true
+so2js_icu_collections.workspace = true
+so2js_macros.workspace = true
 
 # ICU4X crates must all be the same version
 icu_casemap.workspace = true

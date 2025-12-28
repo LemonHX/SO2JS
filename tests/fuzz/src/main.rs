@@ -8,7 +8,7 @@ use std::{
     rc::Rc,
 };
 
-use brimstone_core::{
+use so2js_core::{
     common::wtf_8::Wtf8String,
     handle_scope, must_a,
     parser::source::Source,

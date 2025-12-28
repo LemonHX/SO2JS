@@ -120,7 +120,7 @@ impl OptionsBuilder {
     }
 }
 
-use brimstone_core::{
+use so2js_core::{
     common::{constants::DEFAULT_HEAP_SIZE, options::Options, wtf_8::Wtf8String},
     parser::source::Source,
     runtime::{

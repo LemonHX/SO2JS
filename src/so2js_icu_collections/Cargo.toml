@@ -1,5 +1,5 @@
 [package]
-name = "brimstone_icu_collections"
+name = "so2js_icu_collections"
 version.workspace = true
 edition.workspace = true
 

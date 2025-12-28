@@ -1,11 +1,11 @@
 [package]
-name = "brimstone_integration_test_harness"
+name = "so2js_integration_test_harness"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
 [dependencies]
-brimstone_core.workspace = true
+so2js_core.workspace = true
 
 clap = { workspace = true, features = ["derive"] }
 regex.workspace = true
@@ -16,7 +16,7 @@ yaml-rust.workspace = true
 
 [features]
 default = ["alloc_error"]
-alloc_error = ["brimstone_core/alloc_error"]
-gc_stress_test = ["brimstone_core/gc_stress_test"]
-handle_stats = ["brimstone_core/handle_stats"]
-nightly = ["brimstone_core/nightly"]
+alloc_error = ["so2js_core/alloc_error"]
+gc_stress_test = ["so2js_core/gc_stress_test"]
+handle_stats = ["so2js_core/handle_stats"]
+nightly = ["so2js_core/nightly"]

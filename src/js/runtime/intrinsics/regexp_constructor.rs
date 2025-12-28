@@ -1,5 +1,5 @@
 use alloc::format;
-use brimstone_macros::match_u32;
+use so2js_macros::match_u32;
 use bumpalo::Bump;
 use core::mem::size_of;
 use core::error::Error;

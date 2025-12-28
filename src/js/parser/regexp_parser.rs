@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::convert::TryFrom;
 use hashbrown::{HashMap, HashSet};
 
-use brimstone_macros::match_u32;
+use so2js_macros::match_u32;
 
 use crate::{
     common::{

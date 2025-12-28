@@ -22,7 +22,7 @@ use crate::{
 };
 use alloc::vec;
 use alloc::vec::Vec;
-use brimstone_macros::wrap_ordinary_object;
+use so2js_macros::wrap_ordinary_object;
 
 use super::{
     module::{DynModule, HeapDynModule, ModuleEnum},

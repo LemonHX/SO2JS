@@ -1,6 +1,6 @@
 # Tests
 
-Brimstone uses a variety of testing strategies all located in this directory.
+so2js uses a variety of testing strategies all located in this directory.
 
 # Snapshot Tests
 
@@ -15,7 +15,7 @@ All snapshot tests are run with `cargo test`.
 
 # Integration Tests
 
-Brimstone has a generic integration test runner which can be used to run multiple suites of tests. This includes both first and third party tests suites, such as the official test262 test suite.
+so2js has a generic integration test runner which can be used to run multiple suites of tests. This includes both first and third party tests suites, such as the official test262 test suite.
 
 The integration test runner is located in the `harness` directory.
 
@@ -36,19 +36,19 @@ Install the test262 repo at the pinned commit by running the following script:
 
 ## Running the tests
 
-The test runner is run with `cargo brimstone-test` anywhere in the `brimstone` workspace. Run `cargo brimstone-test -- --help` to see the full set of options for the test runner.
+The test runner is run with `cargo so2js-test` anywhere in the `so2js` workspace. Run `cargo so2js-test -- --help` to see the full set of options for the test runner.
 
 Before running any tests, the test runner must first create an index of the all test suites for fast consumption later on. This only needs to be run when the set of tests has changed, e.g. after you pull in a new version of the test262 repo.
 
 ```
-cargo brimstone-test -- --reindex
+cargo so2js-test -- --reindex
 ```
 
 Then the all integration test suites can be run with:
 
 ```
 # Run all integration test suites
-cargo brimstone-test
+cargo so2js-test
 
 # Run only the tests that match a filter string
 cargo run -- language/expressions
@@ -74,11 +74,11 @@ The file `ignored_tests.jsonc` for each test suite contains sets of tests which 
 
 ## Manifest
 
-Integration test suites are defined in the root `test_manifest.jsonc` file. This allows configuring the name, paths, and other options for each test suite. The test runner will automatically discover the `brimestone` repo's test manifest if run within the `brimstone` workspace. The path to the test manifest can be specified with the `--test-manifest-path` option.
+Integration test suites are defined in the root `test_manifest.jsonc` file. This allows configuring the name, paths, and other options for each test suite. The test runner will automatically discover the `brimestone` repo's test manifest if run within the `so2js` workspace. The path to the test manifest can be specified with the `--test-manifest-path` option.
 
 # Fuzz Tests
 
-Brimstone supports fuzz testing with [googleprojectzero/fuzzilli](https://github.com/googleprojectzero/fuzzilli). Brimstone support for fuzzilli is added in [this fork](https://github.com/Hans-Halverson/fuzzilli-brimstone). A custom harness for Brimstone is included in the `fuzz` directory to integrate with fuzzilli.
+so2js supports fuzz testing with [googleprojectzero/fuzzilli](https://github.com/googleprojectzero/fuzzilli). so2js support for fuzzilli is added in [this fork](https://github.com/Hans-Halverson/fuzzilli-so2js). A custom harness for so2js is included in the `fuzz` directory to integrate with fuzzilli.
 
 The fuzzer can be built and run with:
 

@@ -1,8 +1,8 @@
 [workspace]
 members = [
   "src",
-  "src/brimstone_icu_collections",
-  "src/brimstone_macros",
+  "src/so2js_icu_collections",
+  "src/so2js_macros",
   "src/js",
   "tests",
   "tests/fuzz",
@@ -13,14 +13,17 @@ resolver = "2"
 [workspace.package]
 edition = "2018"
 version = "0.1.0"
-authors = ["hanshalverson <hansghalverson@gmail.com>"]
+authors = [
+  "lemonhx <lemonhx@lemonhx.moe>",
+  "hanshalverson <hansghalverson@gmail.com>",
+]
 
 [workspace.dependencies]
 # Internal Crates
-brimstone = { path = "src" }
-brimstone_core = { path = "src/js" }
-brimstone_icu_collections = { path = "src/brimstone_icu_collections" }
-brimstone_macros = { path = "src/brimstone_macros" }
+so2js = { path = "src" }
+so2js_core = { path = "src/js" }
+so2js_icu_collections = { path = "src/so2js_icu_collections" }
+so2js_macros = { path = "src/so2js_macros" }
 
 
 # External Crates

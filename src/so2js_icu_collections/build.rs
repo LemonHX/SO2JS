@@ -6,7 +6,7 @@ use std::env;
 use std::fs;
 use std::path::Path;
 
-/// Generate the `brimstone_icu_collections` module, which exposes the public interface:
+/// Generate the `so2js_icu_collections` module, which exposes the public interface:
 ///
 /// ```
 /// pub fn has_case_closure_override(c: char) -> bool;

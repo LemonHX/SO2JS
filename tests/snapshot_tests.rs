@@ -1,4 +1,4 @@
-use brimstone_core::{
+use so2js_core::{
     common::options::{Options, OptionsBuilder},
     parser::{self, ast, source::Source, ParseContext},
     runtime::{
@@ -34,18 +34,12 @@ struct TestEnv {
     errors: Vec<String>,
 }
 
-fn init() {
-    brimstone_serialized_heap::init();
-}
-
 fn get_test_root(dirname: &str) -> PathBuf {
     std::env::current_dir().unwrap().join(dirname)
 }
 
 #[test]
 fn js_parser_snapshot_tests() -> GenericResult<()> {
-    init();
-
     let parser_tests_dir = get_test_root("js_parser");
     run_snapshot_tests(&parser_tests_dir, &mut |path| print_ast(path))
 }
@@ -63,8 +57,6 @@ fn print_ast(path: &str) -> GenericResult<String> {
 
 #[test]
 fn js_error_snapshot_tests() -> GenericResult<()> {
-    init();
-
     let error_tests_dir = get_test_root("js_error");
     run_snapshot_tests(&error_tests_dir, &mut |path| print_error(path))
 }
@@ -158,7 +150,6 @@ fn print_regexp_bytecode(path: &str) -> GenericResult<String> {
     let options = OptionsBuilder::new()
         .print_regexp_bytecode(true)
         .dump_buffer(Some(Mutex::new(String::new())))
-        .no_color(true)
         .build();
 
     let options = Rc::new(options);

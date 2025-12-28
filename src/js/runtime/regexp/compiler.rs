@@ -1,6 +1,6 @@
 use alloc::vec;
 use alloc::vec::Vec;
-use brimstone_icu_collections::{
+use so2js_icu_collections::{
     all_case_folded_set, get_case_closure_override, has_case_closure_override,
 };
 use core::hash::{Hash, Hasher};

@@ -2,7 +2,7 @@ use clap::Parser;
 
 use std::{collections::HashMap, path::PathBuf};
 
-use brimstone_integration_test_harness::{
+use so2js_integration_test_harness::{
     ignored::IgnoredIndex,
     index::TestIndex,
     manifest::{Suite, SuiteFilter, TestManifest},
@@ -17,7 +17,7 @@ struct Args {
     #[arg(long, default_value_t = false)]
     all: bool,
 
-    /// Path to the test manifest. If not set attempts to locate the test manifest in the `brimstone`
+    /// Path to the test manifest. If not set attempts to locate the test manifest in the `so2js`
     /// repo automatically.
     #[arg(long)]
     test_manifest_path: Option<String>,
@@ -157,9 +157,9 @@ fn main() {
 }
 
 /// The the default path to the root directory for the test suite if none was provided. Attempts to
-/// return the `tests/test_manifest.jsonc` file in the root of the `brimstone` repository.
+/// return the `tests/test_manifest.jsonc` file in the root of the `so2js` repository.
 ///
-/// Will only succeed when the program is run from within the `brimstone` repository.
+/// Will only succeed when the program is run from within the `so2js` repository.
 fn find_default_test_manifest_path() -> PathBuf {
     let mut path = find_workspace_root_path();
     path.push("tests");
@@ -167,7 +167,7 @@ fn find_default_test_manifest_path() -> PathBuf {
     path
 }
 
-/// Find the root of the `brimstone` repository by searching upwards for a `Cargo.toml` file that
+/// Find the root of the `so2js` repository by searching upwards for a `Cargo.toml` file that
 /// starts with the string `[workspace]`.
 fn find_workspace_root_path() -> PathBuf {
     let mut path = std::env::current_dir().unwrap();
@@ -181,7 +181,7 @@ fn find_workspace_root_path() -> PathBuf {
         }
 
         if !path.pop() {
-            panic!("Could not find the root of the brimstone repository");
+            panic!("Could not find the root of the so2js repository");
         }
     }
 }

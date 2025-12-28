@@ -5,7 +5,8 @@ use std::{
 };
 
 use bitflags::bitflags;
-use brimstone_core::{
+use criterion::{criterion_group, criterion_main, Criterion};
+use so2js_core::{
     common::{options::OptionsBuilder, wtf_8::Wtf8String},
     parser::{
         analyze::{analyze, AnalyzedProgramResult},
@@ -19,7 +20,6 @@ use brimstone_core::{
         Context, ContextBuilder, EvalResult,
     },
 };
-use criterion::{criterion_group, criterion_main, Criterion};
 
 /// A test with a setup, routine, and cleanup phase. Only the routine phase is measured.
 pub fn isolated_test<I, O, S, R, C>(

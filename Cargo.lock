@@ -95,105 +95,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "812e12b5285cc515a9c72a5c1d3b6d46a19dac5acfef5265968c166106e31dd3"
 
 [[package]]
-name = "brimstone"
-version = "0.1.0"
-dependencies = [
- "bitflags",
- "brimstone_core",
- "clap",
- "criterion",
- "once_cell",
- "parking_lot",
-]
-
-[[package]]
-name = "brimstone_core"
-version = "0.1.0"
-dependencies = [
- "allocator-api2",
- "bitflags",
- "brimstone_icu_collections",
- "brimstone_macros",
- "bumpalo",
- "half",
- "hashbrown 0.16.1",
- "icu_casemap",
- "icu_collator",
- "icu_collections",
- "icu_locale",
- "icu_normalizer",
- "icu_properties",
- "icu_provider",
- "icu_provider_adapters",
- "icu_provider_baked",
- "indexmap-allocator-api",
- "num-bigint",
- "num-traits",
- "once_cell",
- "oxc",
- "parking_lot",
- "rand",
- "ryu-js",
- "supports-color",
- "zerotrie",
- "zerovec",
-]
-
-[[package]]
-name = "brimstone_fuzz"
-version = "0.1.0"
-dependencies = [
- "brimstone_core",
-]
-
-[[package]]
-name = "brimstone_icu_collections"
-version = "0.1.0"
-dependencies = [
- "hashbrown 0.16.1",
- "icu_casemap",
- "icu_collator",
- "icu_collections",
- "icu_locale",
- "icu_normalizer",
- "icu_properties",
- "icu_provider",
- "icu_provider_adapters",
- "icu_provider_baked",
- "once_cell",
- "zerotrie",
- "zerovec",
-]
-
-[[package]]
-name = "brimstone_integration_test_harness"
-version = "0.1.0"
-dependencies = [
- "brimstone_core",
- "clap",
- "regex",
- "serde",
- "serde_json",
- "threadpool",
- "yaml-rust",
-]
-
-[[package]]
-name = "brimstone_macros"
-version = "0.1.0"
-dependencies = [
- "quote",
- "syn",
-]
-
-[[package]]
-name = "brimstone_tests"
-version = "0.1.0"
-dependencies = [
- "brimstone_core",
-]
-
-[[package]]
 name = "bumpalo"
 version = "3.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1461,6 +1362,105 @@ name = "smawk"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b7c388c1b5e93756d0c740965c41e8822f866621d41acbdf6336a6a168f8840c"
+
+[[package]]
+name = "so2js"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "clap",
+ "criterion",
+ "once_cell",
+ "parking_lot",
+ "so2js_core",
+]
+
+[[package]]
+name = "so2js_core"
+version = "0.1.0"
+dependencies = [
+ "allocator-api2",
+ "bitflags",
+ "bumpalo",
+ "half",
+ "hashbrown 0.16.1",
+ "icu_casemap",
+ "icu_collator",
+ "icu_collections",
+ "icu_locale",
+ "icu_normalizer",
+ "icu_properties",
+ "icu_provider",
+ "icu_provider_adapters",
+ "icu_provider_baked",
+ "indexmap-allocator-api",
+ "num-bigint",
+ "num-traits",
+ "once_cell",
+ "oxc",
+ "parking_lot",
+ "rand",
+ "ryu-js",
+ "so2js_icu_collections",
+ "so2js_macros",
+ "supports-color",
+ "zerotrie",
+ "zerovec",
+]
+
+[[package]]
+name = "so2js_fuzz"
+version = "0.1.0"
+dependencies = [
+ "so2js_core",
+]
+
+[[package]]
+name = "so2js_icu_collections"
+version = "0.1.0"
+dependencies = [
+ "hashbrown 0.16.1",
+ "icu_casemap",
+ "icu_collator",
+ "icu_collections",
+ "icu_locale",
+ "icu_normalizer",
+ "icu_properties",
+ "icu_provider",
+ "icu_provider_adapters",
+ "icu_provider_baked",
+ "once_cell",
+ "zerotrie",
+ "zerovec",
+]
+
+[[package]]
+name = "so2js_integration_test_harness"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "regex",
+ "serde",
+ "serde_json",
+ "so2js_core",
+ "threadpool",
+ "yaml-rust",
+]
+
+[[package]]
+name = "so2js_macros"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "so2js_tests"
+version = "0.1.0"
+dependencies = [
+ "so2js_core",
+]
 
 [[package]]
 name = "stable_deref_trait"

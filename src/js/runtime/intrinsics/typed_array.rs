@@ -35,7 +35,7 @@ use alloc::format;
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
-use brimstone_macros::wrap_ordinary_object;
+use so2js_macros::wrap_ordinary_object;
 use core::mem::size_of;
 use half::f16;
 use num_bigint::{BigInt, Sign};

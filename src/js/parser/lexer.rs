@@ -1,7 +1,7 @@
 use alloc::rc::Rc;
 use alloc::str::FromStr;
 
-use brimstone_macros::match_u32;
+use so2js_macros::match_u32;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 

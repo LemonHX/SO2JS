@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This script is used to build the brimstone_fuzz executable for use with fuzzilli
+# This script is used to build the so2js_fuzz executable for use with fuzzilli
 
 set -e
 
@@ -24,11 +24,11 @@ RUSTFLAGS="\
   -C passes=sancov-module \
   -C llvm-args=-sanitizer-coverage-trace-pc-guard \
   -C llvm-args=-sanitizer-coverage-level=3" \
-  cargo build --features build_fuzz -p brimstone_fuzz
+  cargo build --features build_fuzz -p so2js_fuzz
 
 # Clone fuzzilli repo if not present
 FUZZILLI_DIR="$CURRENT_DIR/fuzzilli"
 
 if [ ! -d "$FUZZILLI_DIR" ]; then
-  git clone https://github.com/Hans-Halverson/fuzzilli-brimstone.git "$FUZZILLI_DIR"
+  git clone https://github.com/Hans-Halverson/fuzzilli-so2js.git "$FUZZILLI_DIR"
 fi

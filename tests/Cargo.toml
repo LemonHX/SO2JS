@@ -1,11 +1,11 @@
 [package]
-name = "brimstone_tests"
+name = "so2js_tests"
 version.workspace = true
 edition.workspace = true
 publish = false
 
 [dev-dependencies]
-brimstone_core.workspace = true
+so2js_core.workspace = true
 
 [[test]]
 name = "snapshot_tests"

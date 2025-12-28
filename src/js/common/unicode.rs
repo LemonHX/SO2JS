@@ -3,7 +3,7 @@ use core::panic;
 use super::icu::ICU;
 use alloc::string::String;
 
-use brimstone_macros::match_u32;
+use so2js_macros::match_u32;
 
 /// A single unicode code unit. Value may be in the surrogate pair range.
 pub type CodeUnit = u16;

@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use brimstone_macros::wrap_ordinary_object;
+use so2js_macros::wrap_ordinary_object;
 use core::mem::size_of;
 
 use crate::{

@@ -1,4 +1,4 @@
-name: brimstone
+name: so2js
 
 on:
   pull_request:
@@ -49,8 +49,8 @@ jobs:
 
       - name: Run integration tests
         run: |
-          cargo brimstone-test -- --reindex
-          cargo brimstone-test -- --ignore-unimplemented
+          cargo so2js-test -- --reindex
+          cargo so2js-test -- --ignore-unimplemented
 
   # Run all integration tests for implemented features with release build.
   integration-tests-release:
@@ -66,8 +66,8 @@ jobs:
 
       - name: Run integration tests
         run: |
-          cargo brimstone-test -- --reindex
-          cargo brimstone-test --release -- --ignore-unimplemented
+          cargo so2js-test -- --reindex
+          cargo so2js-test --release -- --ignore-unimplemented
 
   # Run all integration tests for implemented features with GC stress test mode on.
   integration-tests-gc-stress-test:
@@ -83,8 +83,8 @@ jobs:
 
       - name: Run integration tests
         run: |
-          cargo brimstone-test -- --reindex
-          cargo brimstone-test --release --features gc_stress_test -- --ignore-unimplemented
+          cargo so2js-test -- --reindex
+          cargo so2js-test --release --features gc_stress_test -- --ignore-unimplemented
 
   # Run all integration tests for implemented features with handle tracking mode on.
   integration-tests-handle-tracking:
@@ -100,8 +100,8 @@ jobs:
 
       - name: Run integration tests
         run: |
-          cargo brimstone-test -- --reindex
-          cargo brimstone-test --release --features handle_stats -- --ignore-unimplemented
+          cargo so2js-test -- --reindex
+          cargo so2js-test --release --features handle_stats -- --ignore-unimplemented
 
   integration-tests-panic-on-oom-nightly:
     runs-on: ubuntu-latest
@@ -122,5 +122,5 @@ jobs:
 
       - name: Run integration tests on nightly without alloc_error feature enabled
         run: |
-          cargo brimstone-test -- --reindex
-          cargo brimstone-test --release --no-default-features --features nightly -- --ignore-unimplemented
+          cargo so2js-test -- --reindex
+          cargo so2js-test --release --no-default-features --features nightly -- --ignore-unimplemented

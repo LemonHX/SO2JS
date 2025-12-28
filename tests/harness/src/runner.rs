@@ -19,7 +19,7 @@ use crate::{
     utils::GenericResult,
 };
 
-use brimstone_core::{
+use so2js_core::{
     common::{
         options::{Options, OptionsBuilder},
         wtf_8::Wtf8String,

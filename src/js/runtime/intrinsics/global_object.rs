@@ -21,7 +21,7 @@ use crate::{
     },
 };
 use alloc::format;
-use brimstone_macros::match_u32;
+use so2js_macros::match_u32;
 
 use super::intrinsics::Intrinsic;
 

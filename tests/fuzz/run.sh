@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This script is used to run fuzzilli on brimstone
+# This script is used to run fuzzilli on so2js
 
 set -e
 
@@ -10,7 +10,7 @@ ROOT_DIR="$CURRENT_DIR/../.."
 FUZZILLI_DIR="$CURRENT_DIR/fuzzilli"
 RESULTS_DIR="$CURRENT_DIR/results"
 
-# Build brimstone for fuzzing and install dependencies
+# Build so2js for fuzzing and install dependencies
 "$CURRENT_DIR/build.sh"
 
 # Build and run fuzzilli
@@ -18,10 +18,10 @@ cd "$FUZZILLI_DIR"
 
 swift run \
   -c release FuzzilliCli \
-  --profile=brimstone \
+  --profile=so2js \
   --logLevel=verbose \
   --diagnostics \
   --storagePath="$RESULTS_DIR" \
   --jobs=4 \
   "$@" \
-  "$ROOT_DIR/target/debug/brimstone_fuzz"
+  "$ROOT_DIR/target/debug/so2js_fuzz"
