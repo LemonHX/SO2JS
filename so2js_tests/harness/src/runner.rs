@@ -320,7 +320,7 @@ fn run_single_test(
 
         let duration = start_timestamp.elapsed().unwrap();
 
-        check_expected_completion(cx, test, completion, duration)
+        check_expected_completion(cx, test, completion.map(|_| ()), duration)
     }));
 
     #[cfg(feature = "handle_stats")]
@@ -435,7 +435,7 @@ fn load_harness_test_file(cx: Context, test262_root: &str, file: &str) {
 fn execute_script_as_bytecode<'a>(
     mut cx: Context,
     analyzed_result: &'a parser::analyze::AnalyzedProgramResult<'a>,
-) -> EvalResult<()> {
+) -> EvalResult<Handle<Value>> {
     let realm = cx.initial_realm();
     let generate_result =
         BytecodeProgramGenerator::generate_from_parse_script_result(cx, analyzed_result, realm);
@@ -453,7 +453,7 @@ fn execute_script_as_bytecode<'a>(
 fn execute_module_as_bytecode<'a>(
     mut cx: Context,
     analyzed_result: &'a parser::analyze::AnalyzedProgramResult<'a>,
-) -> EvalResult<()> {
+) -> EvalResult<Handle<Value>> {
     let realm = cx.initial_realm();
     let generate_result =
         BytecodeProgramGenerator::generate_from_parse_module_result(cx, analyzed_result, realm);

@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 publish = false
 
+[dependencies]
+parking_lot.workspace = true
+
 [dev-dependencies]
 so2js.workspace = true
 

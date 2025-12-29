@@ -31,6 +31,17 @@ pub struct Handle<T> {
     phantom_data: PhantomData<T>,
 }
 
+impl core::fmt::Debug for Handle<Value> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if self.is_dangling() {
+            write!(f, "Handle(dangling)")
+        } else {
+            let value = self.deref();
+            write!(f, "Handle({:?})", value)
+        }
+    }
+}
+
 impl<T: ToHandleContents> Handle<T> {
     #[inline]
     pub fn new(handle_context: &mut HandleContext, contents: HandleContents) -> Handle<T> {

@@ -1,5 +1,8 @@
 use so2js::{
-    common::options::{Options, OptionsBuilder},
+    common::{
+        options::{Options, OptionsBuilder},
+        wtf_8::Wtf8String,
+    },
     parser::{self, ast, source::Source, ParseContext},
     runtime::{
         bytecode::generator::{BytecodeProgramGenerator, BytecodeScript},
@@ -13,8 +16,10 @@ use std::{
     env, error, fs,
     path::{Path, PathBuf},
     rc::Rc,
-    sync::{LazyLock, Mutex},
+    sync::LazyLock,
 };
+
+use parking_lot::Mutex;
 
 type GenericResult<T> = Result<T, Box<dyn error::Error>>;
 
@@ -62,8 +67,11 @@ fn js_error_snapshot_tests() -> GenericResult<()> {
 }
 
 fn print_error(path: &str) -> GenericResult<String> {
-    let source = Rc::new(Source::new_from_file(path)?);
-
+    let file_content = std::fs::read_to_string(path)?;
+    let source = Rc::new(Source::new_for_string(
+        path,
+        Wtf8String::from_string(file_content),
+    )?);
     let options = OptionsBuilder::new()
         .annex_b(path.contains("annex_b"))
         .build();
@@ -89,16 +97,12 @@ fn print_error(path: &str) -> GenericResult<String> {
 
 #[test]
 fn js_bytecode_snapshot_tests() -> GenericResult<()> {
-    init();
-
     let bytecode_tests_dir = get_test_root("js_bytecode");
     run_snapshot_tests(&bytecode_tests_dir, &mut |path| print_bytecode(path))
 }
 
 #[test]
 fn js_regexp_bytecode_snapshot_tests() -> GenericResult<()> {
-    init();
-
     let regexp_bytecode_tests_dir = get_test_root("js_regexp_bytecode");
     run_snapshot_tests(&regexp_bytecode_tests_dir, &mut |path| {
         print_regexp_bytecode(path)
@@ -210,7 +214,11 @@ fn run_and_print_bytecode(path: &str) -> GenericResult<String> {
 }
 
 fn new_parse_context(path: &str) -> GenericResult<ParseContext> {
-    let source = Rc::new(Source::new_from_file(path)?);
+    let file_content = std::fs::read_to_string(path)?;
+    let source = Rc::new(Source::new_for_string(
+        path,
+        Wtf8String::from_string(file_content),
+    )?);
     Ok(ParseContext::new(source))
 }
 

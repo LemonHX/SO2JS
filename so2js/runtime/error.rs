@@ -19,6 +19,7 @@ use super::{
 
 /// Top level error type for the JS engine. Encapsulates all possible errors types that can occur
 /// during parsing, analysis, or evaluation.
+#[derive(Debug)]
 pub enum BsError {
     /// A single parse error can be returned from parsing.
     Parse(LocalizedParseError),

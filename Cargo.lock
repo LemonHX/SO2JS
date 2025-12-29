@@ -1459,6 +1459,7 @@ dependencies = [
 name = "so2js_tests"
 version = "0.1.0"
 dependencies = [
+ "parking_lot",
  "so2js",
 ]
 

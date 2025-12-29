@@ -1,33 +1,22 @@
-use alloc::rc::Rc;
-use alloc::string::String;
 use alloc::string::ToString;
-use bumpalo::AllocErr;
 use hashbrown::HashSet;
 
-use crate::common::wtf_8::Wtf8String;
-use crate::parser::source;
 use crate::runtime::alloc_error::AllocError;
 use crate::{
     completion_value, must_a,
-    parser::{analyze::analyze, parse_module, source::Source, ParseContext},
     runtime::{
         abstract_operations::call_object,
         alloc_error::AllocResult,
-        bytecode::generator::BytecodeProgramGenerator,
-        context::ModuleCacheKey,
-        error::{syntax_error, syntax_parse_error},
         eval_result::EvalResult,
-        intrinsics::{intrinsics::Intrinsic, json_object::JSONObject},
+        intrinsics::intrinsics::Intrinsic,
         promise_object::{PromiseCapability, PromiseObject},
-        string_value::FlatString,
-        Context, Handle, Realm, Value,
+        Context, Handle, Realm,
     },
 };
 
 use super::{
     module::{DynModule, ModuleId},
     source_text_module::{ModuleRequest, ModuleState, SourceTextModule},
-    synthetic_module::SyntheticModule,
 };
 
 /// GraphLoadingStateRecord (https://tc39.es/ecma262/#graphloadingstate-record)
@@ -42,7 +31,7 @@ struct GraphLoader {
 impl GraphLoader {
     /// InnerModuleLoading (https://tc39.es/ecma262/#sec-InnerModuleLoading)
     fn inner_module_loading(&mut self, cx: Context, module: DynModule) -> AllocResult<()> {
-        let sys = cx.sys.as_ref().ok_or_else(|| AllocError::oom())?;
+        let sys = cx.sys.as_ref().ok_or_else(|| AllocError::Oom(()))?;
 
         if let Some(mut module) = module.as_source_text_module() {
             if module.state() == ModuleState::New && self.visited.insert(module.id()) {

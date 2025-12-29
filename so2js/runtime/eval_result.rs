@@ -8,7 +8,7 @@ use super::alloc_error::AllocError;
 /// Any JS value can be thrown as an evaluation error.
 ///
 /// Wrap in a zero-cost newtype for type shenanigans.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum EvalError {
     /// A thrown error JS value.
     Value(Handle<Value>),

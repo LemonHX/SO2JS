@@ -193,15 +193,12 @@ impl Context {
 
             cx.init_builtin_names()?;
             cx.init_builtin_symbols()?;
-
             cx.global_symbol_registry =
                 GlobalSymbolRegistry::new_initial(cx, HeapItemKind::GlobalSymbolRegistryMap)?;
             cx.modules = ModuleCache::new_initial(cx, HeapItemKind::ModuleCacheMap)?;
-
             cx.default_array_properties = DenseArrayProperties::new(cx, 0)?.cast();
             cx.default_named_properties =
                 NamedPropertiesMap::new(cx, HeapItemKind::ObjectNamedPropertiesMap, 0)?;
-
             cx.initial_realm = *Realm::new(cx)?;
 
             Ok(())
@@ -246,7 +243,7 @@ impl Context {
         self.initial_realm_ptr().to_handle()
     }
 
-    pub fn evaluate_script(&mut self, source: Rc<Source>) -> BsResult<()> {
+    pub fn evaluate_script(&mut self, source: Rc<Source>) -> BsResult<Handle<Value>> {
         // Parse script and perform semantic analysis
         let pcx = ParseContext::new(source);
         let parse_result = parse_script(&pcx, self.options.clone())?;
@@ -269,12 +266,10 @@ impl Context {
         )?;
 
         // Execute in the bytecode interpreter
-        self.run_script(bytecode_script)?;
-
-        Ok(())
+        Ok(self.run_script(bytecode_script)?)
     }
 
-    pub fn evaluate_module(&mut self, source: Rc<Source>) -> BsResult<()> {
+    pub fn evaluate_module(&mut self, source: Rc<Source>) -> BsResult<Handle<Value>> {
         // Parse module and perform semantic analysis
         let pcx = ParseContext::new(source);
         let parse_result = parse_module(&pcx, self.options.clone())?;
@@ -297,24 +292,22 @@ impl Context {
         )?;
 
         // Load modules and execute in the bytecode interpreter
-        self.run_module(module)?;
-
-        Ok(())
+        Ok(self.run_module(module)?)
     }
 
     /// Execute a program, running until the task queue is empty.
-    pub fn run_script(&mut self, bytecode_script: BytecodeScript) -> EvalResult<()> {
-        self.with_initial_realm_stack_frame(self.initial_realm_ptr(), |mut cx| {
+    pub fn run_script(&mut self, bytecode_script: BytecodeScript) -> EvalResult<Handle<Value>> {
+        let value = self.with_initial_realm_stack_frame(self.initial_realm_ptr(), |mut cx| {
             cx.vm().execute_script(bytecode_script)
         })?;
 
         self.run_all_tasks()?;
 
-        Ok(())
+        Ok(value)
     }
 
     /// Execute a module, loading and executing all dependencies. Run until the task queue is empty.
-    pub fn run_module(&mut self, module: Handle<SourceTextModule>) -> EvalResult<()> {
+    pub fn run_module(&mut self, module: Handle<SourceTextModule>) -> EvalResult<Handle<Value>> {
         // Loading, linking, and evaluation should all have a current realm set as some objects
         // needing a realm will be created.
         let promise = self
@@ -329,8 +322,11 @@ impl Context {
         if let Some(value) = promise.rejected_value() {
             return eval_err!(value.to_handle(*self));
         }
-
-        Ok(())
+        if let Some(value) = promise.fulfilled_value() {
+            return Ok(value.to_handle(*self));
+        } else {
+            unreachable!()
+        }
     }
 
     pub fn with_initial_realm_stack_frame<T>(

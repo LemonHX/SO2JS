@@ -11,7 +11,7 @@ use crate::{
         heap_item_descriptor::HeapItemKind,
         interned_strings::InternedStrings,
         intrinsics::{
-            intrinsics::Intrinsic, native_error::EvalError,
+            intrinsics::Intrinsic,
             promise_prototype::perform_promise_then, rust_runtime::RustRuntimeFunction,
         },
         module::{

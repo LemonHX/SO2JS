@@ -141,6 +141,13 @@ impl PromiseObject {
         }
     }
 
+    pub fn fulfilled_value(&self) -> Option<Value> {
+        match self.state {
+            PromiseState::Fulfilled { result } => Some(result),
+            _ => None,
+        }
+    }
+
     pub fn set_already_resolved(&mut self, value: bool) {
         match self.state {
             PromiseState::Pending {

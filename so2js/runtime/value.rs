@@ -414,6 +414,14 @@ impl Value {
     }
 }
 
+impl core::fmt::Debug for Value {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut dp = DebugPrinter::new(super::debug_print::DebugPrintMode::Short);
+        let df = self.debug_format(&mut dp);
+        write!(f, "{}", dp.finish())
+    }
+}
+
 impl ToHandleContents for Value {
     type Impl = Value;
 

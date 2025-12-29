@@ -2,7 +2,7 @@ use clap::Parser;
 
 use std::rc::Rc;
 
-use parking_lot::{Mutex, MutexGuard};
+use parking_lot::Mutex;
 
 /// Raw command line arguments.
 #[derive(Parser)]
@@ -181,17 +181,38 @@ fn unwrap_error_or_exit<T>(cx: Context, result: BsResult<T>) -> T {
     }
 }
 
-/// Wrapper to pretty print errors
+// Wrapper to pretty print errors
+// fn main() {
+//     let args = Args::parse();
+//     let cx = create_context(&args).expect("Failed to create initial Context");
+
+//     cx.execute_then_drop(|cx| {
+//         let result = evaluate(cx, &args);
+
+//         #[cfg(feature = "handle_stats")]
+//         println!("{:?}", cx.heap.info().handle_context().handle_stats());
+
+//         unwrap_error_or_exit(cx, result);
+//     })
+// }
+
 fn main() {
-    let args = Args::parse();
-    let cx = create_context(&args).expect("Failed to create initial Context");
+    let cx = ContextBuilder::new()
+        .set_options(Rc::new(Options::default()))
+        .build()
+        .unwrap();
 
-    cx.execute_then_drop(|cx| {
-        let result = evaluate(cx, &args);
-
-        #[cfg(feature = "handle_stats")]
-        println!("{:?}", cx.heap.info().handle_context().handle_stats());
-
-        unwrap_error_or_exit(cx, result);
-    })
+    cx.execute_then_drop(|mut cx| {
+        loop {
+            // take one line of input from stdin
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input).unwrap();
+            let handle = cx
+                .evaluate_module(Rc::new(
+                    Source::new_for_string("<repl>", Wtf8String::from_string(input)).unwrap(),
+                ))
+                .unwrap();
+            println!("{:?}", handle);
+        }
+    });
 }
