@@ -1,0 +1,22 @@
+[package]
+name = "so2js_integration_test_harness"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+so2js.workspace = true
+
+clap = { workspace = true, features = ["derive"] }
+regex.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+threadpool.workspace = true
+yaml-rust.workspace = true
+
+[features]
+default = ["alloc_error"]
+alloc_error = ["so2js/alloc_error"]
+gc_stress_test = ["so2js/gc_stress_test"]
+handle_stats = ["so2js/handle_stats"]
+nightly = ["so2js/nightly"]

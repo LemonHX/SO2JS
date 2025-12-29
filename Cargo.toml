@@ -1,12 +1,14 @@
 [workspace]
 members = [
-  "src",
-  "src/so2js_icu_collections",
-  "src/so2js_macros",
-  "src/js",
-  "tests",
-  "tests/fuzz",
-  "tests/harness",
+  "example",
+  # core members
+  "so2js_icu_collections",
+  "so2js_macros",
+  "so2js",
+  # tests
+  "so2js_tests",
+  "so2js_tests/fuzz",
+  "so2js_tests/harness",
 ]
 resolver = "2"
 
@@ -20,10 +22,9 @@ authors = [
 
 [workspace.dependencies]
 # Internal Crates
-so2js = { path = "src" }
-so2js_core = { path = "src/js" }
-so2js_icu_collections = { path = "src/so2js_icu_collections" }
-so2js_macros = { path = "src/so2js_macros" }
+so2js = { path = "so2js" }
+so2js_icu_collections = { path = "so2js_icu_collections" }
+so2js_macros = { path = "so2js_macros" }
 
 
 # External Crates

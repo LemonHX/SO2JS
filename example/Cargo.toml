@@ -1,0 +1,37 @@
+[package]
+name = "so2js_example"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+default-run = "example"
+
+[[bin]]
+name = "example"
+path = "main.rs"
+
+[dependencies]
+bitflags.workspace = true
+clap = { workspace = true, features = ["derive"] }
+
+so2js.workspace = true
+parking_lot.workspace = true
+once_cell.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+[features]
+default = ["alloc_error", "annex_b"]
+# Enable Annex B extensions by default
+annex_b = ["so2js/annex_b"]
+# Collect handle use statistics
+handle_stats = ["so2js/handle_stats"]
+# Return allocation errors instead of panicking
+alloc_error = ["so2js/alloc_error"]
+
+
+# Run the garbage collector in stress test mode
+gc_stress_test = ["so2js/gc_stress_test"]
+
+[lints]
+workspace = true
