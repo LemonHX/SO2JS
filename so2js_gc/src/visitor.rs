@@ -4,6 +4,8 @@
 //! - `GcVisitor`: Implemented by the GC's Marker, used by objects to report their pointers
 //! - `GcContext`: Implemented by the runtime (Context), provides root scanning and object tracing
 
+use core::ptr::NonNull;
+
 use crate::GcPtr;
 
 /// GC Visitor trait - implemented by the GC's marking logic
@@ -22,19 +24,38 @@ use crate::GcPtr;
 /// }
 /// ```
 pub trait GcVisitor {
-    /// Visit a strongly held pointer
+    /// Visit a strongly held pointer (raw pointer version)
     ///
+    /// This is the core method that must be implemented.
     /// Marks the target gray if it's white (not yet visited).
-    fn visit<T>(&mut self, ptr: &mut GcPtr<T>);
+    ///
+    /// # Safety
+    /// The pointer must point to a valid GC-managed object with a GcHeader.
+    fn visit_raw(&mut self, ptr: NonNull<u8>);
 
-    /// Visit a weakly held pointer
+    /// Visit a weakly held pointer (raw pointer version)
     ///
     /// Does NOT trace the target. During marking, weak pointers are recorded
     /// for later processing. After marking completes, weak references to
     /// unreachable objects will be cleared.
-    fn visit_weak<T>(&mut self, ptr: &mut GcPtr<T>) {
+    fn visit_weak_raw(&mut self, _ptr: NonNull<u8>) {
         // Default: do nothing for weak pointers during marking
-        let _ = ptr;
+    }
+
+    /// Visit a strongly held GcPtr
+    #[inline]
+    fn visit<T>(&mut self, ptr: &mut GcPtr<T>) {
+        if !ptr.is_dangling() {
+            self.visit_raw(ptr.as_non_null().cast());
+        }
+    }
+
+    /// Visit a weakly held GcPtr
+    #[inline]
+    fn visit_weak<T>(&mut self, ptr: &mut GcPtr<T>) {
+        if !ptr.is_dangling() {
+            self.visit_weak_raw(ptr.as_non_null().cast());
+        }
     }
 
     /// Visit an optional strongly held pointer

@@ -502,18 +502,9 @@ impl<'a> Marker<'a> {
 }
 
 impl<'a> GcVisitor for Marker<'a> {
-    fn visit<T>(&mut self, ptr: &mut GcPtr<T>) {
-        if ptr.is_dangling() {
-            return;
-        }
-
-        let object_ptr = ptr.as_ptr() as *mut u8;
-        if object_ptr.is_null() {
-            return;
-        }
-
+    fn visit_raw(&mut self, ptr: NonNull<u8>) {
         unsafe {
-            let header = GcHeader::from_object_ptr(object_ptr);
+            let header = GcHeader::from_object_ptr(ptr.as_ptr());
             if (*header).color() == GcColor::White {
                 (*header).set_color(GcColor::Gray);
                 self.gray_queue
@@ -522,7 +513,7 @@ impl<'a> GcVisitor for Marker<'a> {
         }
     }
 
-    fn visit_weak<T>(&mut self, _ptr: &mut GcPtr<T>) {
+    fn visit_weak_raw(&mut self, _ptr: NonNull<u8>) {
         // Weak pointers are not traced during marking.
         // They will be processed later in the WeakRefProcessing phase.
     }
