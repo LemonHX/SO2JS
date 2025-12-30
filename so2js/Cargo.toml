@@ -23,7 +23,7 @@ supports-color.workspace = true
 parking_lot.workspace = true
 oxc = { workspace = true, features = [] }
 once_cell.workspace = true
-
+so2js_gc.workspace = true
 # Internal crates
 so2js_icu_collections.workspace = true
 so2js_macros.workspace = true

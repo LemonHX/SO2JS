@@ -1,0 +1,16 @@
+[package]
+name = "so2js_gc"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+# Minimal dependencies - just what we need for the GC
+
+[features]
+default = []
+# Run the garbage collector in stress test mode
+gc_stress_test = []
+
+[lints]
+workspace = true

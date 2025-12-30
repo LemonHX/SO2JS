@@ -1389,6 +1389,7 @@ dependencies = [
  "parking_lot",
  "rand",
  "ryu-js",
+ "so2js_gc",
  "so2js_icu_collections",
  "so2js_macros",
  "supports-color",
@@ -1414,6 +1415,10 @@ version = "0.1.0"
 dependencies = [
  "so2js",
 ]
+
+[[package]]
+name = "so2js_gc"
+version = "0.1.0"
 
 [[package]]
 name = "so2js_icu_collections"
