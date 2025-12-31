@@ -122,7 +122,7 @@ impl OptionsBuilder {
 
 use so2js::{
     common::{constants::DEFAULT_HEAP_SIZE, options::Options, wtf_8::Wtf8String},
-    handle_scope, must_a,
+    js_stack_scope, must_a,
     parser::source::Source,
     runtime::{
         abstract_operations::define_property_or_throw, alloc_error::AllocResult,
@@ -197,7 +197,7 @@ impl ConsoleObject {
 
     /// Install the GC object on the realm's global object.
     pub fn install(cx: Context, realm: StackRoot<Realm>) -> AllocResult<()> {
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             let gc_object = GcObject::new(cx, realm)?;
             let desc = PropertyDescriptor::data(gc_object.as_value(), true, false, true);
             must_a!(define_property_or_throw(
@@ -237,7 +237,7 @@ fn main() {
 
     ConsoleObject::install(cx, cx.initial_realm()).unwrap();
     loop {
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             // take one line of input from stdin
             let mut input = String::new();
             std::io::stdin().read_line(&mut input).unwrap();

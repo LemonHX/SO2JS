@@ -1,4 +1,4 @@
-use crate::handle_scope_guard;
+use crate::js_stack_scope_guard;
 
 use super::{
     alloc_error::AllocResult, context::Context, gc::GcVisitorExt, property_key::PropertyKey,

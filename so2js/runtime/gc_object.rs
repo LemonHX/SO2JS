@@ -1,5 +1,5 @@
 use crate::{
-    handle_scope, must_a,
+    js_stack_scope, must_a,
     runtime::{
         abstract_operations::define_property_or_throw, alloc_error::AllocResult, PropertyDescriptor,
     },
@@ -27,7 +27,7 @@ impl GcObject {
 
     /// Install the GC object on the realm's global object.
     pub fn install(cx: Context, realm: StackRoot<Realm>) -> AllocResult<()> {
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             let gc_object = GcObject::new(cx, realm)?;
             let desc = PropertyDescriptor::data(gc_object.as_value(), true, false, true);
             must_a!(define_property_or_throw(

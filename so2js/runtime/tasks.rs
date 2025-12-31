@@ -1,7 +1,7 @@
 use alloc::collections::VecDeque;
 
 use crate::{
-    completion_value, eval_err, handle_scope,
+    completion_value, eval_err, js_stack_scope,
     runtime::{
         abstract_operations::{call, call_object},
         intrinsics::promise_constructor::execute_then,
@@ -127,7 +127,7 @@ impl Context {
     /// Run all tasks until the task queue is empty.
     pub fn run_all_tasks(&mut self) -> EvalResult<()> {
         while let Some(task) = self.task_queue().tasks.pop_front() {
-            handle_scope!(*self, {
+            js_stack_scope!(*self, {
                 match task {
                     Task::Callback1(task) => task.execute(*self),
                     Task::AwaitResume(task) => task.execute(*self),

@@ -5,7 +5,7 @@ use core::{
 };
 use rand::Rng;
 
-use crate::{handle_scope_guard, runtime::alloc_error::AllocResult, set_uninit};
+use crate::{js_stack_scope_guard, runtime::alloc_error::AllocResult, set_uninit};
 
 use super::{
     accessor::Accessor,
@@ -450,13 +450,13 @@ impl StackRoot<ObjectValue> {
         key: StackRoot<PropertyKey>,
         value: StackRoot<Value>,
     ) -> AllocResult<()> {
-        handle_scope_guard!(cx);
+        js_stack_scope_guard!(cx);
 
         self.set_property(cx, key, Property::data(value, true, false, true))
     }
 
     pub fn instrinsic_length_prop(&mut self, cx: Context, length: i32) -> AllocResult<()> {
-        handle_scope_guard!(cx);
+        js_stack_scope_guard!(cx);
 
         let length_value = cx.smi(length);
         self.set_property(
@@ -467,7 +467,7 @@ impl StackRoot<ObjectValue> {
     }
 
     pub fn intrinsic_name_prop(&mut self, mut cx: Context, name: &str) -> AllocResult<()> {
-        handle_scope_guard!(cx);
+        js_stack_scope_guard!(cx);
 
         let name_value = cx.alloc_string(name)?.into();
         self.set_property(
@@ -484,7 +484,7 @@ impl StackRoot<ObjectValue> {
         func: RustRuntimeFunction,
         realm: StackRoot<Realm>,
     ) -> AllocResult<()> {
-        handle_scope_guard!(cx);
+        js_stack_scope_guard!(cx);
 
         let getter = BuiltinFunction::create(cx, func, 0, name, realm, Some("get"))?;
         let accessor_value = Accessor::new(cx, Some(getter), None)?;
@@ -503,7 +503,7 @@ impl StackRoot<ObjectValue> {
         setter: RustRuntimeFunction,
         realm: StackRoot<Realm>,
     ) -> AllocResult<()> {
-        handle_scope_guard!(cx);
+        js_stack_scope_guard!(cx);
 
         let getter = BuiltinFunction::create(cx, getter, 0, name, realm, Some("get"))?;
         let setter = BuiltinFunction::create(cx, setter, 1, name, realm, Some("set"))?;
@@ -523,7 +523,7 @@ impl StackRoot<ObjectValue> {
         length: u32,
         realm: StackRoot<Realm>,
     ) -> AllocResult<()> {
-        handle_scope_guard!(cx);
+        js_stack_scope_guard!(cx);
 
         let func = BuiltinFunction::create(cx, func, length, name, realm, None)?.into();
         self.intrinsic_data_prop(cx, name, func)
@@ -535,7 +535,7 @@ impl StackRoot<ObjectValue> {
         key: StackRoot<PropertyKey>,
         value: StackRoot<Value>,
     ) -> AllocResult<()> {
-        handle_scope_guard!(cx);
+        js_stack_scope_guard!(cx);
 
         self.set_property(cx, key, Property::data(value, false, false, false))
     }

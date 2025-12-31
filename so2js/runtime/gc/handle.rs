@@ -252,7 +252,7 @@ impl Drop for StackRootScopeGuard {
 
 /// A guard which enters a handle scope and exits it when dropped. Does not escape any values.
 #[macro_export]
-macro_rules! handle_scope_guard {
+macro_rules! js_stack_scope_guard {
     ($cx:expr) => {
         let _guard = $crate::runtime::gc::StackRootScopeGuard::new($cx);
     };
@@ -261,7 +261,7 @@ macro_rules! handle_scope_guard {
 /// Enter a handle scope and execute the given statement. Returns and escapes the result of
 /// executing the statement.
 #[macro_export]
-macro_rules! handle_scope {
+macro_rules! js_stack_scope {
     ($cx:expr, $body:stmt) => {
         $crate::runtime::gc::StackRootScope::new($cx, |_| {
             let result = { $body };

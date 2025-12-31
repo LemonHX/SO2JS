@@ -10,7 +10,7 @@ use std::{
 
 use so2js::{
     common::wtf_8::Wtf8String,
-    handle_scope, must_a,
+    js_stack_scope, must_a,
     parser::source::Source,
     runtime::{
         abstract_operations::define_property_or_throw, alloc_error::AllocResult,
@@ -99,7 +99,7 @@ fn main() {
 }
 
 fn install_fuzzilli_function(mut cx: Context) -> AllocResult<()> {
-    handle_scope!(cx, {
+    js_stack_scope!(cx, {
         let realm = cx.initial_realm();
 
         // Register the rust runtime function

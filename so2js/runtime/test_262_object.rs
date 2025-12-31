@@ -1,5 +1,5 @@
 use crate::{
-    handle_scope, must_a,
+    js_stack_scope, must_a,
     parser::{analyze::analyze, parse_script, source::Source, ParseContext},
     runtime::{alloc_error::AllocResult, bytecode::generator::BytecodeProgramGenerator, get},
 };
@@ -57,7 +57,7 @@ impl Test262Object {
     }
 
     pub fn install(mut cx: Context, realm: StackRoot<Realm>) -> AllocResult<()> {
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             // Create the test262 object
             let test_262_object = Test262Object::new(cx, realm)?;
 

@@ -8,7 +8,7 @@ use super::{
     Context, StackRoot, HeapPtr,
 };
 use crate::{
-    handle_scope_guard, parser::loc::find_line_col_for_pos, runtime::alloc_error::AllocResult,
+    js_stack_scope_guard, parser::loc::find_line_col_for_pos, runtime::alloc_error::AllocResult,
 };
 use alloc::string::String;
 use alloc::string::ToString;
@@ -103,7 +103,7 @@ pub fn create_current_stack_frame_info(
     cx: Context,
     skip_current_frame: bool,
 ) -> AllocResult<HeapPtr<StackFrameInfoArray>> {
-    handle_scope_guard!(cx);
+    js_stack_scope_guard!(cx);
 
     let frames = gather_current_stack_frames(cx, skip_current_frame);
 

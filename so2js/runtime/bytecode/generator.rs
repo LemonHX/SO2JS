@@ -16,7 +16,7 @@ use crate::{
         error::ErrorFormatter,
         wtf_8::{Wtf8Cow, Wtf8Str, Wtf8String},
     },
-    handle_scope,
+    js_stack_scope,
     parser::{
         analyze::{AnalyzedFunctionResult, AnalyzedProgramResult},
         ast::{self, AstPtr, AstStr, LabelId, ProgramKind, ResolvedScope, TaggedResolvedScope},
@@ -176,7 +176,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
     ) -> EmitResult<BytecodeScript> {
         debug_assert!(parse_result.program.kind == ProgramKind::Script);
 
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             let source = parse_result.source.clone();
             let mut generator = Self::new(cx, &parse_result.scope_tree, realm, source)?;
             let script = generator.generate_script_program(&parse_result.program)?;
@@ -203,7 +203,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
     fn gen_script_function(&mut self, program: &'a ast::Program<'a>) -> EmitResult<BytecodeScript> {
         let mut emit_result = EmitFunctionResult::empty();
 
-        let global_names = handle_scope!(self.cx, {
+        let global_names = js_stack_scope!(self.cx, {
             let mut generator = BytecodeFunctionGenerator::new_for_program(
                 self.cx,
                 program,
@@ -245,7 +245,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
     ) -> EmitResult<StackRoot<SourceTextModule>> {
         debug_assert!(parse_result.program.kind == ProgramKind::Module);
 
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             let source = parse_result.source.clone();
             let mut generator = Self::new(cx, &parse_result.scope_tree, realm, source)?;
             let module = generator.generate_module_program(&parse_result.program)?;
@@ -278,7 +278,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
     ) -> EmitResult<StackRoot<BytecodeFunction>> {
         let mut emit_result = EmitFunctionResult::empty();
 
-        handle_scope!(self.cx, {
+        js_stack_scope!(self.cx, {
             let mut generator = BytecodeFunctionGenerator::new_for_program(
                 self.cx,
                 program,
@@ -665,7 +665,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
         parse_result: &'a AnalyzedProgramResult<'a>,
         realm: StackRoot<Realm>,
     ) -> EmitResult<StackRoot<BytecodeFunction>> {
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             let mut generator = Self::new(
                 cx,
                 &parse_result.scope_tree,
@@ -699,7 +699,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
     ) -> EmitResult<StackRoot<BytecodeFunction>> {
         let mut emit_result = EmitFunctionResult::empty();
 
-        handle_scope!(self.cx, {
+        js_stack_scope!(self.cx, {
             let mut generator = BytecodeFunctionGenerator::new_for_program(
                 self.cx,
                 eval_program,
@@ -766,7 +766,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
         parse_result: &'a AnalyzedFunctionResult<'a>,
         realm: StackRoot<Realm>,
     ) -> EmitResult<StackRoot<BytecodeFunction>> {
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             let source = parse_result.source.clone();
             let mut generator = Self::new(cx, &parse_result.scope_tree, realm, source)?;
             let function = generator.generate_function_constructor(&parse_result.function);
@@ -830,7 +830,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
 
         let mut emit_result = EmitFunctionResult::empty();
 
-        handle_scope!(self.cx, {
+        js_stack_scope!(self.cx, {
             // Special handling if emitting a default constructor
             if let PendingFunctionNode::Constructor {
                 node: None,

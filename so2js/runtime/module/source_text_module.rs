@@ -1,5 +1,5 @@
 use crate::{
-    field_offset, handle_scope,
+    field_offset, js_stack_scope,
     runtime::{
         alloc_error::AllocResult,
         bytecode::function::BytecodeFunction,
@@ -657,7 +657,7 @@ impl Module for StackRoot<SourceTextModule> {
             return Ok(namespace_object);
         }
 
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             // Lazily initialize the exports map
             self.exports = Some(ExportMap::new(cx, HeapItemKind::ExportMap, 4)?);
 

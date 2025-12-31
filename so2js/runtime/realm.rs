@@ -19,7 +19,7 @@ use super::{
     Context, EvalResult, PropertyKey, Value,
 };
 use crate::{
-    field_offset, handle_scope, must_a, parser::scope_tree::REALM_SCOPE_SLOT_NAME,
+    field_offset, js_stack_scope, must_a, parser::scope_tree::REALM_SCOPE_SLOT_NAME,
     runtime::alloc_error::AllocResult, set_uninit,
 };
 use alloc::format;
@@ -46,7 +46,7 @@ const INTRINSICS_BYTE_OFFSET: usize = field_offset!(Realm, intrinsics);
 impl Realm {
     /// InitializeHostDefinedRealm (https://tc39.es/ecma262/#sec-initializehostdefinedrealm)
     pub fn new(cx: Context) -> AllocResult<StackRoot<Realm>> {
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             let realm = Realm::new_uninit(cx)?;
             must_a!(set_default_global_bindings(cx, realm));
             Ok(realm)
@@ -56,7 +56,7 @@ impl Realm {
     /// Realm initializes intrinsics but leaves other properties uninitialized. Must call
     /// `initialize` before using.
     fn new_uninit(cx: Context) -> AllocResult<StackRoot<Realm>> {
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             // Realm record must be created before setting up intrinsics, as realm must be referenced
             // during intrinsic creation.
             let size = Self::calculate_size_in_bytes();

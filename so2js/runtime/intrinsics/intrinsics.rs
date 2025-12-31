@@ -1,5 +1,5 @@
 use crate::{
-    handle_scope, handle_scope_guard, must_a,
+    js_stack_scope, js_stack_scope_guard, must_a,
     runtime::{
         abstract_operations::define_property_or_throw,
         alloc_error::AllocResult,
@@ -276,7 +276,7 @@ impl Intrinsics {
 
         // Intrinsics which are used by many other intrinsics during creation. These intrinsics
         // form dependency cycles, so first create uninitialized and then initialize later.
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             let object_prototype = ObjectPrototype::new_uninit(cx)?;
             let function_prototype = FunctionPrototype::new_uninit(cx)?;
 
@@ -288,7 +288,7 @@ impl Intrinsics {
 
         // Initialize the global object and scope. Global object will be referenced when settings
         // up intrinsics, but needs object prototype set up first.
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             let object_prototype = realm.get_intrinsic(Intrinsic::ObjectPrototype);
             let global_object = object_create_with_proto::<ObjectValue>(
                 cx,
@@ -305,11 +305,11 @@ impl Intrinsics {
         })?;
 
         // Initialize the most commonly used intrinsics
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             let object_prototype = realm.get_intrinsic(Intrinsic::ObjectPrototype).cast();
             ObjectPrototype::initialize(cx, object_prototype, realm)
         })?;
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             let function_prototype = realm.get_intrinsic(Intrinsic::FunctionPrototype);
             FunctionPrototype::initialize(cx, function_prototype, realm)
         })?;
@@ -358,7 +358,7 @@ impl Intrinsics {
         );
 
         // Properties of basic intrinsics
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             let object_prototype = realm.get_intrinsic(Intrinsic::ObjectPrototype);
             let object_prototype_to_string =
                 must_a!(get(cx, object_prototype, cx.names.to_string()));
@@ -470,7 +470,7 @@ impl Intrinsics {
         register_intrinsic!(Reflect, ReflectObject);
 
         // Builtin functions
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             register_existing_intrinsic!(Eval, create_eval(cx, realm)?);
             register_existing_intrinsic!(
                 GlobalDeclarationInstantiation,
@@ -522,7 +522,7 @@ impl Intrinsics {
         prototype: Intrinsic,
         constructor: Intrinsic,
     ) -> AllocResult<()> {
-        handle_scope_guard!(cx);
+        js_stack_scope_guard!(cx);
 
         let mut prototype_object = realm.get_intrinsic(prototype);
         let constructor_object = realm.get_intrinsic(constructor);
@@ -541,7 +541,7 @@ impl Intrinsics {
         prototype: Intrinsic,
         constructor: Intrinsic,
     ) -> AllocResult<()> {
-        handle_scope_guard!(cx);
+        js_stack_scope_guard!(cx);
 
         let mut prototype_object = realm.get_intrinsic(prototype);
         let constructor_object = realm.get_intrinsic(constructor);
@@ -567,7 +567,7 @@ fn create_throw_type_error_intrinsic(
     cx: Context,
     realm: StackRoot<Realm>,
 ) -> AllocResult<StackRoot<Value>> {
-    handle_scope!(cx, {
+    js_stack_scope!(cx, {
         let mut throw_type_error_func =
             BuiltinFunction::create_builtin_function_without_properties(
                 cx,
@@ -610,7 +610,7 @@ fn add_restricted_function_properties(
     func: StackRoot<ObjectValue>,
     realm: StackRoot<Realm>,
 ) -> AllocResult<()> {
-    handle_scope_guard!(cx);
+    js_stack_scope_guard!(cx);
 
     let thrower_func = realm.get_intrinsic(Intrinsic::ThrowTypeError);
 

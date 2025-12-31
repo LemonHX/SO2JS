@@ -8,7 +8,7 @@ use core::{
 use hashbrown::HashSet;
 
 use crate::{
-    eval_err, handle_scope, handle_scope_guard, must,
+    eval_err, js_stack_scope, js_stack_scope_guard, must,
     runtime::{
         abstract_operations::{
             call, call_object, copy_data_properties, create_data_property_or_throw,
@@ -448,7 +448,7 @@ impl VM {
     /// - References to the instruction cannot be held over any allocations, since the instruction
     ///   points into the managed heap and may be moved by a GC.
     fn dispatch_loop(&mut self) -> EvalResult<()> {
-        handle_scope!(self.cx(), self.dispatch_loop_inner())
+        js_stack_scope!(self.cx(), self.dispatch_loop_inner())
     }
 
     #[inline]
@@ -1578,7 +1578,7 @@ impl VM {
         let closure_ptr = match self.check_value_is_callable(*function)? {
             CallableObject::Closure(closure) => closure,
             CallableObject::Proxy(proxy) => {
-                return handle_scope!(self.cx(), {
+                return js_stack_scope!(self.cx(), {
                     proxy.to_stack().call(self.cx(), receiver, arguments)
                 });
             }
@@ -1593,7 +1593,7 @@ impl VM {
         if let Some(function_id) = closure_ptr.function_ptr().rust_runtime_function_id() {
             // Call rust runtime function directly in its own handle scope
             let cx = self.cx();
-            handle_scope!(cx, {
+            js_stack_scope!(cx, {
                 let receiver = receiver.to_stack_with(cx);
                 self.call_rust_runtime(closure_ptr, function_id, receiver, arguments, None)
             })
@@ -1635,7 +1635,7 @@ impl VM {
         arguments: &[StackRoot<Value>],
         new_target: StackRoot<ObjectValue>,
     ) -> EvalResult<StackRoot<ObjectValue>> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             // Check whether the value is a constructor, potentially deferring to proxy.
             let closure_handle = match self.check_value_is_constructor(*function)? {
                 CallableObject::Closure(closure) => closure.to_stack(),
@@ -1656,7 +1656,7 @@ impl VM {
                 let receiver = self.cx().empty();
 
                 // Call rust runtime function directly in its own handle scope
-                let return_value = handle_scope!(self.cx(), {
+                let return_value = js_stack_scope!(self.cx(), {
                     self.call_rust_runtime(
                         closure_ptr,
                         function_id,
@@ -1733,7 +1733,7 @@ impl VM {
             CallableObject::Closure(closure) => closure,
             // Proxy constructors call into the rust runtime
             CallableObject::Proxy(proxy) => {
-                return handle_scope!(self.cx(), {
+                return js_stack_scope!(self.cx(), {
                     // Can default to undefined receiver, which will be eventually coerced by callee
                     let receiver = receiver
                         .unwrap_or(Value::undefined())
@@ -1757,7 +1757,7 @@ impl VM {
                 self.generate_receiver(receiver, closure_ptr, function_ptr)?;
 
             let cx = self.cx();
-            handle_scope!(cx, {
+            js_stack_scope!(cx, {
                 let receiver = receiver.to_stack();
 
                 // Prepare arguments for the runtime call
@@ -1830,7 +1830,7 @@ impl VM {
             CallableObject::Closure(closure) => closure,
             // Proxy constructors call into the rust runtime
             CallableObject::Proxy(proxy) => {
-                return handle_scope!(self.cx(), {
+                return js_stack_scope!(self.cx(), {
                     let proxy = proxy.to_stack();
                     let new_target = new_target.to_stack();
                     let arguments = self.prepare_rust_runtime_args(args);
@@ -1848,7 +1848,7 @@ impl VM {
         let function_ptr = closure_ptr.function_ptr();
 
         // Check if this is a call to a function in the Rust runtime
-        let return_value = handle_scope!(self.cx(), {
+        let return_value = js_stack_scope!(self.cx(), {
             if let Some(function_id) = function_ptr.rust_runtime_function_id() {
                 // Calling builtin functions does not pass a receiver - pass empty as the
                 // uninitialized value.
@@ -2273,7 +2273,7 @@ impl VM {
                 // Otherwise receiver must be coerced to an object. This can allocate, so store
                 // closure behind a handle across `to_object` call.
                 let cx = self.cx();
-                handle_scope!(cx, {
+                js_stack_scope!(cx, {
                     let closure = closure.to_stack();
                     let receiver = receiver.to_stack();
                     let receiver_object = to_object(cx, receiver)?;
@@ -2389,7 +2389,7 @@ impl VM {
         &mut self,
         instr: &CallMaybeEvalInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let callee = self.read_register(instr.function());
 
             // Check if the callee is the eval function, if so this is a direct eval
@@ -2420,7 +2420,7 @@ impl VM {
         &mut self,
         instr: &CallMaybeEvalVarargsInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let callee = self.read_register(instr.function());
 
             // Check if the callee is the eval function, if so this is a direct eval
@@ -2466,7 +2466,7 @@ impl VM {
         &mut self,
         _: &DefaultSuperCallInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let super_constructor = must!(self
                 .closure()
                 .to_stack()
@@ -2577,7 +2577,7 @@ impl VM {
         error_on_unresolved: bool,
     ) -> EvalResult<()> {
         let cx = self.cx();
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             let name = self.get_constant(name_constant_index);
             let name = name.as_string().to_stack();
 
@@ -2615,7 +2615,7 @@ impl VM {
         instr: &StoreGlobalInstruction<W>,
     ) -> EvalResult<()> {
         let cx = self.cx();
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             let value = self.read_register_to_handle(instr.value());
 
             let name = self.get_constant(instr.constant_index());
@@ -2689,7 +2689,7 @@ impl VM {
         error_on_unresolved: bool,
     ) -> EvalResult<()> {
         let cx = self.cx();
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             let name = self.get_constant(name_constant_index);
             let name = name.as_string().to_stack();
 
@@ -2718,7 +2718,7 @@ impl VM {
         instr: &StoreDynamicInstruction<W>,
     ) -> EvalResult<()> {
         let cx = self.cx();
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             let value = self.read_register(instr.value()).to_stack();
 
             let name = self.get_constant(instr.name_index());
@@ -2750,7 +2750,7 @@ impl VM {
 
     #[inline]
     fn execute_add<W: Width>(&mut self, instr: &AddInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -2766,7 +2766,7 @@ impl VM {
 
     #[inline]
     fn execute_sub<W: Width>(&mut self, instr: &SubInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -2782,7 +2782,7 @@ impl VM {
 
     #[inline]
     fn execute_mul<W: Width>(&mut self, instr: &MulInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -2798,7 +2798,7 @@ impl VM {
 
     #[inline]
     fn execute_div<W: Width>(&mut self, instr: &DivInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -2814,7 +2814,7 @@ impl VM {
 
     #[inline]
     fn execute_rem<W: Width>(&mut self, instr: &RemInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -2830,7 +2830,7 @@ impl VM {
 
     #[inline]
     fn execute_exp<W: Width>(&mut self, instr: &ExpInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -2846,7 +2846,7 @@ impl VM {
 
     #[inline]
     fn execute_bit_and<W: Width>(&mut self, instr: &BitAndInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -2862,7 +2862,7 @@ impl VM {
 
     #[inline]
     fn execute_bit_or<W: Width>(&mut self, instr: &BitOrInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -2878,7 +2878,7 @@ impl VM {
 
     #[inline]
     fn execute_bit_xor<W: Width>(&mut self, instr: &BitXorInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -2894,7 +2894,7 @@ impl VM {
 
     #[inline]
     fn execute_shift_left<W: Width>(&mut self, instr: &ShiftLeftInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -2913,7 +2913,7 @@ impl VM {
         &mut self,
         instr: &ShiftRightArithmeticInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -2932,7 +2932,7 @@ impl VM {
         &mut self,
         instr: &ShiftRightLogicalInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -2951,7 +2951,7 @@ impl VM {
         &mut self,
         instr: &LooseEqualInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -2970,7 +2970,7 @@ impl VM {
         &mut self,
         instr: &LooseNotEqualInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -2989,7 +2989,7 @@ impl VM {
         &mut self,
         instr: &StrictEqualInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let left_value = self.read_register_to_handle(instr.left());
         let right_value = self.read_register_to_handle(instr.right());
@@ -3008,7 +3008,7 @@ impl VM {
         &mut self,
         instr: &StrictNotEqualInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let left_value = self.read_register_to_handle(instr.left());
         let right_value = self.read_register_to_handle(instr.right());
@@ -3024,7 +3024,7 @@ impl VM {
 
     #[inline]
     fn execute_less_than<W: Width>(&mut self, instr: &LessThanInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -3043,7 +3043,7 @@ impl VM {
         &mut self,
         instr: &LessThanOrEqualInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -3062,7 +3062,7 @@ impl VM {
         &mut self,
         instr: &GreaterThanInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -3081,7 +3081,7 @@ impl VM {
         &mut self,
         instr: &GreaterThanOrEqualInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let left_value = self.read_register_to_handle(instr.left());
             let right_value = self.read_register_to_handle(instr.right());
             let dest = instr.dest();
@@ -3097,7 +3097,7 @@ impl VM {
 
     #[inline]
     fn execute_neg<W: Width>(&mut self, instr: &NegInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let value = self.read_register_to_handle(instr.value());
             let dest = instr.dest();
 
@@ -3175,7 +3175,7 @@ impl VM {
 
     #[inline]
     fn execute_bit_not<W: Width>(&mut self, instr: &BitNotInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let value = self.read_register_to_handle(instr.value());
             let dest = instr.dest();
 
@@ -3190,7 +3190,7 @@ impl VM {
 
     #[inline]
     fn execute_typeof<W: Width>(&mut self, instr: &TypeOfInstruction<W>) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let value = self.read_register_to_handle(instr.value());
         let dest = instr.dest();
@@ -3205,7 +3205,7 @@ impl VM {
 
     #[inline]
     fn execute_in<W: Width>(&mut self, instr: &InInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let object = self.read_register_to_handle(instr.object());
             let key = self.read_register_to_handle(instr.key());
             let dest = instr.dest();
@@ -3224,7 +3224,7 @@ impl VM {
         &mut self,
         instr: &InstanceOfInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let object = self.read_register_to_handle(instr.object());
             let constructor = self.read_register_to_handle(instr.constructor());
             let dest = instr.dest();
@@ -3240,7 +3240,7 @@ impl VM {
 
     #[inline]
     fn execute_to_number<W: Width>(&mut self, instr: &ToNumberInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let value = self.read_register_to_handle(instr.value());
             let dest = instr.dest();
 
@@ -3255,7 +3255,7 @@ impl VM {
 
     #[inline]
     fn execute_to_numeric<W: Width>(&mut self, instr: &ToNumericInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let value = self.read_register_to_handle(instr.value());
             let dest = instr.dest();
 
@@ -3270,7 +3270,7 @@ impl VM {
 
     #[inline]
     fn execute_to_string<W: Width>(&mut self, instr: &ToStringInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let value = self.read_register_to_handle(instr.value());
             let dest = instr.dest();
 
@@ -3288,7 +3288,7 @@ impl VM {
         &mut self,
         instr: &ToPropertyKeyInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let value = self.read_register_to_handle(instr.value());
             let dest = instr.dest();
 
@@ -3303,7 +3303,7 @@ impl VM {
 
     #[inline]
     fn execute_to_object<W: Width>(&mut self, instr: &ToObjectInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let value = self.read_register_to_handle(instr.value());
             let dest = instr.dest();
 
@@ -3321,7 +3321,7 @@ impl VM {
         &mut self,
         instr: &NewClosureInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let func = self.get_constant(instr.function_index());
         let func = func.to_stack().cast::<BytecodeFunction>();
@@ -3342,7 +3342,7 @@ impl VM {
         &mut self,
         instr: &NewAsyncClosureInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let func = self.get_constant(instr.function_index());
         let func = func.to_stack().cast::<BytecodeFunction>();
@@ -3364,7 +3364,7 @@ impl VM {
         &mut self,
         instr: &NewGeneratorInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let func = self.get_constant(instr.function_index());
         let func = func.to_stack().cast::<BytecodeFunction>();
@@ -3393,7 +3393,7 @@ impl VM {
         &mut self,
         instr: &NewAsyncGeneratorInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let func = self.get_constant(instr.function_index());
         let func = func.to_stack().cast::<BytecodeFunction>();
@@ -3416,7 +3416,7 @@ impl VM {
 
     #[inline]
     fn execute_new_object<W: Width>(&mut self, instr: &NewObjectInstruction<W>) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let dest = instr.dest();
 
@@ -3430,7 +3430,7 @@ impl VM {
 
     #[inline]
     fn execute_new_array<W: Width>(&mut self, instr: &NewArrayInstruction<W>) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let dest = instr.dest();
 
@@ -3444,7 +3444,7 @@ impl VM {
 
     #[inline]
     fn execute_new_regexp<W: Width>(&mut self, instr: &NewRegExpInstruction<W>) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let compiled_regexp = self.get_constant(instr.regexp_index());
         let compiled_regexp = compiled_regexp.to_stack().cast::<CompiledRegExpObject>();
@@ -3464,7 +3464,7 @@ impl VM {
         &mut self,
         instr: &NewMappedArgumentsInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let dest = instr.dest();
 
@@ -3493,7 +3493,7 @@ impl VM {
         &mut self,
         instr: &NewUnmappedArgumentsInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let dest = instr.dest();
 
@@ -3515,7 +3515,7 @@ impl VM {
 
     #[inline]
     fn execute_new_class<W: Width>(&mut self, instr: &NewClassInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let dest = instr.dest();
 
             let class_names = self
@@ -3561,7 +3561,7 @@ impl VM {
         &mut self,
         instr: &NewAccessorInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let dest = instr.dest();
         let getter = self.read_register_to_handle(instr.getter()).as_object();
@@ -3580,7 +3580,7 @@ impl VM {
         &mut self,
         instr: &NewPrivateSymbolInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let dest = instr.dest();
         let name = self.get_constant(instr.name_index()).as_string().to_stack();
@@ -3598,7 +3598,7 @@ impl VM {
         &mut self,
         instr: &GetPropertyInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let object = self.read_register_to_handle(instr.object());
             let key = self.read_register_to_handle(instr.key());
             let dest = instr.dest();
@@ -3628,7 +3628,7 @@ impl VM {
         &mut self,
         instr: &SetPropertyInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let object = self.read_register_to_handle(instr.object());
             let key = self.read_register_to_handle(instr.key());
             let value = self.read_register_to_handle(instr.value());
@@ -3656,7 +3656,7 @@ impl VM {
         &mut self,
         instr: &DefinePropertyInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let object = self.read_register_to_handle(instr.object());
             let key = self.read_register_to_handle(instr.key());
             let value = self.read_register_to_handle(instr.value());
@@ -3710,7 +3710,7 @@ impl VM {
         &mut self,
         instr: &GetNamedPropertyInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let object = self.read_register_to_handle(instr.object());
 
             let key = self.get_constant(instr.name_constant_index());
@@ -3745,7 +3745,7 @@ impl VM {
         &mut self,
         instr: &SetNamedPropertyInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let object = self.read_register_to_handle(instr.object());
 
             let key = self.get_constant(instr.name_constant_index());
@@ -3779,7 +3779,7 @@ impl VM {
         &mut self,
         instr: &DefineNamedPropertyInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let object = self.read_register_to_handle(instr.object());
 
             let key = self.get_constant(instr.name_constant_index());
@@ -3802,7 +3802,7 @@ impl VM {
         &mut self,
         instr: &GetSuperPropertyInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let home_object = self
                 .read_register_to_handle(instr.home_object())
                 .as_object();
@@ -3830,7 +3830,7 @@ impl VM {
         &mut self,
         instr: &GetNamedSuperPropertyInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let home_object = self
                 .read_register_to_handle(instr.home_object())
                 .as_object();
@@ -3863,7 +3863,7 @@ impl VM {
         &mut self,
         instr: &SetSuperPropertyInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let home_object = self
                 .read_register_to_handle(instr.home_object())
                 .as_object();
@@ -3897,7 +3897,7 @@ impl VM {
         &mut self,
         instr: &DeletePropertyInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let object = self.read_register_to_handle(instr.object());
             let key = self.read_register_to_handle(instr.key());
             let dest = instr.dest();
@@ -3918,7 +3918,7 @@ impl VM {
         &mut self,
         instr: &DeleteBindingInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let mut scope = self.scope().to_stack();
             let name = self
                 .get_constant(instr.name_constant_index())
@@ -3940,7 +3940,7 @@ impl VM {
         &mut self,
         instr: &GetPrivatePropertyInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let object = self.read_register_to_handle(instr.object());
             let key = self.read_register_to_handle(instr.key()).as_symbol();
             let dest = instr.dest();
@@ -3960,7 +3960,7 @@ impl VM {
         &mut self,
         instr: &SetPrivatePropertyInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let object = self.read_register_to_handle(instr.object());
             let key = self.read_register_to_handle(instr.key()).as_symbol();
             let value = self.read_register_to_handle(instr.value());
@@ -3978,7 +3978,7 @@ impl VM {
         &mut self,
         instr: &DefinePrivatePropertyInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let mut object = self.read_register_to_handle(instr.object()).as_object();
             let key = self.read_register_to_handle(instr.key()).as_symbol();
             let value = self.read_register_to_handle(instr.value());
@@ -4010,7 +4010,7 @@ impl VM {
         &mut self,
         instr: &SetArrayPropertyInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let array = self
             .read_register_to_handle(instr.array())
@@ -4031,7 +4031,7 @@ impl VM {
         &mut self,
         instr: &SetPrototypeOfInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let mut object = self.read_register_to_handle(instr.object()).as_object();
         let prototype = self.read_register_to_handle(instr.prototype());
@@ -4051,7 +4051,7 @@ impl VM {
         &mut self,
         instr: &CopyDataPropertiesInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let dest = self.read_register_to_handle(instr.dest()).as_object();
             let source = self.read_register_to_handle(instr.source());
             let excluded_property_keys = self
@@ -4069,7 +4069,7 @@ impl VM {
 
     #[inline]
     fn execute_get_method<W: Width>(&mut self, instr: &GetMethodInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let dest = instr.dest();
             let object = self.read_register_to_handle(instr.object());
             let key = self.get_constant(instr.name()).as_string().to_stack();
@@ -4095,7 +4095,7 @@ impl VM {
         &mut self,
         instr: &PushLexicalScopeInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let scope = self.scope().to_stack();
         let scope_names = self
@@ -4117,7 +4117,7 @@ impl VM {
         &mut self,
         instr: &PushFunctionScopeInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let scope = self.scope().to_stack();
         let scope_names = self
@@ -4139,7 +4139,7 @@ impl VM {
         &mut self,
         instr: &PushWithScopeInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let object = self.read_register_to_handle(instr.object());
 
             let scope = self.scope().to_stack();
@@ -4169,7 +4169,7 @@ impl VM {
 
     #[inline]
     fn execute_dup_scope<W: Width>(&mut self, _: &DupScopeInstruction<W>) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let scope = self.scope().to_stack();
 
@@ -4298,7 +4298,7 @@ impl VM {
         &mut self,
         instr: &RestParameterInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let dest = instr.dest();
 
@@ -4339,7 +4339,7 @@ impl VM {
         &mut self,
         instr: &GetSuperConstructorInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let derived_constructor = self
             .read_register_to_handle(instr.derived_constructor())
@@ -4455,7 +4455,7 @@ impl VM {
         &mut self,
         instr: &NewForInIteratorInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let object = self.read_register_to_handle(instr.object());
             let dest = instr.dest();
 
@@ -4471,7 +4471,7 @@ impl VM {
 
     #[inline]
     fn execute_for_in_next<W: Width>(&mut self, instr: &ForInNextInstruction<W>) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let mut iterator = self
                 .read_register_to_handle(instr.iterator())
                 .cast::<ForInIterator>();
@@ -4491,7 +4491,7 @@ impl VM {
         &mut self,
         instr: &GetIteratorInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let iterable = self.read_register_to_handle(instr.iterable());
             let iterator_dest = instr.iterator();
             let next_method_dest = instr.next_method();
@@ -4511,7 +4511,7 @@ impl VM {
         &mut self,
         instr: &GetAsyncIteratorInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let iterable = self.read_register_to_handle(instr.iterable());
             let iterator_dest = instr.iterator();
             let next_method_dest = instr.next_method();
@@ -4531,7 +4531,7 @@ impl VM {
         &mut self,
         instr: &IteratorNextInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let next_method = self.read_register_to_handle(instr.next_method());
             let iterator = self.read_register_to_handle(instr.iterator());
             let value_dest = instr.value();
@@ -4550,7 +4550,7 @@ impl VM {
         &mut self,
         instr: &IteratorUnpackResultInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let iterator_result = self.read_register_to_handle(instr.iterator_result());
             let value_dest = instr.value();
             let is_done_dest = instr.is_done();
@@ -4594,7 +4594,7 @@ impl VM {
         &mut self,
         instr: &IteratorCloseInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let iterator = self.read_register_to_handle(instr.iterator());
             let return_method = get_method(self.cx(), iterator, self.cx().names.return_())?;
 
@@ -4617,7 +4617,7 @@ impl VM {
         &mut self,
         instr: &AsyncIteratorCloseStartInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let return_result_dest = instr.return_result();
             let has_return_method = instr.has_return_method();
             let iterator = self.read_register_to_handle(instr.iterator());
@@ -4672,7 +4672,7 @@ impl VM {
         &mut self,
         instr: &ResolvePromiseInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let promise = self.read_register_to_handle(instr.promise());
         let value = self.read_register_to_handle(instr.value());
@@ -4687,7 +4687,7 @@ impl VM {
 
     #[inline]
     fn execute_reject_promise<W: Width>(&mut self, instr: &RejectPromiseInstruction<W>) {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let promise = self.read_register(instr.promise());
         let value = self.read_register(instr.value());
@@ -4703,7 +4703,7 @@ impl VM {
         &mut self,
         instr: &ImportMetaInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope_guard!(self.cx());
+        js_stack_scope_guard!(self.cx());
 
         let dest = instr.dest();
 
@@ -4728,7 +4728,7 @@ impl VM {
         &mut self,
         instr: &DynamicImportInstruction<W>,
     ) -> EvalResult<()> {
-        handle_scope!(self.cx(), {
+        js_stack_scope!(self.cx(), {
             let dest = instr.dest();
             let specifier = self.read_register_to_handle(instr.specifier());
             let options = self.read_register_to_handle(instr.options());

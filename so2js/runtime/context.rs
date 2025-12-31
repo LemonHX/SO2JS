@@ -17,7 +17,7 @@ use crate::{
         options::Options,
         wtf_8::{Wtf8Str, Wtf8String},
     },
-    eval_err, handle_scope,
+    eval_err, js_stack_scope,
     parser::{analyze::analyze, parse_module, parse_script, source::Source, ParseContext},
     runtime::{alloc_error::AllocResult, annex_b::init_annex_b_methods},
 };
@@ -207,7 +207,7 @@ impl Context {
     fn init_heap_allocated_context_fields(&mut self) -> AllocResult<()> {
         let mut cx = *self;
 
-        handle_scope!(cx, {
+        js_stack_scope!(cx, {
             // Initialize all uninitialized fields
             cx.base_descriptors = BaseDescriptors::new(cx)?;
             InternedStrings::init(cx)?;

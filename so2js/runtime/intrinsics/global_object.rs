@@ -3,7 +3,7 @@ use crate::{
         unicode::{encode_utf8_codepoint, get_hex_value, is_continuation_byte},
         wtf_8::Wtf8String,
     },
-    handle_scope, handle_scope_guard,
+    js_stack_scope, js_stack_scope_guard,
     runtime::{
         abstract_operations::define_property_or_throw,
         alloc_error::AllocResult,
@@ -27,7 +27,7 @@ use super::intrinsics::Intrinsic;
 
 /// SetDefaultGlobalBindings (https://tc39.es/ecma262/#sec-setdefaultglobalbindings)
 pub fn set_default_global_bindings(cx: Context, realm: StackRoot<Realm>) -> EvalResult<()> {
-    handle_scope!(cx, {
+    js_stack_scope!(cx, {
         macro_rules! value_prop {
             ($name:expr, $value:expr, $is_writable:expr, $is_enumerable:expr, $is_configurable:expr) => {{
                 handle_scope_guard!(cx);

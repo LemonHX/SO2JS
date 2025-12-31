@@ -3,7 +3,7 @@ use super::{
     source_text_module::{ImportEntry, ModuleEntry, SourceTextModule},
 };
 use crate::{
-    handle_scope,
+    js_stack_scope,
     runtime::{
         boxed_value::BoxedValue,
         error::syntax_error,
@@ -118,7 +118,7 @@ impl GraphLinker {
 
         // Can isolate InitializeEnvironment in a separate handle scope since handles cannot be
         // stored anywhere else and escape.
-        handle_scope!(cx, initialize_environment(cx, module))?;
+        js_stack_scope!(cx, initialize_environment(cx, module))?;
 
         debug_assert!(module.dfs_ancestor_index() <= module.dfs_index());
 
@@ -211,7 +211,7 @@ fn initialize_environment(cx: Context, module: StackRoot<SourceTextModule>) -> E
 }
 
 pub fn link(cx: Context, module: StackRoot<SourceTextModule>) -> EvalResult<()> {
-    handle_scope!(cx, {
+    js_stack_scope!(cx, {
         let mut linker = GraphLinker::new();
         linker.link(cx, module)
     })
