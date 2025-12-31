@@ -71,7 +71,7 @@ impl Realm {
             set_uninit!(realm.lexical_names, HeapPtr::uninit());
             set_uninit!(realm.empty_function, HeapPtr::uninit());
 
-            let realm = realm.to_stack();
+            let realm = realm.to_stack(cx);
 
             // Global object and scope are created here
             Intrinsics::initialize(cx, realm)?;
@@ -91,8 +91,8 @@ impl Realm {
     }
 
     #[inline]
-    pub fn global_object(&self) -> StackRoot<ObjectValue> {
-        self.global_object_ptr().to_stack()
+    pub fn global_object(&self, cx: Context) -> StackRoot<ObjectValue> {
+        self.global_object_ptr().to_stack(cx)
     }
 
     #[inline]
@@ -101,8 +101,8 @@ impl Realm {
     }
 
     #[inline]
-    pub fn default_global_scope(&self) -> StackRoot<Scope> {
-        self.global_scopes.get(0).to_stack()
+    pub fn default_global_scope(&self, cx: Context) -> StackRoot<Scope> {
+        self.global_scopes.get(0).to_stack(cx)
     }
 
     #[inline]
@@ -366,7 +366,7 @@ impl GlobalScopes {
             return Ok(old_global_scopes);
         }
 
-        let old_global_scopes = old_global_scopes.to_stack();
+        let old_global_scopes = old_global_scopes.to_stack(cx);
         let mut new_global_scopes = GlobalScopes::new(cx, old_capacity * 2)?;
         new_global_scopes.len = old_len;
 

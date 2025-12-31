@@ -57,17 +57,17 @@ impl RegExpStringIterator {
         set_uninit!(object.is_unicode, is_unicode);
         set_uninit!(object.is_done, false);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     #[inline]
-    fn regexp_object(&self) -> StackRoot<ObjectValue> {
-        self.regexp_object.to_stack()
+    fn regexp_object(&self, cx: Context) -> StackRoot<ObjectValue> {
+        self.regexp_object.to_stack(cx)
     }
 
     #[inline]
-    fn target_string(&self) -> StackRoot<StringValue> {
-        self.target_string.to_stack()
+    fn target_string(&self, cx: Context) -> StackRoot<StringValue> {
+        self.target_string.to_stack(cx)
     }
 
     cast_from_value_fn!(RegExpStringIterator, "RegExp String Iterator");
@@ -103,8 +103,8 @@ impl RegExpStringIteratorPrototype {
     ) -> EvalResult<StackRoot<Value>> {
         let mut regexp_iterator = RegExpStringIterator::cast_from_value(cx, this_value)?;
 
-        let regexp_object = regexp_iterator.regexp_object();
-        let target_string = regexp_iterator.target_string();
+        let regexp_object = regexp_iterator.regexp_object(cx);
+        let target_string = regexp_iterator.target_string(cx);
 
         // Check if we have already marked the iterator as done
         if regexp_iterator.is_done {
@@ -137,9 +137,13 @@ impl RegExpStringIteratorPrototype {
             let last_index = get(cx, regexp_object, cx.names.last_index())?;
             let last_index = to_length(cx, last_index)?;
 
-            let next_index =
-                advance_u64_string_index(target_string, last_index, regexp_iterator.is_unicode)?;
-            let next_index_value = Value::from(next_index).to_stack_with(cx);
+            let next_index = advance_u64_string_index(
+                cx,
+                target_string,
+                last_index,
+                regexp_iterator.is_unicode,
+            )?;
+            let next_index_value = Value::from(next_index).to_stack(cx);
             set(
                 cx,
                 regexp_object,

@@ -20,7 +20,7 @@ use crate::{
         realm::Realm,
         string_value::{FlatString, StringValue},
         type_utilities::{is_callable, is_callable_object, to_integer_or_infinity},
-        Context, StackRoot, HeapPtr, Value,
+        Context, HeapPtr, StackRoot, Value,
     },
 };
 use alloc::string::ToString;
@@ -38,7 +38,7 @@ impl FunctionPrototype {
             object_create_with_optional_proto::<Closure>(cx, HeapItemKind::Closure, None)?;
         object.init_extra_fields(HeapPtr::uninit(), HeapPtr::uninit());
 
-        Ok(object.to_stack().into())
+        Ok(object.to_stack(cx).into())
     }
 
     /// Properties of the Function Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object)
@@ -64,7 +64,7 @@ impl FunctionPrototype {
             /* is_constructor */ false,
             /* name */ None,
         )?;
-        let scope = realm.default_global_scope();
+        let scope = realm.default_global_scope(cx);
 
         object
             .cast::<Closure>()
@@ -204,7 +204,7 @@ impl FunctionPrototype {
 
         let this_object = this_value.as_object();
         if let Some(closure) = this_object.as_closure() {
-            let function = closure.function();
+            let function = closure.function(cx);
 
             // First check for if the closure is a bound function
             if BoundFunctionObject::is_bound_function(cx, *this_object) {
@@ -214,7 +214,7 @@ impl FunctionPrototype {
             // Builtin functions have special formatting using the function name
             if function.rust_runtime_function_id().is_some() {
                 let mut string_parts = vec![cx.alloc_string("function ")?.as_string()];
-                if let Some(name) = function.name() {
+                if let Some(name) = function.name(cx) {
                     string_parts.push(name);
                 }
                 string_parts.push(cx.alloc_string("() { [native code] }")?.as_string());
@@ -233,7 +233,7 @@ impl FunctionPrototype {
 
             let func_string = FlatString::from_wtf8(cx, &source_slice)?
                 .as_string()
-                .to_stack();
+                .to_stack(cx);
 
             return Ok(func_string.as_value());
         }

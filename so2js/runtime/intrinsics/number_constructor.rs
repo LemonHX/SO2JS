@@ -46,7 +46,7 @@ impl NumberObject {
 
         set_uninit!(object.number_data, number_data);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn new_from_constructor(
@@ -63,7 +63,7 @@ impl NumberObject {
 
         set_uninit!(object.number_data, number_data);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn new_with_proto(
@@ -76,7 +76,7 @@ impl NumberObject {
 
         set_uninit!(object.number_data, number_data);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn number_data(&self) -> f64 {
@@ -172,7 +172,7 @@ impl NumberConstructor {
         };
 
         match cx.current_new_target() {
-            None => Ok(Value::from(number_value).to_stack_with(cx)),
+            None => Ok(Value::from(number_value).to_stack(cx)),
             Some(new_target) => {
                 Ok(NumberObject::new_from_constructor(cx, new_target, number_value)?.as_value())
             }

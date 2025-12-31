@@ -121,7 +121,7 @@ impl PromiseObject {
             }
         );
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn is_pending(&self) -> bool {
@@ -303,7 +303,7 @@ impl StackRoot<PromiseObject> {
         match &mut self.state {
             // Prepend reaction onto the current linked list of reactions.
             PromiseState::Pending { reactions, .. } => {
-                let prev_reactions = reactions.map(|r| r.to_stack());
+                let prev_reactions = reactions.map(|r| r.to_stack(cx));
                 let new_reactions = Some(PromiseReaction::new_await_resume(
                     cx,
                     suspended_generator,
@@ -341,7 +341,7 @@ impl StackRoot<PromiseObject> {
         match &mut self.state {
             // Prepend reaction onto the current linked list of reactions.
             PromiseState::Pending { reactions, .. } => {
-                let prev_reactions = reactions.map(|r| r.to_stack());
+                let prev_reactions = reactions.map(|r| r.to_stack(cx));
                 let new_reactions = Some(PromiseReaction::new_then(
                     cx,
                     fulfill_handler,
@@ -408,7 +408,7 @@ pub fn coerce_to_ordinary_promise(
         }
     }
 
-    let promise = PromiseObject::new_pending(cx)?.to_stack();
+    let promise = PromiseObject::new_pending(cx)?.to_stack(cx);
     resolve(cx, promise, value)?;
 
     Ok(promise)
@@ -433,9 +433,9 @@ pub fn promise_resolve(
 
     // Create a new promise and immediately resolve it
     let capability = PromiseCapability::new(cx, constructor)?;
-    call_object(cx, capability.resolve(), cx.undefined(), &[result])?;
+    call_object(cx, capability.resolve(cx), cx.undefined(), &[result])?;
 
-    Ok(capability.promise())
+    Ok(capability.promise(cx))
 }
 
 fn enqueue_promise_then_reaction_task(
@@ -448,7 +448,7 @@ fn enqueue_promise_then_reaction_task(
     // Get the realm of the handler function, defaulting to the current realm if getting the
     // realm fails (i.e. the handler function is a revoked proxy).
     let realm = match handler {
-        Some(handler) => match get_function_realm_no_error(cx, handler.to_stack()) {
+        Some(handler) => match get_function_realm_no_error(cx, handler.to_stack(cx)) {
             Some(realm) => Some(realm),
             None => Some(cx.current_realm_ptr()),
         },
@@ -543,7 +543,7 @@ impl PromiseCapability {
         set_uninit!(capability.resolve, Value::undefined());
         set_uninit!(capability.reject, Value::undefined());
 
-        let mut capability = capability.to_stack();
+        let mut capability = capability.to_stack(cx);
 
         // Create the executor function and attach the capability object to it
         let mut executor = BuiltinFunction::create(
@@ -565,9 +565,9 @@ impl PromiseCapability {
         // reject fields of the capability.
         let promise = construct(cx, constructor, &[executor.into()], None)?;
 
-        if !is_callable(capability.resolve.to_stack_with(cx)) {
+        if !is_callable(capability.resolve.to_stack(cx)) {
             return type_error(cx, "resolve must be callable");
-        } else if !is_callable(capability.reject.to_stack_with(cx)) {
+        } else if !is_callable(capability.reject.to_stack(cx)) {
             return type_error(cx, "reject must be callable");
         }
 
@@ -577,16 +577,16 @@ impl PromiseCapability {
         Ok(capability)
     }
 
-    pub fn promise(&self) -> StackRoot<ObjectValue> {
-        self.promise.unwrap().to_stack()
+    pub fn promise(&self, cx: Context) -> StackRoot<ObjectValue> {
+        self.promise.unwrap().to_stack(cx)
     }
 
-    pub fn resolve(&self) -> StackRoot<ObjectValue> {
-        self.resolve.as_object().to_stack()
+    pub fn resolve(&self, cx: Context) -> StackRoot<ObjectValue> {
+        self.resolve.as_object().to_stack(cx)
     }
 
-    pub fn reject(&self) -> StackRoot<ObjectValue> {
-        self.reject.as_object().to_stack()
+    pub fn reject(&self, cx: Context) -> StackRoot<ObjectValue> {
+        self.reject.as_object().to_stack(cx)
     }
 
     pub fn executor(

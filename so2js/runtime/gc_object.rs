@@ -6,8 +6,8 @@ use crate::{
 };
 
 use super::{
-    eval_result::EvalResult, gc::Heap, intrinsics::intrinsics::Intrinsic,
-    object_value::ObjectValue, realm::Realm, Context, StackRoot, Value,
+    eval_result::EvalResult, intrinsics::intrinsics::Intrinsic, object_value::ObjectValue,
+    realm::Realm, Context, StackRoot, Value,
 };
 
 pub struct GcObject;
@@ -22,7 +22,7 @@ impl GcObject {
 
         object.intrinsic_func(cx, cx.names.run(), Self::run, 0, realm)?;
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     /// Install the GC object on the realm's global object.
@@ -42,11 +42,11 @@ impl GcObject {
     }
 
     pub fn run(
-        cx: Context,
+        mut cx: Context,
         _: StackRoot<Value>,
         _: &[StackRoot<Value>],
     ) -> EvalResult<StackRoot<Value>> {
-        Heap::run_gc(cx);
+        cx.run_gc();
         Ok(cx.undefined())
     }
 }

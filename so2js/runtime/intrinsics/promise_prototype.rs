@@ -306,7 +306,7 @@ pub fn perform_promise_then(
     promise.add_then_reaction(cx, fulfill_handler, reject_handler, capability)?;
 
     if let Some(capability) = capability {
-        Ok(capability.promise().into())
+        Ok(capability.promise(cx).into())
     } else {
         Ok(cx.undefined())
     }

@@ -169,7 +169,7 @@ pub fn create_stack_trace(
 
                 // Save the first source position that is found
                 if first_source_file_line_col.is_none() {
-                    let source_file = func.source_file_ptr().unwrap().to_stack();
+                    let source_file = func.source_file_ptr().unwrap().to_stack(cx);
                     first_source_file_line_col = Some((source_file, line, column));
                 }
             }

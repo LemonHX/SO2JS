@@ -73,11 +73,11 @@ impl ArrayIterator {
         set_uninit!(object.current_index, 0);
         set_uninit!(object.get_length, get_length);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
-    fn array(&self) -> StackRoot<ObjectValue> {
-        self.array.to_stack()
+    fn array(&self, cx: Context) -> StackRoot<ObjectValue> {
+        self.array.to_stack(cx)
     }
 
     fn get_typed_array_length(cx: Context, array: StackRoot<ObjectValue>) -> EvalResult<u64> {
@@ -128,7 +128,7 @@ impl ArrayIteratorPrototype {
         _: &[StackRoot<Value>],
     ) -> EvalResult<StackRoot<Value>> {
         let mut array_iterator = ArrayIterator::cast_from_value(cx, this_value)?;
-        let array = array_iterator.array();
+        let array = array_iterator.array(cx);
 
         // Early return if iterator is already done, before potential failure during `get_length`
         if array_iterator.is_done {
@@ -148,7 +148,7 @@ impl ArrayIteratorPrototype {
 
         match array_iterator.kind {
             ArrayIteratorKind::Key => {
-                let key = Value::from(current_index).to_stack_with(cx);
+                let key = Value::from(current_index).to_stack(cx);
                 Ok(create_iter_result_object(cx, key, false)?)
             }
             ArrayIteratorKind::Value => {
@@ -157,7 +157,7 @@ impl ArrayIteratorPrototype {
                 Ok(create_iter_result_object(cx, value, false)?)
             }
             ArrayIteratorKind::KeyAndValue => {
-                let key = Value::from(current_index).to_stack_with(cx);
+                let key = Value::from(current_index).to_stack(cx);
                 let property_key = PropertyKey::from_u64_handle(cx, current_index)?;
                 let value = array.get(cx, property_key, array.into())?;
 

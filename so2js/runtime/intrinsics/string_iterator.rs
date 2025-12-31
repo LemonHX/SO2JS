@@ -38,7 +38,7 @@ impl StringIterator {
 
         set_uninit!(object.iter, string.iter_code_points_safe());
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     cast_from_value_fn!(StringIterator, "String Iterator");

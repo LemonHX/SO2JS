@@ -1,6 +1,6 @@
+use alloc::format;
 use alloc::vec;
 use alloc::vec::Vec;
-use alloc::format;
 use hashbrown::HashSet;
 
 use crate::{extend_object, must, runtime::alloc_error::AllocResult, set_uninit};
@@ -11,7 +11,7 @@ use super::{
     },
     array_object::create_array_from_list,
     error::type_error,
-    gc::{StackRoot, HeapItem, HeapPtr, GcVisitorExt},
+    gc::{GcVisitorExt, HeapItem, HeapPtr, StackRoot},
     get,
     heap_item_descriptor::HeapItemKind,
     intrinsics::intrinsics::Intrinsic,
@@ -55,17 +55,17 @@ impl ProxyObject {
         set_uninit!(object.is_callable, is_callable);
         set_uninit!(object.is_constructor, is_constructor);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     #[inline]
-    pub fn handler(&self) -> Option<StackRoot<ObjectValue>> {
-        self.proxy_handler.map(|o| o.to_stack())
+    pub fn handler(&self, cx: Context) -> Option<StackRoot<ObjectValue>> {
+        self.proxy_handler.map(|o| o.to_stack(cx))
     }
 
     #[inline]
-    pub fn target(&self) -> Option<StackRoot<ObjectValue>> {
-        self.proxy_target.map(|o| o.to_stack())
+    pub fn target(&self, cx: Context) -> Option<StackRoot<ObjectValue>> {
+        self.proxy_target.map(|o| o.to_stack(cx))
     }
 
     #[inline]
@@ -99,8 +99,8 @@ impl VirtualObject for StackRoot<ProxyObject> {
             return type_error(cx, "operation attempted on revoked proxy");
         }
 
-        let handler = self.handler().unwrap().into();
-        let target = self.target().unwrap();
+        let handler = self.handler(cx).unwrap().into();
+        let target = self.target(cx).unwrap();
 
         let trap = get_method(cx, handler, cx.names.get_own_property_descriptor())?;
 
@@ -122,13 +122,13 @@ impl VirtualObject for StackRoot<ProxyObject> {
                     cx,
                     &format!(
                         "proxy can't report a non-configurable own property '{}' as non-existent",
-                        key.format()?
+                        key.format(cx)?
                     ),
                 );
             }
 
             if !is_extensible_(cx, target)? {
-                return type_error(cx, &format!("proxy can't report an existing own property '{}' as non-existent on a non-extensible object", key.format()?));
+                return type_error(cx, &format!("proxy can't report an existing own property '{}' as non-existent on a non-extensible object", key.format(cx)?));
             }
 
             return Ok(None);
@@ -150,7 +150,7 @@ impl VirtualObject for StackRoot<ProxyObject> {
                 cx,
                 &format!(
                     "proxy can't report an incompatible property descriptor for '{}'",
-                    key.format()?
+                    key.format(cx)?
                 ),
             );
         }
@@ -162,10 +162,10 @@ impl VirtualObject for StackRoot<ProxyObject> {
                 ..
             }) = target_desc
             {
-                return type_error(cx, &format!("proxy can't report existing configurable property '{}' as non-configurable", key.format()?));
+                return type_error(cx, &format!("proxy can't report existing configurable property '{}' as non-configurable", key.format(cx)?));
             } else if let Some(false) = result_desc.is_writable {
                 if let Some(true) = target_desc.unwrap().is_writable {
-                    return type_error(cx, &format!("proxy can't report a non-configurable, non-writable property '{}' as writable", key.format()?));
+                    return type_error(cx, &format!("proxy can't report a non-configurable, non-writable property '{}' as writable", key.format(cx)?));
                 }
             }
         }
@@ -184,8 +184,8 @@ impl VirtualObject for StackRoot<ProxyObject> {
             return type_error(cx, "operation attempted on revoked proxy");
         }
 
-        let handler = self.handler().unwrap().into();
-        let mut target = self.target().unwrap();
+        let handler = self.handler(cx).unwrap().into();
+        let mut target = self.target(cx).unwrap();
 
         let trap = get_method(cx, handler, cx.names.define_property())?;
 
@@ -215,7 +215,7 @@ impl VirtualObject for StackRoot<ProxyObject> {
                     cx,
                     &format!(
                         "proxy can't define a new property '{}' on a non-extensible object",
-                        key.format()?
+                        key.format(cx)?
                     ),
                 );
             } else if is_setting_non_configurable {
@@ -223,7 +223,7 @@ impl VirtualObject for StackRoot<ProxyObject> {
                     cx,
                     &format!(
                         "proxy can't define a non-existent property '{}' as non-configurable",
-                        key.format()?
+                        key.format(cx)?
                     ),
                 );
             }
@@ -238,14 +238,14 @@ impl VirtualObject for StackRoot<ProxyObject> {
                     cx,
                     &format!(
                         "proxy can't report an incompatible property descriptor for '{}'",
-                        key.format()?
+                        key.format(cx)?
                     ),
                 );
             }
 
             if is_setting_non_configurable {
                 if let Some(true) = target_desc.is_configurable {
-                    return type_error(cx, &format!("proxy can't define an existing configurable property '{}' as non-configurable", key.format()?));
+                    return type_error(cx, &format!("proxy can't define an existing configurable property '{}' as non-configurable", key.format(cx)?));
                 }
             }
 
@@ -253,7 +253,7 @@ impl VirtualObject for StackRoot<ProxyObject> {
                 if let Some(false) = target_desc.is_configurable {
                     if let Some(true) = target_desc.is_writable {
                         if let Some(false) = desc.is_writable {
-                            return type_error(cx, &format!("proxy can't define an existing non-configurable writable property '{}' as non-writable", key.format()?));
+                            return type_error(cx, &format!("proxy can't define an existing non-configurable writable property '{}' as non-writable", key.format(cx)?));
                         }
                     }
                 }
@@ -269,8 +269,8 @@ impl VirtualObject for StackRoot<ProxyObject> {
             return type_error(cx, "operation attempted on revoked proxy");
         }
 
-        let handler = self.handler().unwrap().into();
-        let target = self.target().unwrap();
+        let handler = self.handler(cx).unwrap().into();
+        let target = self.target(cx).unwrap();
 
         let trap = get_method(cx, handler, cx.names.has())?;
 
@@ -289,13 +289,13 @@ impl VirtualObject for StackRoot<ProxyObject> {
                     return type_error(
                         cx,
                         &format!(
-                            "proxy can't report a non-configurable own property '{}' as non-existent", key.format()?
+                            "proxy can't report a non-configurable own property '{}' as non-existent", key.format(cx)?
                         ),
                     );
                 }
 
                 if !is_extensible_(cx, target)? {
-                    return type_error(cx, &format!("proxy can't report an existing own property '{}' as non-existent on a non-extensible object", key.format()?));
+                    return type_error(cx, &format!("proxy can't report an existing own property '{}' as non-existent on a non-extensible object", key.format(cx)?));
                 }
             }
         }
@@ -314,8 +314,8 @@ impl VirtualObject for StackRoot<ProxyObject> {
             return type_error(cx, "operation attempted on revoked proxy");
         }
 
-        let handler = self.handler().unwrap().into();
-        let target = self.target().unwrap();
+        let handler = self.handler(cx).unwrap().into();
+        let target = self.target(cx).unwrap();
 
         let trap = get_method(cx, handler, cx.names.get())?;
 
@@ -332,14 +332,14 @@ impl VirtualObject for StackRoot<ProxyObject> {
                 if target_desc.is_data_descriptor() {
                     if let Some(false) = target_desc.is_writable {
                         if !same_value(trap_result, target_desc.value.unwrap())? {
-                            return type_error(cx, &format!("proxy must report the same value for the non-writable, non-configurable property '{}'", key.format()?));
+                            return type_error(cx, &format!("proxy must report the same value for the non-writable, non-configurable property '{}'", key.format(cx)?));
                         }
                     }
                 } else if target_desc.is_accessor_descriptor()
                     && target_desc.get.is_none()
                     && !trap_result.is_undefined()
                 {
-                    return type_error(cx, &format!("proxy must report undefined for a non-configurable accessor property '{}' without a getter", key.format()?));
+                    return type_error(cx, &format!("proxy must report undefined for a non-configurable accessor property '{}' without a getter", key.format(cx)?));
                 }
             }
         }
@@ -359,8 +359,8 @@ impl VirtualObject for StackRoot<ProxyObject> {
             return type_error(cx, "operation attempted on revoked proxy");
         }
 
-        let handler = self.handler().unwrap().into();
-        let mut target = self.target().unwrap();
+        let handler = self.handler(cx).unwrap().into();
+        let mut target = self.target(cx).unwrap();
 
         let trap = get_method(cx, handler, cx.names.set_())?;
 
@@ -381,11 +381,11 @@ impl VirtualObject for StackRoot<ProxyObject> {
                 if target_desc.is_data_descriptor() {
                     if let Some(false) = target_desc.is_writable {
                         if !same_value(value, target_desc.value.unwrap())? {
-                            return type_error(cx, &format!("proxy can't successfully set a non-writable, non-configurable property '{}'", key.format()?));
+                            return type_error(cx, &format!("proxy can't successfully set a non-writable, non-configurable property '{}'", key.format(cx)?));
                         }
                     }
                 } else if target_desc.is_accessor_descriptor() && target_desc.set.is_none() {
-                    return type_error(cx, &format!("proxy can't succesfully set an accessor property '{}' without a setter", key.format()?));
+                    return type_error(cx, &format!("proxy can't succesfully set an accessor property '{}' without a setter", key.format(cx)?));
                 }
             }
         }
@@ -399,8 +399,8 @@ impl VirtualObject for StackRoot<ProxyObject> {
             return type_error(cx, "operation attempted on revoked proxy");
         }
 
-        let handler = self.handler().unwrap().into();
-        let mut target = self.target().unwrap();
+        let handler = self.handler(cx).unwrap().into();
+        let mut target = self.target(cx).unwrap();
 
         let trap = get_method(cx, handler, cx.names.delete_property())?;
 
@@ -422,7 +422,7 @@ impl VirtualObject for StackRoot<ProxyObject> {
                     cx,
                     &format!(
                         "property '{}' is non-configurable and can't be deleted",
-                        key.format()?
+                        key.format(cx)?
                     ),
                 );
             }
@@ -435,7 +435,7 @@ impl VirtualObject for StackRoot<ProxyObject> {
                 cx,
                 &format!(
                     "proxy can't delete property '{}' on a non-extensible object",
-                    key.format()?
+                    key.format(cx)?
                 ),
             );
         }
@@ -449,8 +449,8 @@ impl VirtualObject for StackRoot<ProxyObject> {
             return type_error(cx, "operation attempted on revoked proxy");
         }
 
-        let handler = self.handler().unwrap().into();
-        let target = self.target().unwrap();
+        let handler = self.handler(cx).unwrap().into();
+        let target = self.target(cx).unwrap();
 
         let trap = get_method(cx, handler, cx.names.own_keys())?;
 
@@ -483,13 +483,13 @@ impl VirtualObject for StackRoot<ProxyObject> {
                 );
             }
 
-            let next_key = must!(PropertyKey::from_value(cx, next)).to_stack();
+            let next_key = must!(PropertyKey::from_value(cx, next)).to_stack(cx);
             if !unchecked_result_keys.insert(next_key) {
                 return type_error(
                     cx,
                     &format!(
                         "proxy ownKeys can't report property '{}' more than once",
-                        key.format()?
+                        key.format(cx)?
                     ),
                 );
             }
@@ -502,7 +502,7 @@ impl VirtualObject for StackRoot<ProxyObject> {
         let mut target_non_configurable_keys = vec![];
 
         for key in target_keys {
-            let property_key = must!(PropertyKey::from_value(cx, key)).to_stack();
+            let property_key = must!(PropertyKey::from_value(cx, key)).to_stack(cx);
             let desc = target.get_own_property(cx, property_key)?;
 
             if let Some(PropertyDescriptor {
@@ -526,7 +526,7 @@ impl VirtualObject for StackRoot<ProxyObject> {
                     cx,
                     &format!(
                         "proxy can't skip a non-configurable property '{}'",
-                        key.format()?
+                        key.format(cx)?
                     ),
                 );
             }
@@ -538,7 +538,7 @@ impl VirtualObject for StackRoot<ProxyObject> {
 
         for key in target_configurable_keys {
             if !unchecked_result_keys.remove(&key) {
-                return type_error(cx, &format!("proxy can't report an existing own property '{}' as non-existent on a non-extensible object", key.format()?));
+                return type_error(cx, &format!("proxy can't report an existing own property '{}' as non-existent on a non-extensible object", key.format(cx)?));
             }
         }
 
@@ -548,7 +548,7 @@ impl VirtualObject for StackRoot<ProxyObject> {
                 cx,
                 &format!(
                     "proxy can't report a new property '{}' on a non-extensible object",
-                    key.format()?
+                    key.format(cx)?
                 ),
             );
         }
@@ -567,8 +567,8 @@ impl VirtualObject for StackRoot<ProxyObject> {
             return type_error(cx, "operation attempted on revoked proxy");
         }
 
-        let handler = self.handler().unwrap().into();
-        let target = self.target().unwrap();
+        let handler = self.handler(cx).unwrap().into();
+        let target = self.target(cx).unwrap();
 
         let trap = get_method(cx, handler, cx.names.apply())?;
 
@@ -592,8 +592,8 @@ impl VirtualObject for StackRoot<ProxyObject> {
             return type_error(cx, "operation attempted on revoked proxy");
         }
 
-        let handler = self.handler().unwrap().into();
-        let target = self.target().unwrap();
+        let handler = self.handler(cx).unwrap().into();
+        let target = self.target(cx).unwrap();
 
         let trap = get_method(cx, handler, cx.names.construct())?;
 
@@ -617,7 +617,7 @@ impl VirtualObject for StackRoot<ProxyObject> {
             return type_error(cx, "operation attempted on revoked proxy");
         }
 
-        self.target().unwrap().get_realm(cx)
+        self.target(cx).unwrap().get_realm(cx)
     }
 }
 
@@ -628,8 +628,8 @@ impl ProxyObject {
             return type_error(cx, "operation attempted on revoked proxy");
         }
 
-        let handler = self.handler().unwrap().into();
-        let target = self.target().unwrap();
+        let handler = self.handler(cx).unwrap().into();
+        let target = self.target(cx).unwrap();
 
         // Allocations happen after this point, so can no longer use self
 
@@ -677,8 +677,8 @@ impl ProxyObject {
             return type_error(cx, "operation attempted on revoked proxy");
         }
 
-        let handler = self.handler().unwrap().into();
-        let mut target = self.target().unwrap();
+        let handler = self.handler(cx).unwrap().into();
+        let mut target = self.target(cx).unwrap();
 
         // Allocations happen after this point, so can no longer use self
 
@@ -719,8 +719,8 @@ impl ProxyObject {
             return type_error(cx, "operation attempted on revoked proxy");
         }
 
-        let handler = self.handler().unwrap().into();
-        let target = self.target().unwrap();
+        let handler = self.handler(cx).unwrap().into();
+        let target = self.target(cx).unwrap();
 
         // Allocations happen after this point, so can no longer use self
 
@@ -748,8 +748,8 @@ impl ProxyObject {
             return type_error(cx, "operation attempted on revoked proxy");
         }
 
-        let handler = self.handler().unwrap().into();
-        let mut target = self.target().unwrap();
+        let handler = self.handler(cx).unwrap().into();
+        let mut target = self.target(cx).unwrap();
 
         // Allocations happen after this point, so can no longer use self
 

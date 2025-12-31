@@ -1,9 +1,9 @@
+use alloc::collections::vec_deque::VecDeque;
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
-use alloc::collections::vec_deque::VecDeque;
 use core::{error::Error, fmt, ops::Range};
 use hashbrown::{HashMap, HashSet};
 
@@ -57,7 +57,7 @@ use crate::{
         source_file::SourceFile,
         string_value::{FlatString, StringValue},
         value::BigIntValue,
-        Context, StackRoot, HeapPtr, Realm, Value,
+        Context, HeapPtr, Realm, StackRoot, Value,
     },
 };
 
@@ -121,7 +121,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
 
         // If we are dumping bytecode then we must collect all functions
         let all_functions = if cx.options.print_bytecode {
-            Some(FunctionVecField::new_vec(cx, 4)?.to_stack())
+            Some(FunctionVecField::new_vec(cx, 4)?.to_stack(cx))
         } else {
             None
         };
@@ -610,7 +610,8 @@ impl<'a> BytecodeProgramGenerator<'a> {
         let names = BytecodeFunctionGenerator::gen_scope_name_strings(self.cx, vm_node)?;
         let name_flags = BytecodeFunctionGenerator::gen_scope_name_flags(ast_node, self.scope_tree);
         let scope_names = ScopeNames::new(self.cx, ScopeFlags::empty(), &names, &name_flags)?;
-        let mut module_scope = Scope::new_module(self.cx, scope_names, self.realm.global_object())?;
+        let mut module_scope =
+            Scope::new_module(self.cx, scope_names, self.realm.global_object(self.cx))?;
 
         // Initialize the exports with boxed values. Imports will be initialized during linking,
         // and all other bindings will be initialized normally during execution.
@@ -983,7 +984,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
             Patch::Export { slot_index } => {
                 // Create closure for the exported function
                 let module_scope = self.module.unwrap().module_scope();
-                let realm = self.module.unwrap().program_function_ptr().realm();
+                let realm = self.module.unwrap().program_function_ptr().realm(self.cx);
 
                 let closure = Closure::new_in_realm(
                     self.cx,
@@ -2989,7 +2990,7 @@ impl<'a> BytecodeFunctionGenerator<'a> {
         let dest = self.allocate_destination(dest)?;
 
         // BigInts are stored in the constant table, but not deduped
-        let bigint_value = BigIntValue::new(self.cx, lit.value())?.to_stack();
+        let bigint_value = BigIntValue::new(self.cx, lit.value())?.to_stack(self.cx);
         let constant_index = self
             .constant_table_builder
             .add_heap_item(bigint_value.cast())?;
@@ -10021,7 +10022,7 @@ impl BsVecField<HeapPtr<BytecodeFunction>> for FunctionVecField<'_> {
         **self.0.as_ref().unwrap()
     }
 
-    fn set(&mut self, vec: HeapPtr<FunctionVec>) {
-        *self.0 = Some(vec.to_stack());
+    fn set(&mut self, vec: HeapPtr<FunctionVec>, cx: Context) {
+        *self.0 = Some(vec.to_stack(cx));
     }
 }

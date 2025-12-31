@@ -37,7 +37,7 @@ impl WeakRefPrototype {
         _: &[StackRoot<Value>],
     ) -> EvalResult<StackRoot<Value>> {
         if let Some(weak_ref_object) = this_weak_ref_value(this_value) {
-            Ok(weak_ref_object.weak_ref_target().to_stack())
+            Ok(weak_ref_object.weak_ref_target().to_stack(cx))
         } else {
             type_error(cx, "deref method must be called on WeakRef")
         }

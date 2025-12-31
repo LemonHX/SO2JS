@@ -60,7 +60,7 @@ impl CompiledRegExpObject {
         for capture_group in regexp.capture_groups.iter() {
             let handle = if let Some(name_string) = capture_group {
                 has_named_capture_groups = true;
-                Some(cx.alloc_wtf8_str_ptr(name_string)?.to_stack())
+                Some(cx.alloc_wtf8_str_ptr(name_string)?.to_stack(cx))
             } else {
                 None
             };
@@ -97,7 +97,7 @@ impl CompiledRegExpObject {
             .capture_groups_as_slice_mut()
             .copy_from_slice(capture_group_ptrs.as_slice());
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     #[inline]
@@ -116,8 +116,8 @@ impl CompiledRegExpObject {
     }
 
     #[inline]
-    pub fn escaped_pattern_source(&self) -> StackRoot<StringValue> {
-        self.escaped_pattern_source.to_stack()
+    pub fn escaped_pattern_source(&self, cx: Context) -> StackRoot<StringValue> {
+        self.escaped_pattern_source.to_stack(cx)
     }
 
     #[inline]

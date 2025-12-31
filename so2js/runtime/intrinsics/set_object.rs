@@ -5,13 +5,13 @@ use crate::{
     runtime::{
         alloc_error::AllocResult,
         collections::{BsIndexSet, BsIndexSetField},
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::HeapItemKind,
         intrinsics::intrinsics::Intrinsic,
         object_value::ObjectValue,
         ordinary_object::{object_create, object_create_from_constructor},
         value::{ValueCollectionKey, ValueCollectionKeyStackRoot},
-        Context, EvalResult, StackRoot, HeapPtr, Value,
+        Context, EvalResult, HeapPtr, StackRoot, Value,
     },
     set_uninit,
 };
@@ -31,7 +31,7 @@ impl SetObject {
         constructor: StackRoot<ObjectValue>,
     ) -> EvalResult<StackRoot<SetObject>> {
         // Allocate and place behind handle before allocating object
-        let set_data = SetObjectSetField::new(cx, ValueSet::MIN_CAPACITY)?.to_stack();
+        let set_data = SetObjectSetField::new(cx, ValueSet::MIN_CAPACITY)?.to_stack(cx);
 
         let mut object = object_create_from_constructor::<SetObject>(
             cx,
@@ -42,17 +42,20 @@ impl SetObject {
 
         set_uninit!(object.set_data, *set_data);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     /// Create a new SetObject with the provided set data.
-    pub fn new_from_set(cx: Context, set_data: StackRoot<ValueSet>) -> AllocResult<StackRoot<SetObject>> {
+    pub fn new_from_set(
+        cx: Context,
+        set_data: StackRoot<ValueSet>,
+    ) -> AllocResult<StackRoot<SetObject>> {
         let mut object =
             object_create::<SetObject>(cx, HeapItemKind::SetObject, Intrinsic::SetPrototype)?;
 
         set_uninit!(object.set_data, *set_data);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     #[inline]
@@ -61,8 +64,8 @@ impl SetObject {
     }
 
     #[inline]
-    pub fn set_data(&self) -> StackRoot<ValueSet> {
-        self.set_data_ptr().to_stack()
+    pub fn set_data(&self, cx: Context) -> StackRoot<ValueSet> {
+        self.set_data_ptr().to_stack(cx)
     }
 }
 
@@ -72,7 +75,7 @@ impl StackRoot<SetObject> {
     }
 
     pub fn insert(&self, cx: Context, item: StackRoot<Value>) -> AllocResult<bool> {
-        let item_handle = ValueCollectionKeyStackRoot::new(item)?;
+        let item_handle = ValueCollectionKeyStackRoot::new(cx, item)?;
 
         Ok(self
             .set_data_field()

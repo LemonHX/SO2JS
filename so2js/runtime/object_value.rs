@@ -18,7 +18,7 @@ use super::{
     context::ContextCell,
     error::type_error,
     eval_result::EvalResult,
-    gc::{GcVisitorExt, StackRoot, HeapItem, HeapPtr},
+    gc::{GcVisitorExt, HeapItem, HeapPtr, StackRoot},
     generator_object::GeneratorObject,
     heap_item_descriptor::HeapItemKind,
     intrinsics::{
@@ -189,7 +189,7 @@ impl ObjectValue {
         set_uninit!(object.is_extensible_field, is_extensible);
         object.set_uninit_hash_code();
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     // Array properties methods
@@ -595,12 +595,12 @@ impl StackRoot<ObjectValue> {
 }
 
 /// IsTypedArrayFixedLength (https://tc39.es/ecma262/#sec-istypedarrayfixedlength)
-fn is_typed_array_fixed_length(typed_array: DynTypedArray) -> bool {
+fn is_typed_array_fixed_length(typed_array: DynTypedArray, cx: Context) -> bool {
     if typed_array.array_length().is_none() {
         return false;
     }
 
-    typed_array.viewed_array_buffer().is_fixed_length()
+    typed_array.viewed_array_buffer(cx).is_fixed_length()
 }
 
 // Wrap all virtual methods for easy access

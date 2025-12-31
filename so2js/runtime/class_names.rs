@@ -13,10 +13,10 @@ use crate::{
 use super::{
     bytecode::function::BytecodeFunction,
     collections::InlineArray,
-    gc::{HeapItem, GcVisitorExt},
+    gc::{GcVisitorExt, HeapItem},
     heap_item_descriptor::HeapItemDescriptor,
     string_value::FlatString,
-    Context, EvalResult, StackRoot, HeapPtr, Value,
+    Context, EvalResult, HeapPtr, StackRoot, Value,
 };
 
 /// A collection of information about a class that is used in a NewClass instruction.
@@ -103,7 +103,7 @@ impl ClassNames {
 
         set_uninit!(class_names.num_arguments, num_arguments);
 
-        Ok(class_names.to_stack())
+        Ok(class_names.to_stack(cx))
     }
 
     const METHODS_OFFSET: usize = field_offset!(ClassNames, methods);
@@ -152,9 +152,9 @@ impl Method {
     }
 
     #[inline]
-    fn from_heap(heap_method: &HeapMethod) -> Method {
+    fn from_heap(heap_method: &HeapMethod, cx: Context) -> Method {
         Method {
-            name: heap_method.name.map(|n| n.to_stack()),
+            name: heap_method.name.map(|n| n.to_stack(cx)),
             is_static: heap_method.is_static,
             is_getter: heap_method.is_getter,
             is_setter: heap_method.is_setter,
@@ -201,9 +201,9 @@ pub fn new_class(
         HeapItemKind::OrdinaryObject,
         proto_parent,
     )?
-    .to_stack();
+    .to_stack(cx);
 
-    let scope = cx.vm().scope().to_stack();
+    let scope = cx.vm().scope().to_stack(cx);
     let constructor = Closure::new_with_proto(cx, constructor_function, scope, constructor_parent)?;
 
     // Define a `constructor` property on the prototype

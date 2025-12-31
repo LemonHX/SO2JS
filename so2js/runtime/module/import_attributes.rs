@@ -43,7 +43,7 @@ impl ImportAttributes {
             object.attribute_pairs.as_mut_slice()[i * 2 + 1] = **value;
         }
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     #[inline]

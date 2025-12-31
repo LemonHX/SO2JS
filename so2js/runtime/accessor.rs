@@ -4,10 +4,10 @@ use crate::{
 };
 
 use super::{
-    gc::{HeapItem, GcVisitorExt},
+    gc::{GcVisitorExt, HeapItem},
     heap_item_descriptor::HeapItemDescriptor,
     object_value::ObjectValue,
-    Context, StackRoot, HeapPtr, Value,
+    Context, HeapPtr, StackRoot, Value,
 };
 
 /// The value of an accessor property. May contain a getter and/or a setter.
@@ -33,7 +33,7 @@ impl Accessor {
         set_uninit!(accessor.get, get.map(|v| *v));
         set_uninit!(accessor.set, set.map(|v| *v));
 
-        Ok(accessor.to_stack())
+        Ok(accessor.to_stack(cx))
     }
 
     pub fn from_value(value: StackRoot<Value>) -> StackRoot<Accessor> {

@@ -68,7 +68,7 @@ pub trait TypedArray {
 
     fn viewed_array_buffer_ptr(&self) -> HeapPtr<ArrayBufferObject>;
 
-    fn viewed_array_buffer(&self) -> StackRoot<ArrayBufferObject>;
+    fn viewed_array_buffer(&self, cx: Context) -> StackRoot<ArrayBufferObject>;
 
     fn name(&self, cx: Context) -> StackRoot<StringValue>;
 
@@ -164,7 +164,7 @@ pub fn to_int8_element(cx: Context, value: StackRoot<Value>) -> EvalResult<i8> {
 
 #[inline]
 pub fn from_int8_element(cx: Context, element: i8) -> AllocResult<StackRoot<Value>> {
-    Ok(Value::from(element).to_stack_with(cx))
+    Ok(Value::from(element).to_stack(cx))
 }
 
 create_typed_array!(
@@ -185,7 +185,7 @@ pub fn to_uint8_element(cx: Context, value: StackRoot<Value>) -> EvalResult<u8> 
 
 #[inline]
 pub fn from_uint8_element(cx: Context, element: u8) -> AllocResult<StackRoot<Value>> {
-    Ok(Value::from(element).to_stack_with(cx))
+    Ok(Value::from(element).to_stack(cx))
 }
 
 create_typed_array!(
@@ -206,7 +206,7 @@ pub fn to_uint8_clamped_element(cx: Context, value: StackRoot<Value>) -> EvalRes
 
 #[inline]
 pub fn from_uint8_clamped_element(cx: Context, element: u8) -> AllocResult<StackRoot<Value>> {
-    Ok(Value::from(element).to_stack_with(cx))
+    Ok(Value::from(element).to_stack(cx))
 }
 
 create_typed_array!(
@@ -227,7 +227,7 @@ pub fn to_int16_element(cx: Context, value: StackRoot<Value>) -> EvalResult<i16>
 
 #[inline]
 pub fn from_int16_element(cx: Context, element: i16) -> AllocResult<StackRoot<Value>> {
-    Ok(Value::from(element).to_stack_with(cx))
+    Ok(Value::from(element).to_stack(cx))
 }
 
 create_typed_array!(
@@ -248,7 +248,7 @@ pub fn to_uint16_element(cx: Context, value: StackRoot<Value>) -> EvalResult<u16
 
 #[inline]
 pub fn from_uint16_element(cx: Context, element: u16) -> AllocResult<StackRoot<Value>> {
-    Ok(Value::from(element).to_stack_with(cx))
+    Ok(Value::from(element).to_stack(cx))
 }
 
 create_typed_array!(
@@ -269,7 +269,7 @@ pub fn to_int32_element(cx: Context, value: StackRoot<Value>) -> EvalResult<i32>
 
 #[inline]
 pub fn from_int32_element(cx: Context, element: i32) -> AllocResult<StackRoot<Value>> {
-    Ok(Value::from(element).to_stack_with(cx))
+    Ok(Value::from(element).to_stack(cx))
 }
 
 create_typed_array!(
@@ -290,7 +290,7 @@ pub fn to_uint32_element(cx: Context, value: StackRoot<Value>) -> EvalResult<u32
 
 #[inline]
 pub fn from_uint32_element(cx: Context, element: u32) -> AllocResult<StackRoot<Value>> {
-    Ok(Value::from(element).to_stack_with(cx))
+    Ok(Value::from(element).to_stack(cx))
 }
 
 create_typed_array!(
@@ -374,7 +374,7 @@ pub fn to_float16_element(cx: Context, value: StackRoot<Value>) -> EvalResult<f1
 
 #[inline]
 pub fn from_float16_element(cx: Context, element: f16) -> AllocResult<StackRoot<Value>> {
-    Ok(Value::from(element.to_f64()).to_stack())
+    Ok(Value::from(element.to_f64()).to_stack(cx))
 }
 
 create_typed_array!(
@@ -396,7 +396,7 @@ pub fn to_float32_element(cx: Context, value: StackRoot<Value>) -> EvalResult<f3
 
 #[inline]
 pub fn from_float32_element(cx: Context, element: f32) -> AllocResult<StackRoot<Value>> {
-    Ok(Value::from(element).to_stack_with(cx))
+    Ok(Value::from(element).to_stack(cx))
 }
 
 create_typed_array!(
@@ -418,7 +418,7 @@ pub fn to_float64_element(cx: Context, value: StackRoot<Value>) -> EvalResult<f6
 
 #[inline]
 pub fn from_float64_element(cx: Context, element: f64) -> AllocResult<StackRoot<Value>> {
-    Ok(Value::from(element).to_stack_with(cx))
+    Ok(Value::from(element).to_stack(cx))
 }
 
 create_typed_array!(

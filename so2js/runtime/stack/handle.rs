@@ -12,9 +12,8 @@ use core::{
     pin::Pin,
     ptr::NonNull,
 };
-use so2js_gc::GcHeader;
 
-use super::{GcVisitorExt, Heap, HeapPtr, IsHeapItem};
+use crate::runtime::gc::{GcVisitorExt, HeapPtr, IsHeapItem};
 
 /// StackRoots store a pointer-sized unit of data. This may be either a value or a heap pointer.
 pub type StackRootContents = usize;
@@ -27,7 +26,8 @@ pub trait ToStackRootContents {
 
 /// StackRoots hold a value or heap pointer behind a pointer. StackRoots are safe to store on the stack
 /// during a GC, since the handle's pointer does not change but the address of the heap item
-/// behind the pointer may be updated.
+/// behind the pointer may be updated. All handle creation must be given an explicit handle
+/// context (no implicit Context lookup).
 pub struct StackRoot<T> {
     ptr: NonNull<StackRootContents>,
     phantom_data: PhantomData<T>,
@@ -254,7 +254,7 @@ impl Drop for StackRootScopeGuard {
 #[macro_export]
 macro_rules! js_stack_scope_guard {
     ($cx:expr) => {
-        let _guard = $crate::runtime::gc::StackRootScopeGuard::new($cx);
+        let _guard = $crate::runtime::stack::StackRootScopeGuard::new($cx);
     };
 }
 
@@ -263,7 +263,7 @@ macro_rules! js_stack_scope_guard {
 #[macro_export]
 macro_rules! js_stack_scope {
     ($cx:expr, $body:stmt) => {
-        $crate::runtime::gc::StackRootScope::new($cx, |_| {
+        $crate::runtime::stack::StackRootScope::new($cx, |_| {
             let result = { $body };
             result
         })
@@ -515,57 +515,24 @@ impl StackRoot<Value> {
 }
 
 impl Value {
+    /// Root a Value (pointer or immediate) using an explicit Context/handle context.
+    /// Does not attempt to recover Context from GC headers; callers must pass the Context they own.
     #[inline]
-    pub fn to_stack(self) -> StackRoot<Value> {
-        assert!(
-            self.is_pointer(),
-            "to_stack() called on non-pointer Value; use to_stack_with(cx) instead"
-        );
-
-        // Get Context from the GcHeader stored with each object
-        let self_ptr = self.as_pointer();
-        let gc_header = unsafe { GcHeader::from_object_ptr(self_ptr.as_ptr()) };
-        let context_ptr = gc_header.context_ptr() as *mut ContextCell;
-        let context_cell = unsafe { &mut *context_ptr };
-        let handle_context = &mut context_cell.handle_context;
-        StackRoot::new(handle_context, Value::to_handle_contents(self))
-    }
-
-    #[inline]
-    pub fn to_stack_with(self, mut cx: Context) -> StackRoot<Value> {
+    pub fn to_stack(self, mut cx: Context) -> StackRoot<Value> {
         let handle_context = &mut cx.handle_context;
         StackRoot::new(handle_context, Value::to_handle_contents(self))
     }
 }
 
 impl<T: IsHeapItem> HeapPtr<T> {
+    /// Root a heap pointer using an explicit Context/handle context. No GC-header context lookup.
     #[inline]
-    pub fn to_stack(self) -> StackRoot<T> {
+    pub fn to_stack(self, mut cx: Context) -> StackRoot<T> {
         assert!(
             !self.is_dangling(),
             "to_stack() called on dangling/uninitialized HeapPtr!"
         );
 
-        // Get Context from the GcHeader stored with each object
-        let self_ptr = self.as_ptr();
-        let gc_header = unsafe { GcHeader::from_object_ptr(self_ptr) };
-        let context_ptr = gc_header.context_ptr() as *mut ContextCell;
-
-        // Debug: check if context_ptr looks valid
-        debug_assert!(
-            !context_ptr.is_null(),
-            "context_ptr is null! self.as_ptr() = {:p}, gc_header = {:p}",
-            self_ptr,
-            gc_header as *const _
-        );
-
-        let context_cell = unsafe { &mut *context_ptr };
-        let handle_context = &mut context_cell.handle_context;
-        StackRoot::new(handle_context, T::to_handle_contents(self))
-    }
-
-    #[inline]
-    pub fn to_stack_with(self, mut cx: Context) -> StackRoot<T> {
         let handle_context = &mut cx.handle_context;
         StackRoot::new(handle_context, T::to_handle_contents(self))
     }
@@ -620,16 +587,15 @@ impl<T> Escapable for HeapPtr<T> {
 impl Escapable for StackRoot<Value> {
     #[inline]
     fn escape(&self, cx: Context) -> Self {
-        (**self).to_stack_with(cx)
+        (**self).to_stack(cx)
     }
 }
 
 impl<T: IsHeapItem> Escapable for StackRoot<T> {
     #[inline]
-    fn escape(&self, _: Context) -> Self {
-        // NOTE: We cannot recover Context from dangling pointers; this is only called for
-        // initialized heap items during scope escape, so use header-based to_stack.
-        (**self).to_stack()
+    fn escape(&self, cx: Context) -> Self {
+        // Re-root into the parent handle context explicitly using the provided Context.
+        (**self).to_stack(cx)
     }
 }
 

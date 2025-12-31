@@ -365,7 +365,7 @@ impl MathObject {
         }
 
         if has_infinity || has_nan {
-            return Ok(sum.to_stack());
+            return Ok(sum.to_stack(cx));
         }
 
         Ok(cx.number(f64::sqrt(sum.as_number())))
@@ -462,7 +462,7 @@ impl MathObject {
             }
         }
 
-        Ok(highest.to_stack())
+        Ok(highest.to_stack(cx))
     }
 
     /// Math.min (https://tc39.es/ecma262/#sec-math.min)
@@ -495,7 +495,7 @@ impl MathObject {
             }
         }
 
-        Ok(lowest.to_stack())
+        Ok(lowest.to_stack(cx))
     }
 
     /// Math.pow (https://tc39.es/ecma262/#sec-math.pow)
@@ -510,7 +510,7 @@ impl MathObject {
         let exponent_arg = get_argument(cx, arguments, 1);
         let exponent = to_number(cx, exponent_arg)?;
 
-        Ok(Value::from(number_exponentiate(base.as_number(), exponent.as_number())).to_stack())
+        Ok(Value::from(number_exponentiate(base.as_number(), exponent.as_number())).to_stack(cx))
     }
 
     /// Math.random (https://tc39.es/ecma262/#sec-math.random)
@@ -560,7 +560,7 @@ impl MathObject {
         if n.is_smi() {
             let n_smi = n.as_smi();
             if n_smi == 0 {
-                Ok(n.to_stack())
+                Ok(n.to_stack(cx))
             } else if n_smi > 0 {
                 Ok(cx.one())
             } else {
@@ -568,7 +568,7 @@ impl MathObject {
             }
         } else {
             if n.is_negative_zero() || n.is_positive_zero() {
-                Ok(n.to_stack())
+                Ok(n.to_stack(cx))
             } else if n.as_double() > 0.0 {
                 Ok(cx.one())
             } else if n.is_nan() {

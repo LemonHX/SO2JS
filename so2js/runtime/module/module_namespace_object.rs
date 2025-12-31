@@ -59,7 +59,7 @@ impl ModuleNamespaceObject {
 
         set_uninit!(object.module, module.to_heap());
 
-        let object = object.to_stack();
+        let object = object.to_stack(cx);
 
         // Module Namepace Objects [ %Symbol.toStringTag% ] (https://tc39.es/ecma262/#sec-%symbol.tostringtag%)
         let to_string_tag_key = cx.well_known_symbols.to_string_tag();
@@ -121,10 +121,10 @@ impl HeapPtr<ModuleNamespaceObject> {
 
             let namespace_object =
                 if heap_item.descriptor().kind() == HeapItemKind::SourceTextModule {
-                    let mut module = heap_item.cast::<SourceTextModule>().to_stack();
+                    let mut module = heap_item.cast::<SourceTextModule>().to_stack(cx);
                     module.get_namespace_object(cx)?
                 } else {
-                    let mut module = heap_item.cast::<SyntheticModule>().to_stack();
+                    let mut module = heap_item.cast::<SyntheticModule>().to_stack(cx);
                     module.get_namespace_object(cx)?
                 };
 
@@ -138,7 +138,7 @@ impl HeapPtr<ModuleNamespaceObject> {
         key: PropertyKey,
     ) -> AllocResult<Option<Value>> {
         // Coerce to string, which is guaranteed to be flat
-        let name = key.to_stack().to_value(cx)?.as_string().as_flat();
+        let name = key.to_stack(cx).to_value(cx)?.as_string().as_flat();
         let scope_names = module.module_scope_ptr().scope_names_ptr();
 
         if let Some(scope_index) = scope_names.lookup_name(*name) {
@@ -182,7 +182,7 @@ impl VirtualObject for StackRoot<ModuleNamespaceObject> {
         match self.lookup_export(cx, *key)? {
             None => Ok(None),
             Some(value) => {
-                let value = value.to_stack();
+                let value = value.to_stack(cx);
                 let desc = PropertyDescriptor::data(value, true, true, false);
                 Ok(Some(desc))
             }
@@ -244,7 +244,7 @@ impl VirtualObject for StackRoot<ModuleNamespaceObject> {
 
         match self.lookup_export(cx, *key)? {
             None => Ok(cx.undefined()),
-            Some(value) => Ok(value.to_stack()),
+            Some(value) => Ok(value.to_stack(cx)),
         }
     }
 
@@ -276,7 +276,7 @@ impl VirtualObject for StackRoot<ModuleNamespaceObject> {
                 let raw_keys = module
                     .exports_ptr()
                     .iter_gc_unsafe()
-                    .map(|(key, _)| key.to_stack())
+                    .map(|(key, _)| key.to_stack(cx))
                     .collect::<Vec<_>>();
 
                 // Convert all keys to strings
@@ -294,7 +294,7 @@ impl VirtualObject for StackRoot<ModuleNamespaceObject> {
                 .scope_names_ptr()
                 .name_ptrs()
                 .iter()
-                .map(|name| name.to_stack())
+                .map(|name| name.to_stack(cx))
                 .collect::<Vec<_>>(),
         };
 

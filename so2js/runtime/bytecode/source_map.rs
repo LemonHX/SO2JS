@@ -5,7 +5,7 @@ use crate::{
     parser::loc::Pos,
     runtime::{
         alloc_error::AllocResult, collections::array::ByteArray,
-        heap_item_descriptor::HeapItemKind, Context, StackRoot, HeapPtr,
+        heap_item_descriptor::HeapItemKind, Context, HeapPtr, StackRoot,
     },
 };
 
@@ -24,7 +24,7 @@ pub struct BytecodeSourceMap;
 
 impl BytecodeSourceMap {
     pub fn new(cx: Context, source_positions: &[u8]) -> AllocResult<StackRoot<ByteArray>> {
-        Ok(ByteArray::new_from_slice(cx, HeapItemKind::ByteArray, source_positions)?.to_stack())
+        Ok(ByteArray::new_from_slice(cx, HeapItemKind::ByteArray, source_positions)?.to_stack(cx))
     }
 
     /// The first two varints are the full source range of the function. Return them as a range.

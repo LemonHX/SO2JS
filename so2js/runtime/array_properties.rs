@@ -68,7 +68,7 @@ impl HeapPtr<ArrayProperties> {
                 return None;
             }
 
-            Some(Property::data(value.to_stack(), true, true, true))
+            Some(Property::data(value.to_stack(cx), true, true, true))
         } else {
             let sparse_properties = self.as_sparse();
             sparse_properties
@@ -112,7 +112,7 @@ impl ArrayProperties {
         let new_capacity = u32::max(old_capacity.saturating_mul(2), new_length);
 
         // Save old dense properties before allocation
-        let dense_properties = dense_properties.to_stack();
+        let dense_properties = dense_properties.to_stack(cx);
 
         // Create new dense array properties, ensure that no allocation happens after this point
         // otherwise we could try to GC a partially initialized array.
@@ -151,7 +151,7 @@ impl ArrayProperties {
         }
 
         // Save old dense properties before allocation
-        let dense_properties = dense_properties.to_stack();
+        let dense_properties = dense_properties.to_stack(cx);
 
         // Create new dense array properties, ensure that no allocation happens after this point
         // otherwise we could try to GC a partially initialized array.
@@ -176,7 +176,7 @@ impl ArrayProperties {
         cx: Context,
         mut object: StackRoot<ObjectValue>,
     ) -> AllocResult<()> {
-        let dense_properties = object.array_properties().as_dense().to_stack();
+        let dense_properties = object.array_properties().as_dense().to_stack(cx);
 
         // Initial sparse map size is the number of non-empty properties
         let num_non_empty_properties = dense_properties
@@ -251,7 +251,7 @@ impl ArrayProperties {
             }
 
             // Save behind handle before allocating
-            let sparse_properties = sparse_properties.to_stack();
+            let sparse_properties = sparse_properties.to_stack(cx);
 
             // In sparse removal case we must first find the last non-configurable property.
             // Can use stored property directly since loop does not allocate.

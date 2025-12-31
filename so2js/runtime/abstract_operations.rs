@@ -234,7 +234,7 @@ pub fn set_integrity_level(
     match level {
         IntegrityLevel::Sealed => {
             // Property key is shared between iterations
-            let mut key = PropertyKey::uninit().to_stack();
+            let mut key = PropertyKey::uninit().to_stack(cx);
 
             for key_value in keys {
                 key.replace(must!(PropertyKey::from_value(cx, key_value)));
@@ -244,7 +244,7 @@ pub fn set_integrity_level(
         }
         IntegrityLevel::Frozen => {
             // Property key is shared between iterations
-            let mut key = PropertyKey::uninit().to_stack();
+            let mut key = PropertyKey::uninit().to_stack(cx);
 
             for key_value in keys {
                 key.replace(must!(PropertyKey::from_value(cx, key_value)));
@@ -278,7 +278,7 @@ pub fn test_integrity_level(
     let keys = object.own_property_keys(cx)?;
 
     // Property key is shared between iterations
-    let mut key = PropertyKey::uninit().to_stack();
+    let mut key = PropertyKey::uninit().to_stack(cx);
 
     for key_value in keys {
         key.replace(must!(PropertyKey::from_value(cx, key_value)));
@@ -320,7 +320,7 @@ pub fn create_list_from_array_like(
     let mut vec = Vec::with_capacity(length as usize);
 
     // Property key is shared between iterations
-    let mut key = PropertyKey::uninit().to_stack();
+    let mut key = PropertyKey::uninit().to_stack(cx);
 
     for i in 0..length {
         key.replace(PropertyKey::array_index(cx, i as u32)?);
@@ -431,7 +431,7 @@ pub fn enumerable_own_property_names(
     let mut properties = vec![];
 
     // Property key is shared between iterations
-    let mut key = PropertyKey::uninit().to_stack();
+    let mut key = PropertyKey::uninit().to_stack(cx);
 
     for key_value in keys {
         if key_value.is_symbol() {
@@ -514,7 +514,7 @@ pub fn copy_data_properties(
     let keys = from.own_property_keys(cx)?;
 
     // Property key is shared between iterations
-    let mut next_key = PropertyKey::uninit().to_stack();
+    let mut next_key = PropertyKey::uninit().to_stack(cx);
 
     for next_key_value in keys {
         next_key.replace(must!(PropertyKey::from_value(cx, next_key_value)));
@@ -555,7 +555,7 @@ pub fn private_get(
     match accessor.get {
         None => type_error(cx, "cannot access private field or method"),
         Some(getter) => {
-            let getter_handle = getter.to_stack();
+            let getter_handle = getter.to_stack(cx);
             call_object(cx, getter_handle, object.into(), &[])
         }
     }
@@ -584,7 +584,7 @@ pub fn private_set(
         match accessor.set {
             None => type_error(cx, "cannot set getter-only private property"),
             Some(setter) => {
-                let setter_handle = setter.to_stack();
+                let setter_handle = setter.to_stack(cx);
                 call_object(cx, setter_handle, object.into(), &[value])?;
                 Ok(())
             }

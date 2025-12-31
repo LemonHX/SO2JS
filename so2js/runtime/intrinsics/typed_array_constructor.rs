@@ -112,13 +112,13 @@ impl TypedArrayConstructor {
 
             let length = values.len();
 
-            let length_value = Value::from(length).to_stack_with(cx);
+            let length_value = Value::from(length).to_stack(cx);
             let target_object =
                 typed_array_create_from_constructor_object(cx, this_constructor, &[length_value])?;
 
             // Shared between iterations
-            let mut index_key = PropertyKey::uninit().to_stack();
-            let mut index_value = Value::uninit().to_stack();
+            let mut index_key = PropertyKey::uninit().to_stack(cx);
+            let mut index_value = Value::uninit().to_stack(cx);
 
             for (i, value) in values.into_iter().enumerate() {
                 index_key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -140,13 +140,13 @@ impl TypedArrayConstructor {
         let array_like = must!(to_object(cx, source));
         let length = length_of_array_like(cx, array_like)? as usize;
 
-        let length_value = Value::from(length).to_stack_with(cx);
+        let length_value = Value::from(length).to_stack(cx);
         let target_object =
             typed_array_create_from_constructor_object(cx, this_constructor, &[length_value])?;
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
-        let mut index_value = Value::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
+        let mut index_value = Value::uninit().to_stack(cx);
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -178,14 +178,14 @@ impl TypedArrayConstructor {
 
         let this_constructor = this_value.as_object();
         let length = arguments.len();
-        let length_value = Value::from(length).to_stack_with(cx);
+        let length_value = Value::from(length).to_stack(cx);
 
         let typed_array =
             typed_array_create_from_constructor(cx, this_constructor, &[length_value])?;
         let object = typed_array.into_object_value();
 
         // Shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for (i, value) in arguments.iter().enumerate() {
             key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -237,7 +237,7 @@ macro_rules! create_typed_array_constructor {
                 set_uninit!(object.array_length, array_length);
                 set_uninit!(object.byte_offset, byte_offset);
 
-                Ok(object.to_stack().into())
+                Ok(object.to_stack(cx).into())
             }
 
             #[inline]
@@ -465,7 +465,7 @@ macro_rules! create_typed_array_constructor {
                     }
                 }
 
-                ordinary_own_string_symbol_property_keys(self.as_object(), &mut keys);
+                ordinary_own_string_symbol_property_keys(cx, self.as_object(), &mut keys);
 
                 Ok(keys)
             }
@@ -492,8 +492,8 @@ macro_rules! create_typed_array_constructor {
                 self.viewed_array_buffer
             }
 
-            fn viewed_array_buffer(&self) -> StackRoot<ArrayBufferObject> {
-                self.viewed_array_buffer.to_stack()
+            fn viewed_array_buffer(&self, cx: Context) -> StackRoot<ArrayBufferObject> {
+                self.viewed_array_buffer.to_stack(cx)
             }
 
             fn name(&self, cx: Context) -> StackRoot<StringValue> {
@@ -631,7 +631,7 @@ macro_rules! create_typed_array_constructor {
                         cx,
                         &format!(
                             "{} constructor must be called with new",
-                            cx.names.$rust_name().format()?
+                            cx.names.$rust_name().format(cx)?
                         ),
                     );
                 };
@@ -725,7 +725,7 @@ macro_rules! create_typed_array_constructor {
                 proto: StackRoot<ObjectValue>,
                 source_typed_array: DynTypedArray,
             ) -> EvalResult<StackRoot<Value>> {
-                let source_data = source_typed_array.viewed_array_buffer();
+                let source_data = source_typed_array.viewed_array_buffer(cx);
                 let source_element_size = source_typed_array.element_size();
                 let source_byte_offset = source_typed_array.byte_offset();
 
@@ -913,7 +913,7 @@ macro_rules! create_typed_array_constructor {
                 let typed_array_object = Self::allocate_from_object_with_length(cx, proto, length)?;
 
                 // Shared between iterations
-                let mut key = PropertyKey::uninit().to_stack();
+                let mut key = PropertyKey::uninit().to_stack(cx);
 
                 // Add each value from iterator into typed array
                 for (i, value) in values.into_iter().enumerate() {
@@ -936,7 +936,7 @@ macro_rules! create_typed_array_constructor {
                     Self::allocate_from_object_with_length(cx, proto, length as usize)?;
 
                 // Shared between iterations
-                let mut key = PropertyKey::uninit().to_stack();
+                let mut key = PropertyKey::uninit().to_stack(cx);
 
                 // Add each value from array into typed array
                 for i in 0..length {
@@ -1002,7 +1002,7 @@ pub fn canonical_numeric_index_string(
 
         // If string representations are equal, must be canonical numeric index
         let number_string = must_a!(to_string(cx, number_value));
-        if key_string.equals(&number_string)? {
+        if key_string.equals(&number_string, cx)? {
             if !is_integral_number(*number_value) {
                 return Ok(CanonicalIndexType::Invalid);
             }

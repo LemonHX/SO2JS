@@ -6,12 +6,12 @@ use crate::{
         alloc_error::AllocResult,
         collections::{BsHashMap, BsHashMapField},
         eval_result::EvalResult,
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::HeapItemKind,
         object_value::ObjectValue,
         ordinary_object::object_create_from_constructor,
         value::{ValueCollectionKey, ValueCollectionKeyStackRoot},
-        Context, StackRoot, HeapPtr, Value,
+        Context, HeapPtr, StackRoot, Value,
     },
     set_uninit,
 };
@@ -37,7 +37,7 @@ impl WeakMapObject {
         constructor: StackRoot<ObjectValue>,
     ) -> EvalResult<StackRoot<WeakMapObject>> {
         let weak_map_data =
-            WeakValueMap::new_initial(cx, HeapItemKind::WeakMapObjectWeakValueMap)?.to_stack();
+            WeakValueMap::new_initial(cx, HeapItemKind::WeakMapObjectWeakValueMap)?.to_stack(cx);
 
         let mut object = object_create_from_constructor::<WeakMapObject>(
             cx,
@@ -48,7 +48,7 @@ impl WeakMapObject {
 
         set_uninit!(object.weak_map_data, *weak_map_data);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn weak_map_data(&self) -> HeapPtr<WeakValueMap> {
@@ -75,7 +75,7 @@ impl StackRoot<WeakMapObject> {
         key: StackRoot<Value>,
         value: StackRoot<Value>,
     ) -> AllocResult<bool> {
-        let key_handle = ValueCollectionKeyStackRoot::new(key)?;
+        let key_handle = ValueCollectionKeyStackRoot::new(cx, key)?;
 
         Ok(self
             .weak_map_data_field()

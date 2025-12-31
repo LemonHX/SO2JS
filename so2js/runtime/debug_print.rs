@@ -1,3 +1,5 @@
+use crate::runtime::Context;
+
 use super::{
     bytecode::{
         constant_table::ConstantTable, exception_handlers::ExceptionStackRootrs,
@@ -10,10 +12,10 @@ use super::{
     value::{BigIntValue, SymbolValue},
     HeapPtr,
 };
+use alloc::format;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
-use alloc::format;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum DebugPrintMode {
@@ -29,18 +31,19 @@ pub trait DebugPrint {
     fn debug_format(&self, printer: &mut DebugPrinter);
 
     /// Return the debug representation of this value.
-    fn debug_print(&self, mode: DebugPrintMode) -> String {
-        let mut printer = DebugPrinter::new(mode);
+    fn debug_print(&self, mode: DebugPrintMode, cx: Context) -> String {
+        let mut printer = DebugPrinter::new(mode, cx);
         self.debug_format(&mut printer);
         printer.finish()
     }
 
-    fn debug_print_short(&self) -> String {
-        self.debug_print(DebugPrintMode::Short)
+    fn debug_print_short(&self, cx: Context) -> String {
+        self.debug_print(DebugPrintMode::Short, cx)
     }
 }
 
 pub struct DebugPrinter {
+    pub cx: Context,
     result: String,
     current_indent: usize,
     /// Stack of print modes, top of stack is the current mode.
@@ -50,8 +53,9 @@ pub struct DebugPrinter {
 }
 
 impl DebugPrinter {
-    pub fn new(mode: DebugPrintMode) -> Self {
+    pub fn new(mode: DebugPrintMode, cx: Context) -> Self {
         Self {
+            cx,
             mode_stack: vec![mode],
             result: String::new(),
             current_indent: 0,

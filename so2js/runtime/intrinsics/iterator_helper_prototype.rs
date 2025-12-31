@@ -5,7 +5,7 @@ use crate::runtime::{
     iterator::{create_iter_result_object, iterator_close},
     object_value::ObjectValue,
     property::Property,
-    Context, EvalResult, StackRoot, Realm, Value,
+    Context, EvalResult, Realm, StackRoot, Value,
 };
 
 use super::{intrinsics::Intrinsic, iterator_helper_object::IteratorHelperObject};
@@ -111,7 +111,7 @@ impl IteratorHelperPrototype {
             // If "generator" has not yet started then close the underlying iterator and return done
             GeneratorState::SuspendedStart => {
                 object.set_generator_state(GeneratorState::Completed);
-                iterator_close(cx, object.iterator_object(), Ok(cx.undefined()))?;
+                iterator_close(cx, object.iterator_object(cx), Ok(cx.undefined()))?;
 
                 return Ok(create_iter_result_object(cx, cx.undefined(), true)?);
             }
@@ -127,7 +127,9 @@ impl IteratorHelperPrototype {
     }
 }
 
-fn validate_iterator_helper_object(value: StackRoot<Value>) -> Option<StackRoot<IteratorHelperObject>> {
+fn validate_iterator_helper_object(
+    value: StackRoot<Value>,
+) -> Option<StackRoot<IteratorHelperObject>> {
     if !value.is_object() {
         return None;
     }

@@ -4,9 +4,9 @@ use crate::{
         alloc_error::AllocResult,
         collections::InlineArray,
         debug_print::{DebugPrint, DebugPrintMode, DebugPrinter},
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
-        Context, StackRoot, HeapPtr, Value,
+        Context, HeapPtr, StackRoot, Value,
     },
     set_uninit,
 };
@@ -47,7 +47,7 @@ impl ConstantTable {
         let metadata_ptr = object.get_metadata_ptr() as *mut u8;
         unsafe { core::ptr::copy_nonoverlapping(metadata.as_ptr(), metadata_ptr, metadata.len()) };
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     const CONSTANTS_BYTE_OFFSET: usize = field_offset!(ConstantTable, constants);

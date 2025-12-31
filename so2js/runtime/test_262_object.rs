@@ -14,7 +14,7 @@ use super::{
     intrinsics::{array_buffer_constructor::ArrayBufferObject, intrinsics::Intrinsic},
     object_value::ObjectValue,
     string_value::StringValue,
-    Context, EvalResult, StackRoot, PropertyKey, Realm, Value,
+    Context, EvalResult, PropertyKey, Realm, StackRoot, Value,
 };
 
 /// Utility functions used in test262 tests. Must be included in the main library for now so that
@@ -39,7 +39,7 @@ impl Test262Object {
 
         let global_string = cx.alloc_string("global")?.as_string();
         let global_key = PropertyKey::string_handle(cx, global_string)?;
-        object.intrinsic_data_prop(cx, global_key, realm.global_object().into())?;
+        object.intrinsic_data_prop(cx, global_key, realm.global_object(cx).into())?;
 
         let detach_array_buffer_string = cx.alloc_string("detachArrayBuffer")?.as_string();
         let detach_array_buffer_key = PropertyKey::string_handle(cx, detach_array_buffer_string)?;
@@ -53,7 +53,7 @@ impl Test262Object {
 
         object.intrinsic_func(cx, cx.names.gc(), GcObject::run, 0, realm)?;
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn install(mut cx: Context, realm: StackRoot<Realm>) -> AllocResult<()> {
@@ -62,7 +62,7 @@ impl Test262Object {
             let test_262_object = Test262Object::new(cx, realm)?;
 
             // Install the the "$262" property on the global object
-            realm.global_object().intrinsic_data_prop(
+            realm.global_object(cx).intrinsic_data_prop(
                 cx,
                 test_262_key(cx)?,
                 test_262_object.into(),
@@ -72,13 +72,13 @@ impl Test262Object {
             let print_string = cx.alloc_string("print")?.as_string();
             let print_key = PropertyKey::string_handle(cx, print_string)?;
             realm
-                .global_object()
+                .global_object(cx)
                 .intrinsic_func(cx, print_key, Self::print, 1, realm)?;
 
             // Install the global print log property
             must_a!(Self::set_print_log(
                 cx,
-                realm.global_object(),
+                realm.global_object(cx),
                 cx.names.empty_string().as_string()
             ));
 
@@ -128,7 +128,7 @@ impl Test262Object {
             return type_error(cx, "print expects a string");
         }
 
-        let global_object = cx.current_realm_ptr().global_object();
+        let global_object = cx.current_realm_ptr().global_object(cx);
 
         let old_print_log = Self::get_print_log(cx, global_object)?;
         let new_print_log = StringValue::concat(cx, old_print_log, argument.as_string())?;
@@ -146,7 +146,7 @@ impl Test262Object {
         let realm = Realm::new(cx)?;
         Test262Object::install(cx, realm)?;
 
-        get(cx, realm.global_object(), test_262_key(cx)?)
+        get(cx, realm.global_object(cx), test_262_key(cx)?)
     }
 
     pub fn eval_script(
@@ -160,10 +160,10 @@ impl Test262Object {
         }
 
         // Use the file path of the active source file
-        let file_path = cx.vm().current_source_file().path().to_string();
+        let file_path = cx.vm().current_source_file().path(cx).to_string();
 
         let source =
-            match Source::new_for_eval(file_path, script_text.as_string().to_wtf8_string()?) {
+            match Source::new_for_eval(file_path, script_text.as_string().to_wtf8_string(cx)?) {
                 Ok(source) => Rc::new(source),
                 Err(error) => return syntax_parse_error(cx, &error),
             };

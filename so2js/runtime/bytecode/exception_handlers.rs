@@ -9,9 +9,9 @@ use crate::{
         alloc_error::AllocResult,
         collections::InlineArray,
         debug_print::{DebugPrint, DebugPrinter},
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
-        Context, StackRoot, HeapPtr,
+        Context, HeapPtr, StackRoot,
     },
     set_uninit,
 };
@@ -134,7 +134,7 @@ impl ExceptionStackRootrs {
         set_uninit!(object.width, width);
         object.handlers.init_from_slice(&handlers);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     const HANDLERS_BYTE_OFFSET: usize = field_offset!(ExceptionStackRootrs, handlers);

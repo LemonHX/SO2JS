@@ -7,7 +7,7 @@ use crate::{
         error::type_error,
         eval_result::EvalResult,
         function::get_argument,
-        gc::{StackRoot, HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem, StackRoot},
         heap_item_descriptor::HeapItemKind,
         iterator::{create_iter_result_object, get_iterator_flattenable},
         object_value::ObjectValue,
@@ -68,7 +68,7 @@ impl IteratorConstructor {
             Intrinsic::IteratorPrototype,
         )?;
 
-        Ok(object.to_stack().as_value())
+        Ok(object.to_stack(cx).as_value())
     }
 
     pub fn from(
@@ -115,15 +115,15 @@ impl WrappedValidIterator {
         set_uninit!(object.iterator, *iterator);
         set_uninit!(object.next_method, *next_method);
 
-        Ok(object.as_object().to_stack())
+        Ok(object.as_object().to_stack(cx))
     }
 
-    fn iterator(&self) -> StackRoot<ObjectValue> {
-        self.iterator.to_stack()
+    fn iterator(&self, cx: Context) -> StackRoot<ObjectValue> {
+        self.iterator.to_stack(cx)
     }
 
     fn next_method(&self, cx: Context) -> StackRoot<Value> {
-        self.next_method.to_stack()
+        self.next_method.to_stack(cx)
     }
 }
 
@@ -150,7 +150,7 @@ impl WrapForValidIteratorPrototype {
             HeapItemKind::OrdinaryObject,
             iterator_prototype,
         )?
-        .to_stack();
+        .to_stack(cx);
 
         object.intrinsic_func(cx, cx.names.next(), Self::next, 0, realm)?;
         object.intrinsic_func(cx, cx.names.return_(), Self::return_, 0, realm)?;
@@ -168,7 +168,7 @@ impl WrapForValidIteratorPrototype {
         if this_value.is_object() {
             if let Some(wrapper) = this_value.as_object().as_wrapped_valid_iterator_object() {
                 // Call the wrapped iterator's next method
-                let iterator = wrapper.iterator().as_value();
+                let iterator = wrapper.iterator(cx).as_value();
                 return call(cx, wrapper.next_method(cx), iterator, &[]);
             }
         }
@@ -189,7 +189,7 @@ impl WrapForValidIteratorPrototype {
         if this_value.is_object() {
             if let Some(wrapper) = this_value.as_object().as_wrapped_valid_iterator_object() {
                 // Call the wrapped iterator's return method if one exists
-                let iterator = wrapper.iterator().as_value();
+                let iterator = wrapper.iterator(cx).as_value();
                 return match get_method(cx, iterator, cx.names.return_())? {
                     None => Ok(create_iter_result_object(cx, cx.undefined(), true)?),
                     Some(return_) => call_object(cx, return_, iterator, &[]),

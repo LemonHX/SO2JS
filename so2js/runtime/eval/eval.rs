@@ -28,7 +28,7 @@ use crate::{
         property::Property,
         scope::{Scope, ScopeKind},
         string_value::FlatString,
-        Context, EvalResult, StackRoot, HeapPtr, Value,
+        Context, EvalResult, HeapPtr, StackRoot, Value,
     },
 };
 
@@ -49,10 +49,10 @@ pub fn perform_eval(
     let private_names = get_private_names_from_scopes(direct_scope.map(|s| *s));
 
     // Use the file path of the active source file
-    let file_path = cx.vm().current_source_file().path().to_string();
+    let file_path = cx.vm().current_source_file().path(cx).to_string();
 
     // Parse source code
-    let source = match Source::new_for_eval(file_path, code.to_wtf8_string()?) {
+    let source = match Source::new_for_eval(file_path, code.to_wtf8_string(cx)?) {
         Ok(source) => Rc::new(source),
         Err(error) => return syntax_parse_error(cx, &error),
     };
@@ -100,16 +100,16 @@ pub fn perform_eval(
     };
 
     // Eval function's parent scope is the global scope in an indirect eval
-    let eval_scope = direct_scope.unwrap_or_else(|| cx.current_realm().default_global_scope());
+    let eval_scope = direct_scope.unwrap_or_else(|| cx.current_realm().default_global_scope(cx));
     let closure = Closure::new(cx, bytecode_function, eval_scope)?;
 
     // Determine the receiver for the eval function call
     let receiver: StackRoot<Value> = if is_direct {
         // Direct evals inherit their receiver from the caller
-        cx.vm().receiver().to_stack()
+        cx.vm().receiver().to_stack(cx)
     } else {
         // For indirect evals receiver is the global object
-        closure.global_object().into()
+        closure.global_object(cx).into()
     };
 
     // Execute the eval function's bytecode in the VM
@@ -153,7 +153,7 @@ fn check_eval_var_name_conflicts(
     eval_var_names: &[StackRoot<FlatString>],
     eval_func_names: &[StackRoot<FlatString>],
 ) -> EvalResult<()> {
-    let mut scope = cx.vm().scope().to_stack();
+    let mut scope = cx.vm().scope().to_stack(cx);
 
     // Special case for an eval in the function params scope
     if scope.scope_names_ptr().is_function_parameters_scope() {
@@ -230,7 +230,7 @@ fn eval_declaration_instantiation(mut cx: Context, program: &ast::Program) -> Ev
     check_eval_var_name_conflicts(cx, &eval_var_names, &eval_func_names)?;
 
     // Find the enclosing var scope
-    let mut var_scope = cx.vm().scope().to_stack();
+    let mut var_scope = cx.vm().scope().to_stack(cx);
     while !var_scope.scope_names_ptr().is_var_scope() {
         var_scope.replace(var_scope.parent().unwrap());
     }

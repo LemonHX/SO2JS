@@ -50,7 +50,7 @@ impl SymbolPrototype {
         _: &[StackRoot<Value>],
     ) -> EvalResult<StackRoot<Value>> {
         let symbol_value = this_symbol_value(cx, this_value)?;
-        match symbol_value.as_symbol().description() {
+        match symbol_value.as_symbol().description(cx) {
             None => Ok(cx.undefined()),
             Some(desc) => Ok(desc.as_value()),
         }
@@ -84,7 +84,7 @@ fn this_symbol_value(cx: Context, value: StackRoot<Value>) -> EvalResult<StackRo
     if value.is_object() {
         let object_value = value.as_object();
         if let Some(symbol_object) = object_value.as_symbol_object() {
-            return Ok(symbol_object.symbol_data().into());
+            return Ok(symbol_object.symbol_data(cx).into());
         }
     }
 
@@ -96,7 +96,7 @@ pub fn symbol_descriptive_string(
     mut cx: Context,
     symbol: StackRoot<SymbolValue>,
 ) -> AllocResult<StackRoot<StringValue>> {
-    match symbol.description() {
+    match symbol.description(cx) {
         None => Ok(cx.alloc_string("Symbol()")?.as_string()),
         Some(description) => {
             let symbol_prefix = cx.alloc_string("Symbol(")?.as_string();

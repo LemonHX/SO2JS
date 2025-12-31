@@ -269,7 +269,7 @@ impl VM {
         &mut self,
         bytecode_script: BytecodeScript,
     ) -> EvalResult<StackRoot<Value>> {
-        let mut realm = bytecode_script.script_function.realm();
+        let mut realm = bytecode_script.script_function.realm(self.cx());
         let global_names = bytecode_script.global_names;
 
         // Call the GlobalDeclarationInstantiation function in the rust runtime
@@ -284,7 +284,7 @@ impl VM {
         self.call_rust_runtime(
             init_closure,
             init_function_id,
-            realm.global_object().into(),
+            realm.global_object(self.cx()).into(),
             &[global_names.cast()],
             None,
         )?;
@@ -302,7 +302,7 @@ impl VM {
         )?;
 
         // Evaluate with the global object as the receiver
-        let receiver = program_closure.global_object().into();
+        let receiver = program_closure.global_object(self.cx()).into();
 
         self.execute(program_closure, receiver, &[])
     }
@@ -315,7 +315,7 @@ impl VM {
     ) -> EvalResult<StackRoot<Value>> {
         let program_function = module.program_function();
         let module_scope = module.module_scope();
-        let realm = program_function.realm();
+        let realm = program_function.realm(self.cx());
 
         let module_closure =
             Closure::new_in_realm(self.cx(), program_function, module_scope, realm)?;
@@ -425,7 +425,7 @@ impl VM {
         // of dispatch loop when the marked return address is encountered.
         self.dispatch_loop()?;
 
-        Ok(return_value.to_stack())
+        Ok(return_value.to_stack(self.cx()))
     }
 
     fn reset_stack(&mut self) {
@@ -552,8 +552,8 @@ impl VM {
                         debug_assert!(generator_object.is_async_generator());
 
                         let mut async_generator =
-                            generator_object.as_async_generator().unwrap().to_stack();
-                        let yield_value = yield_value.to_stack();
+                            generator_object.as_async_generator().unwrap().to_stack(self.cx());
+                        let yield_value = yield_value.to_stack(self.cx());
 
                         maybe_throw_a!(async_generator_complete_step(
                             self.cx(),
@@ -621,7 +621,7 @@ impl VM {
                             (completion_value_index, completion_type_index),
                             self.stack_frame().as_slice(),
                         ))
-                        .to_stack();
+                        .to_stack(self.cx());
 
                         maybe_throw_a!(
                             argument_promise.add_await_reaction(self.cx(), generator.into())
@@ -666,7 +666,7 @@ impl VM {
                     // Find the index of the FP in the stack frame
                     let fp_index = unsafe { self.fp().offset_from(self.sp()) as usize };
 
-                    let current_closure = self.closure().to_stack();
+                    let current_closure = self.closure().to_stack(self.cx());
 
                     // Create the generator in the started state, copying the current stack frame
                     // and PC to resume.
@@ -753,7 +753,7 @@ impl VM {
                 ($get_instr:ident) => {{
                     let instr = $get_instr!(ThrowInstruction);
                     self.set_pc_after(instr);
-                    let error_value = self.read_register(instr.error()).to_stack();
+                    let error_value = self.read_register(instr.error()).to_stack(self.cx());
                     throw!(error_value);
                 }};
             }
@@ -1426,7 +1426,7 @@ impl VM {
 
     #[inline]
     fn read_register_to_handle<W: Width>(&mut self, reg: Register<W>) -> StackRoot<Value> {
-        self.read_register(reg).to_stack_with(self.cx())
+        self.read_register(reg).to_stack(self.cx())
     }
 
     #[inline]
@@ -1579,7 +1579,9 @@ impl VM {
             CallableObject::Closure(closure) => closure,
             CallableObject::Proxy(proxy) => {
                 return js_stack_scope!(self.cx(), {
-                    proxy.to_stack().call(self.cx(), receiver, arguments)
+                    proxy
+                        .to_stack(self.cx())
+                        .call(self.cx(), receiver, arguments)
                 });
             }
             CallableObject::Error(error) => return eval_err!(error),
@@ -1594,7 +1596,7 @@ impl VM {
             // Call rust runtime function directly in its own handle scope
             let cx = self.cx();
             js_stack_scope!(cx, {
-                let receiver = receiver.to_stack_with(cx);
+                let receiver = receiver.to_stack(cx);
                 self.call_rust_runtime(closure_ptr, function_id, receiver, arguments, None)
             })
         } else {
@@ -1621,7 +1623,7 @@ impl VM {
             // dispatch loop when the marked return address is encountered.
             self.dispatch_loop()?;
 
-            Ok(return_value.to_stack_with(self.cx()))
+            Ok(return_value.to_stack(self.cx()))
         }
     }
 
@@ -1638,10 +1640,12 @@ impl VM {
         js_stack_scope!(self.cx(), {
             // Check whether the value is a constructor, potentially deferring to proxy.
             let closure_handle = match self.check_value_is_constructor(*function)? {
-                CallableObject::Closure(closure) => closure.to_stack(),
+                CallableObject::Closure(closure) => closure.to_stack(self.cx()),
                 // Proxy constructors call directly into the rust runtime
                 CallableObject::Proxy(proxy) => {
-                    return proxy.to_stack().construct(self.cx(), arguments, new_target);
+                    return proxy
+                        .to_stack(self.cx())
+                        .construct(self.cx(), arguments, new_target);
                 }
                 CallableObject::Error(error) => return eval_err!(error),
             };
@@ -1704,7 +1708,7 @@ impl VM {
                 // of dispatch loop when the marked return address is encountered. May allocate.
                 self.dispatch_loop()?;
 
-                let return_value = return_value.to_stack();
+                let return_value = return_value.to_stack(self.cx());
 
                 // Use the function's return value if it is an object
                 if return_value.is_object() {
@@ -1735,11 +1739,12 @@ impl VM {
             CallableObject::Proxy(proxy) => {
                 return js_stack_scope!(self.cx(), {
                     // Can default to undefined receiver, which will be eventually coerced by callee
-                    let receiver = receiver
-                        .unwrap_or(Value::undefined())
-                        .to_stack_with(self.cx());
+                    let receiver = receiver.unwrap_or(Value::undefined()).to_stack(self.cx());
                     let arguments = self.prepare_rust_runtime_args(args);
-                    let return_value = proxy.to_stack().call(self.cx(), receiver, &arguments)?;
+                    let return_value =
+                        proxy
+                            .to_stack(self.cx())
+                            .call(self.cx(), receiver, &arguments)?;
                     unsafe { *return_value_address = *return_value };
 
                     Ok(())
@@ -1758,7 +1763,7 @@ impl VM {
 
             let cx = self.cx();
             js_stack_scope!(cx, {
-                let receiver = receiver.to_stack();
+                let receiver = receiver.to_stack(self.cx());
 
                 // Prepare arguments for the runtime call
                 let arguments = self.prepare_rust_runtime_args(args);
@@ -1831,8 +1836,8 @@ impl VM {
             // Proxy constructors call into the rust runtime
             CallableObject::Proxy(proxy) => {
                 return js_stack_scope!(self.cx(), {
-                    let proxy = proxy.to_stack();
-                    let new_target = new_target.to_stack();
+                    let proxy = proxy.to_stack(self.cx());
+                    let new_target = new_target.to_stack(self.cx());
                     let arguments = self.prepare_rust_runtime_args(args);
                     let return_value = proxy.construct(self.cx(), &arguments, new_target)?;
 
@@ -1857,7 +1862,7 @@ impl VM {
                 // Prepare arguments for the runtime call
                 let arguments = self.prepare_rust_runtime_args(args);
 
-                let new_target = new_target.to_stack();
+                let new_target = new_target.to_stack(self.cx());
 
                 let return_value = self.call_rust_runtime(
                     closure_ptr,
@@ -1871,9 +1876,9 @@ impl VM {
                 Ok(*(return_value.as_object())) as EvalResult<HeapPtr<ObjectValue>>
             } else {
                 // Otherwise this is a call to a JS function in the VM.
-                let closure_handle = closure_ptr.to_stack();
-                let function_handle = function_ptr.to_stack();
-                let new_target = new_target.to_stack();
+                let closure_handle = closure_ptr.to_stack(self.cx());
+                let function_handle = function_ptr.to_stack(self.cx());
+                let new_target = new_target.to_stack(self.cx());
 
                 // Create the receiver to use. Allocates.
                 let is_base = function_ptr.is_base_constructor();
@@ -2201,12 +2206,12 @@ impl VM {
         match self.get_args_slice(args) {
             ArgsSlice::Forward(slice) => {
                 for arg in slice {
-                    arguments.push(arg.to_stack());
+                    arguments.push(arg.to_stack(self.cx()));
                 }
             }
             ArgsSlice::Reverse(slice) => {
                 for arg in slice.iter().rev() {
-                    arguments.push(arg.to_stack());
+                    arguments.push(arg.to_stack(self.cx()));
                 }
             }
         }
@@ -2274,8 +2279,8 @@ impl VM {
                 // closure behind a handle across `to_object` call.
                 let cx = self.cx();
                 js_stack_scope!(cx, {
-                    let closure = closure.to_stack();
-                    let receiver = receiver.to_stack();
+                    let closure = closure.to_stack(self.cx());
+                    let receiver = receiver.to_stack(self.cx());
                     let receiver_object = to_object(cx, receiver)?;
                     Ok((*closure, *receiver_object.as_value()))
                 })
@@ -2451,8 +2456,8 @@ impl VM {
         flags: EvalFlags,
     ) -> EvalResult<()> {
         let is_strict_caller = self.closure().function_ptr().is_strict();
-        let scope = self.scope().to_stack();
-        let arg = arg.to_stack();
+        let scope = self.scope().to_stack(self.cx());
+        let arg = arg.to_stack(self.cx());
 
         // Allocates
         let result = perform_eval(self.cx(), arg, is_strict_caller, Some(scope), flags)?;
@@ -2469,7 +2474,7 @@ impl VM {
         js_stack_scope!(self.cx(), {
             let super_constructor = must!(self
                 .closure()
-                .to_stack()
+                .to_stack(self.cx())
                 .as_object()
                 .get_prototype_of(self.cx()));
 
@@ -2483,7 +2488,7 @@ impl VM {
                 .stack_frame()
                 .args()
                 .iter()
-                .map(|arg| arg.to_stack())
+                .map(|arg| arg.to_stack(self.cx()))
                 .collect::<Vec<_>>();
 
             // New target is in the first local register
@@ -2579,29 +2584,32 @@ impl VM {
         let cx = self.cx();
         js_stack_scope!(cx, {
             let name = self.get_constant(name_constant_index);
-            let name = name.as_string().to_stack();
+            let name = name.as_string().to_stack(self.cx());
 
             // May allocate, reuse name handle
             let name_key = PropertyKey::string(cx, name)?;
             let name_key = name.replace_into(name_key);
 
-            let global_object = self.closure().global_object();
+            let global_object = self.closure().global_object(self.cx());
 
             // Must first check if it is a lexical name in one of the realm's global scopes
-            let value =
-                if let Some(value) = self.closure().realm().get_lexical_name(*name.as_flat()) {
-                    value
-                } else if has_property(cx, global_object, name_key)? {
-                    // Otherwise might be a property in the global object
-                    *get(cx, global_object, name_key)?
-                } else if error_on_unresolved {
-                    // Error if property is not found
-                    return err_not_defined(cx, name);
-                } else {
-                    // If not erroring, return undefined for unresolved names
-                    self.write_register(dest, Value::undefined());
-                    return Ok(());
-                };
+            let value = if let Some(value) = self
+                .closure()
+                .realm(self.cx())
+                .get_lexical_name(*name.as_flat())
+            {
+                value
+            } else if has_property(cx, global_object, name_key)? {
+                // Otherwise might be a property in the global object
+                *get(cx, global_object, name_key)?
+            } else if error_on_unresolved {
+                // Error if property is not found
+                return err_not_defined(cx, name);
+            } else {
+                // If not erroring, return undefined for unresolved names
+                self.write_register(dest, Value::undefined());
+                return Ok(());
+            };
 
             self.write_register(dest, value);
 
@@ -2619,38 +2627,37 @@ impl VM {
             let value = self.read_register_to_handle(instr.value());
 
             let name = self.get_constant(instr.constant_index());
-            let name = name.as_string().to_stack();
+            let name = name.as_string().to_stack(self.cx());
 
             // May allocate, reuse name handle
             let name_key = PropertyKey::string(cx, name)?;
             let name_key = name.replace_into(name_key);
 
-            let mut global_object = self.closure().global_object();
+            let mut global_object = self.closure().global_object(self.cx());
 
             // First set the global lexical binding with the given name if it exists
-            let success =
-                if self
-                    .closure()
-                    .realm()
-                    .set_lexical_name(self.cx(), *name.as_flat(), *value)?
-                {
-                    true
-                } else if has_property(cx, global_object, name_key)? {
-                    // Otherwise if there is a global var with the given name then set the property on
-                    // the global object.
-                    global_object.set(cx, name_key, value, global_object.as_value())?
-                } else if self.closure().function_ptr().is_strict() {
-                    // Otherwise if in strict mode, error on unresolved name
-                    return err_not_defined(cx, name);
-                } else {
-                    // Otherwise in sloppy mode create a new global property
-                    return set(cx, global_object, name_key, value, false);
-                };
+            let success = if self.closure().realm(self.cx()).set_lexical_name(
+                self.cx(),
+                *name.as_flat(),
+                *value,
+            )? {
+                true
+            } else if has_property(cx, global_object, name_key)? {
+                // Otherwise if there is a global var with the given name then set the property on
+                // the global object.
+                global_object.set(cx, name_key, value, global_object.as_value())?
+            } else if self.closure().function_ptr().is_strict() {
+                // Otherwise if in strict mode, error on unresolved name
+                return err_not_defined(cx, name);
+            } else {
+                // Otherwise in sloppy mode create a new global property
+                return set(cx, global_object, name_key, value, false);
+            };
 
             // If property set failed and in strict mode then error, otherwise silently ignore
             // failure in sloppy mode.
             if !success && self.closure().function_ptr().is_strict() {
-                return err_cannot_set_property(cx, name.format()?);
+                return err_cannot_set_property(cx, name.format(self.cx())?);
             }
 
             Ok(())
@@ -2691,9 +2698,9 @@ impl VM {
         let cx = self.cx();
         js_stack_scope!(cx, {
             let name = self.get_constant(name_constant_index);
-            let name = name.as_string().to_stack();
+            let name = name.as_string().to_stack(self.cx());
 
-            let scope = self.scope().to_stack();
+            let scope = self.scope().to_stack(self.cx());
             let is_strict = self.closure().function_ptr().is_strict();
 
             if let Some(value) = scope.lookup(cx, name, is_strict)? {
@@ -2719,12 +2726,12 @@ impl VM {
     ) -> EvalResult<()> {
         let cx = self.cx();
         js_stack_scope!(cx, {
-            let value = self.read_register(instr.value()).to_stack();
+            let value = self.read_register(instr.value()).to_stack(self.cx());
 
             let name = self.get_constant(instr.name_index());
-            let name = name.as_string().to_stack();
+            let name = name.as_string().to_stack(self.cx());
 
-            let mut scope = self.scope().to_stack();
+            let mut scope = self.scope().to_stack(self.cx());
             let is_strict = self.closure().function_ptr().is_strict();
 
             let found_name = scope.lookup_store(cx, name, value, is_strict)?;
@@ -2739,7 +2746,7 @@ impl VM {
                     let name_key = name.cast::<PropertyKey>();
 
                     // If in sloppy mode, create a new property on the global object
-                    let mut global_object = self.closure().global_object();
+                    let mut global_object = self.closure().global_object(self.cx());
                     global_object.set(cx, name_key, value, global_object.into())?;
                 }
             }
@@ -3324,10 +3331,10 @@ impl VM {
         js_stack_scope_guard!(self.cx());
 
         let func = self.get_constant(instr.function_index());
-        let func = func.to_stack().cast::<BytecodeFunction>();
+        let func = func.to_stack(self.cx()).cast::<BytecodeFunction>();
 
         let dest = instr.dest();
-        let scope = self.scope().to_stack();
+        let scope = self.scope().to_stack(self.cx());
 
         // Allocates
         let closure = Closure::new(self.cx(), func, scope)?;
@@ -3345,10 +3352,10 @@ impl VM {
         js_stack_scope_guard!(self.cx());
 
         let func = self.get_constant(instr.function_index());
-        let func = func.to_stack().cast::<BytecodeFunction>();
+        let func = func.to_stack(self.cx()).cast::<BytecodeFunction>();
 
         let dest = instr.dest();
-        let scope = self.scope().to_stack();
+        let scope = self.scope().to_stack(self.cx());
 
         // Allocates
         let proto = self.cx().get_intrinsic(Intrinsic::AsyncFunctionPrototype);
@@ -3367,10 +3374,10 @@ impl VM {
         js_stack_scope_guard!(self.cx());
 
         let func = self.get_constant(instr.function_index());
-        let func = func.to_stack().cast::<BytecodeFunction>();
+        let func = func.to_stack(self.cx()).cast::<BytecodeFunction>();
 
         let dest = instr.dest();
-        let scope = self.scope().to_stack();
+        let scope = self.scope().to_stack(self.cx());
 
         // Allocates
         let func_proto = self
@@ -3396,10 +3403,10 @@ impl VM {
         js_stack_scope_guard!(self.cx());
 
         let func = self.get_constant(instr.function_index());
-        let func = func.to_stack().cast::<BytecodeFunction>();
+        let func = func.to_stack(self.cx()).cast::<BytecodeFunction>();
 
         let dest = instr.dest();
-        let scope = self.scope().to_stack();
+        let scope = self.scope().to_stack(self.cx());
 
         // Allocates
         let func_proto = self
@@ -3447,7 +3454,9 @@ impl VM {
         js_stack_scope_guard!(self.cx());
 
         let compiled_regexp = self.get_constant(instr.regexp_index());
-        let compiled_regexp = compiled_regexp.to_stack().cast::<CompiledRegExpObject>();
+        let compiled_regexp = compiled_regexp
+            .to_stack(self.cx())
+            .cast::<CompiledRegExpObject>();
 
         let dest = instr.dest();
 
@@ -3468,15 +3477,15 @@ impl VM {
 
         let dest = instr.dest();
 
-        let closure = self.closure().to_stack();
-        let scope = self.scope().to_stack();
+        let closure = self.closure().to_stack(self.cx());
+        let scope = self.scope().to_stack(self.cx());
         let num_parameters = closure.function_ptr().num_parameters() as usize;
 
         let arguments = self
             .stack_frame()
             .args()
             .iter()
-            .map(|arg| arg.to_stack())
+            .map(|arg| arg.to_stack(self.cx()))
             .collect::<Vec<_>>();
 
         // Allocates
@@ -3502,7 +3511,7 @@ impl VM {
             .stack_frame()
             .args()
             .iter()
-            .map(|arg| arg.to_stack())
+            .map(|arg| arg.to_stack(self.cx()))
             .collect::<Vec<_>>();
 
         // Allocates
@@ -3520,11 +3529,11 @@ impl VM {
 
             let class_names = self
                 .get_constant(instr.class_names_index())
-                .to_stack()
+                .to_stack(self.cx())
                 .cast::<ClassNames>();
             let constructor_function = self
                 .get_constant(instr.constructor_function_index())
-                .to_stack()
+                .to_stack(self.cx())
                 .cast::<BytecodeFunction>();
 
             let super_class = self.read_register_to_handle(instr.super_class());
@@ -3538,7 +3547,7 @@ impl VM {
                 .get_reg_rev_slice(instr.methods(), class_names.num_arguments())
                 .iter()
                 .rev()
-                .map(|value| value.to_stack())
+                .map(|value| value.to_stack(self.cx()))
                 .collect::<Vec<_>>();
 
             // Allocates
@@ -3583,7 +3592,10 @@ impl VM {
         js_stack_scope_guard!(self.cx());
 
         let dest = instr.dest();
-        let name = self.get_constant(instr.name_index()).as_string().to_stack();
+        let name = self
+            .get_constant(instr.name_index())
+            .as_string()
+            .to_stack(self.cx());
 
         // Allocates
         let private_symbol = SymbolValue::new(self.cx(), Some(name), /* is_private */ true)?;
@@ -3641,7 +3653,7 @@ impl VM {
             if is_strict {
                 let success = coerced_object.set(self.cx(), property_key, value, object)?;
                 if !success {
-                    return err_cannot_set_property(self.cx(), property_key.format()?);
+                    return err_cannot_set_property(self.cx(), property_key.format(self.cx())?);
                 }
             } else {
                 coerced_object.set(self.cx(), property_key, value, coerced_object.into())?;
@@ -3714,7 +3726,7 @@ impl VM {
             let object = self.read_register_to_handle(instr.object());
 
             let key = self.get_constant(instr.name_constant_index());
-            let key = key.as_string().to_stack();
+            let key = key.as_string().to_stack(self.cx());
 
             let dest = instr.dest();
             let is_strict = self.closure().function_ptr().is_strict();
@@ -3749,7 +3761,7 @@ impl VM {
             let object = self.read_register_to_handle(instr.object());
 
             let key = self.get_constant(instr.name_constant_index());
-            let key = key.as_string().to_stack();
+            let key = key.as_string().to_stack(self.cx());
 
             let value = self.read_register_to_handle(instr.value());
 
@@ -3764,7 +3776,7 @@ impl VM {
             if is_strict {
                 let success = coerced_object.set(self.cx(), property_key, value, object)?;
                 if !success {
-                    return err_cannot_set_property(self.cx(), property_key.format()?);
+                    return err_cannot_set_property(self.cx(), property_key.format(self.cx())?);
                 }
             } else {
                 coerced_object.set(self.cx(), property_key, value, coerced_object.into())?;
@@ -3783,7 +3795,7 @@ impl VM {
             let object = self.read_register_to_handle(instr.object());
 
             let key = self.get_constant(instr.name_constant_index());
-            let key = key.as_string().to_stack();
+            let key = key.as_string().to_stack(self.cx());
 
             let value = self.read_register_to_handle(instr.value());
 
@@ -3837,7 +3849,7 @@ impl VM {
             let receiver = self.read_register_to_handle(instr.receiver());
 
             let key = self.get_constant(instr.name_constant_index());
-            let key = key.as_string().to_stack();
+            let key = key.as_string().to_stack(self.cx());
 
             let dest = instr.dest();
 
@@ -3882,7 +3894,7 @@ impl VM {
             if is_strict {
                 let success = home_prototype.set(self.cx(), property_key, value, receiver)?;
                 if !success {
-                    return err_cannot_set_property(self.cx(), property_key.format()?);
+                    return err_cannot_set_property(self.cx(), property_key.format(self.cx())?);
                 }
             } else {
                 home_prototype.set(self.cx(), property_key, value, receiver)?;
@@ -3919,10 +3931,10 @@ impl VM {
         instr: &DeleteBindingInstruction<W>,
     ) -> EvalResult<()> {
         js_stack_scope!(self.cx(), {
-            let mut scope = self.scope().to_stack();
+            let mut scope = self.scope().to_stack(self.cx());
             let name = self
                 .get_constant(instr.name_constant_index())
-                .to_stack()
+                .to_stack(self.cx())
                 .as_string();
             let dest = instr.dest();
 
@@ -4057,7 +4069,7 @@ impl VM {
             let excluded_property_keys = self
                 .get_args_rev_slice(instr.argv(), instr.argc())
                 .iter()
-                .map(|v| v.to_stack().cast::<PropertyKey>())
+                .map(|v| v.to_stack(self.cx()).cast::<PropertyKey>())
                 .collect::<HashSet<_>>();
 
             // May allocate
@@ -4072,7 +4084,10 @@ impl VM {
         js_stack_scope!(self.cx(), {
             let dest = instr.dest();
             let object = self.read_register_to_handle(instr.object());
-            let key = self.get_constant(instr.name()).as_string().to_stack();
+            let key = self
+                .get_constant(instr.name())
+                .as_string()
+                .to_stack(self.cx());
 
             let key = PropertyKey::string_handle(self.cx(), key)?;
 
@@ -4097,10 +4112,10 @@ impl VM {
     ) -> EvalResult<()> {
         js_stack_scope_guard!(self.cx());
 
-        let scope = self.scope().to_stack();
+        let scope = self.scope().to_stack(self.cx());
         let scope_names = self
             .get_constant(instr.scope_names_index())
-            .to_stack()
+            .to_stack(self.cx())
             .cast::<ScopeNames>();
 
         // Allocates
@@ -4119,10 +4134,10 @@ impl VM {
     ) -> EvalResult<()> {
         js_stack_scope_guard!(self.cx());
 
-        let scope = self.scope().to_stack();
+        let scope = self.scope().to_stack(self.cx());
         let scope_names = self
             .get_constant(instr.scope_names_index())
-            .to_stack()
+            .to_stack(self.cx())
             .cast::<ScopeNames>();
 
         // Allocates
@@ -4142,10 +4157,10 @@ impl VM {
         js_stack_scope!(self.cx(), {
             let object = self.read_register_to_handle(instr.object());
 
-            let scope = self.scope().to_stack();
+            let scope = self.scope().to_stack(self.cx());
             let scope_names = self
                 .get_constant(instr.scope_names_index())
-                .to_stack()
+                .to_stack(self.cx())
                 .cast::<ScopeNames>();
 
             // Allocates
@@ -4171,7 +4186,7 @@ impl VM {
     fn execute_dup_scope<W: Width>(&mut self, _: &DupScopeInstruction<W>) -> EvalResult<()> {
         js_stack_scope_guard!(self.cx());
 
-        let scope = self.scope().to_stack();
+        let scope = self.scope().to_stack(self.cx());
 
         // Allocates
         let dup_scope = scope.duplicate(self.cx())?;
@@ -4306,8 +4321,8 @@ impl VM {
         let rest_array = must!(array_create(self.cx(), 0, None));
 
         // StackRoots are shared between iterations
-        let mut array_key = PropertyKey::uninit().to_stack();
-        let mut value_handle = Value::uninit().to_stack_with(self.cx());
+        let mut array_key = PropertyKey::uninit().to_stack(self.cx());
+        let mut value_handle = Value::uninit().to_stack(self.cx());
 
         // The arguments between the number of formal parameters and the actual argc supplied will
         // all be added to the rest array.
@@ -4369,7 +4384,7 @@ impl VM {
         }
 
         let name = self.get_constant(instr.name_constant_index()).as_string();
-        let name_str = name.to_stack().format()?;
+        let name_str = name.to_stack(self.cx()).format(self.cx())?;
 
         reference_error(
             self.cx(),
@@ -4712,7 +4727,9 @@ impl VM {
 
         // May allocate
         let value = if let Some(module) = module_scope.module_scope_module() {
-            let object = module.to_stack().get_import_meta_object(self.cx())?;
+            let object = module
+                .to_stack(self.cx())
+                .get_import_meta_object(self.cx())?;
             object.as_value()
         } else {
             Value::undefined()
@@ -4739,7 +4756,7 @@ impl VM {
                 .function_ptr()
                 .source_file_ptr()
                 .unwrap()
-                .path();
+                .path(self.cx());
 
             // May allocate
             let namespace_promise =

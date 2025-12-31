@@ -69,7 +69,7 @@ impl Scope {
 
         scope.slots.init_with(num_slots, Value::undefined());
 
-        Ok(scope.to_stack())
+        Ok(scope.to_stack(cx))
     }
 
     pub fn new_global(
@@ -246,9 +246,9 @@ impl StackRoot<Scope> {
                 // we need to load the value from the BoxedValue.
                 if scope.kind == ScopeKind::Module && scope_names.is_module_binding(index) {
                     let boxed_value = slot_value.as_pointer().cast::<BoxedValue>();
-                    return Ok(Some(boxed_value.get().to_stack()));
+                    return Ok(Some(boxed_value.get().to_stack(cx)));
                 } else {
-                    return Ok(Some(slot_value.to_stack()));
+                    return Ok(Some(slot_value.to_stack(cx)));
                 }
             }
 
@@ -283,7 +283,7 @@ impl StackRoot<Scope> {
                 let realm = scope.global_scope_realm();
                 let value = realm.get_lexical_name(*name.as_flat());
 
-                return Ok(value.map(|v| v.to_stack()));
+                return Ok(value.map(|v| v.to_stack(cx)));
             }
         }
     }
@@ -453,7 +453,7 @@ impl StackRoot<Scope> {
     /// Return the object for this scope, creating it if necessary.
     pub fn ensure_scope_object(&mut self, cx: Context) -> AllocResult<StackRoot<ObjectValue>> {
         if let Some(object) = self.object {
-            return Ok(object.to_stack());
+            return Ok(object.to_stack(cx));
         }
 
         let object = ordinary_object_create(cx)?;

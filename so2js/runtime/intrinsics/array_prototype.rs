@@ -163,7 +163,7 @@ impl ArrayPrototype {
             Self::apply_concat_to_element(cx, *element, array, &mut n)?;
         }
 
-        let new_length_value = Value::from(n).to_stack_with(cx);
+        let new_length_value = Value::from(n).to_stack(cx);
         set(cx, array, cx.names.length(), new_length_value, true)?;
 
         Ok(array.as_value())
@@ -204,7 +204,7 @@ impl ArrayPrototype {
             }
 
             // Property key is shared between iterations
-            let mut element_index_key = PropertyKey::uninit().to_stack();
+            let mut element_index_key = PropertyKey::uninit().to_stack(cx);
 
             for i in 0..length {
                 element_index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -297,8 +297,8 @@ impl ArrayPrototype {
         let mut count = count as u64;
 
         // Property keys are shared between iterations
-        let mut from_key = PropertyKey::uninit().to_stack();
-        let mut to_key = PropertyKey::uninit().to_stack();
+        let mut from_key = PropertyKey::uninit().to_stack(cx);
+        let mut to_key = PropertyKey::uninit().to_stack(cx);
 
         if from_index < to_index && to_index < from_index + count {
             // Treat as i64 due to potential subtraction below 0. Guaranteed to not need number
@@ -370,8 +370,8 @@ impl ArrayPrototype {
         let this_arg = get_argument(cx, arguments, 1);
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
-        let mut index_value = Value::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
+        let mut index_value = Value::uninit().to_stack(cx);
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -432,7 +432,7 @@ impl ArrayPrototype {
         };
 
         // Property key is shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for i in start_index..end_index {
             key.replace(PropertyKey::from_u64(cx, i)?);
@@ -464,8 +464,8 @@ impl ArrayPrototype {
         let mut result_index = 0;
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
-        let mut index_value = Value::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
+        let mut index_value = Value::uninit().to_stack(cx);
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -632,8 +632,8 @@ impl ArrayPrototype {
         let mut target_index = start;
 
         // Property key is shared between iterations
-        let mut source_key = PropertyKey::uninit().to_stack();
-        let mut target_key = PropertyKey::uninit().to_stack();
+        let mut source_key = PropertyKey::uninit().to_stack(cx);
+        let mut target_key = PropertyKey::uninit().to_stack(cx);
 
         for i in 0..source_length {
             source_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -641,7 +641,7 @@ impl ArrayPrototype {
                 let mut element = get(cx, source, source_key)?;
 
                 if let Some(mapper_function) = mapper_function {
-                    let index_value = Value::from(i).to_stack_with(cx);
+                    let index_value = Value::from(i).to_stack(cx);
                     let arguments = [element, index_value, source.into()];
                     element = call(cx, mapper_function, this_arg, &arguments)?;
                 }
@@ -738,8 +738,8 @@ impl ArrayPrototype {
         let this_arg = get_argument(cx, arguments, 1);
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
-        let mut index_value = Value::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
+        let mut index_value = Value::uninit().to_stack(cx);
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -786,7 +786,7 @@ impl ArrayPrototype {
         };
 
         // Property key is shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for i in start_index..length {
             key.replace(PropertyKey::from_u64(cx, i)?);
@@ -830,14 +830,14 @@ impl ArrayPrototype {
         };
 
         // Property key is shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for i in start_index..length {
             key.replace(PropertyKey::from_u64(cx, i)?);
             if has_property(cx, object, key)? {
                 let element = get(cx, object, key)?;
                 if is_strictly_equal(search_element, element)? {
-                    return Ok(Value::from(i).to_stack_with(cx));
+                    return Ok(Value::from(i).to_stack(cx));
                 }
             }
         }
@@ -864,7 +864,7 @@ impl ArrayPrototype {
         let mut joined = cx.names.empty_string().as_string();
 
         // Property key is shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for i in 0..length {
             if i > 0 {
@@ -931,14 +931,14 @@ impl ArrayPrototype {
         };
 
         // Property key is shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for i in (0..=start_index).rev() {
             key.replace(PropertyKey::from_u64(cx, i)?);
             if has_property(cx, object, key)? {
                 let element = get(cx, object, key)?;
                 if is_strictly_equal(search_element, element)? {
-                    return Ok(Value::from(i).to_stack_with(cx));
+                    return Ok(Value::from(i).to_stack(cx));
                 }
             }
         }
@@ -966,8 +966,8 @@ impl ArrayPrototype {
         let array = array_species_create(cx, object, length)?;
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
-        let mut index_value = Value::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
+        let mut index_value = Value::uninit().to_stack(cx);
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1006,7 +1006,7 @@ impl ArrayPrototype {
         let element = get(cx, object, index_key)?;
         delete_property_or_throw(cx, object, index_key)?;
 
-        let new_length_value = Value::from(new_length).to_stack_with(cx);
+        let new_length_value = Value::from(new_length).to_stack(cx);
         set(cx, object, cx.names.length(), new_length_value, true)?;
 
         Ok(element)
@@ -1027,14 +1027,14 @@ impl ArrayPrototype {
         }
 
         // Property key is shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for (i, argument) in arguments.iter().enumerate() {
             key.replace(PropertyKey::from_u64(cx, length + i as u64)?);
             set(cx, object, key, *argument, true)?;
         }
 
-        let new_length_value = Value::from(new_length).to_stack_with(cx);
+        let new_length_value = Value::from(new_length).to_stack(cx);
         set(cx, object, cx.names.length(), new_length_value, true)?;
 
         Ok(new_length_value)
@@ -1063,7 +1063,7 @@ impl ArrayPrototype {
             return type_error(cx, "reduce does not have initial value");
         } else {
             // Property key is shared between iterations
-            let mut index_key = PropertyKey::uninit().to_stack();
+            let mut index_key = PropertyKey::uninit().to_stack(cx);
 
             // Find the first value in the array if an initial value was not specified
             loop {
@@ -1081,8 +1081,8 @@ impl ArrayPrototype {
         };
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
-        let mut index_value = Value::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
+        let mut index_value = Value::uninit().to_stack(cx);
 
         for i in initial_index..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1121,7 +1121,7 @@ impl ArrayPrototype {
         } else if length == 0 {
             return type_error(cx, "reduceRight does not have initial value");
         } else {
-            let mut index_key = PropertyKey::uninit().to_stack();
+            let mut index_key = PropertyKey::uninit().to_stack(cx);
 
             // Find the first value in the array if an initial value was not specified
             loop {
@@ -1139,8 +1139,8 @@ impl ArrayPrototype {
         };
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
-        let mut index_value = Value::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
+        let mut index_value = Value::uninit().to_stack(cx);
 
         for i in (0..=initial_index).rev() {
             index_key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -1172,8 +1172,8 @@ impl ArrayPrototype {
         let mut upper = length.wrapping_sub(1);
 
         // Shared between iterations
-        let mut lower_key = PropertyKey::uninit().to_stack();
-        let mut upper_key = PropertyKey::uninit().to_stack();
+        let mut lower_key = PropertyKey::uninit().to_stack(cx);
+        let mut upper_key = PropertyKey::uninit().to_stack(cx);
 
         while lower != middle {
             lower_key.replace(PropertyKey::from_u64(cx, lower)?);
@@ -1233,8 +1233,8 @@ impl ArrayPrototype {
         let first = get(cx, object, first_key)?;
 
         // Shared between iterations
-        let mut from_key = PropertyKey::uninit().to_stack();
-        let mut to_key = PropertyKey::uninit().to_stack();
+        let mut from_key = PropertyKey::uninit().to_stack(cx);
+        let mut to_key = PropertyKey::uninit().to_stack(cx);
 
         for i in 1..length {
             from_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1251,7 +1251,7 @@ impl ArrayPrototype {
         let last_key = PropertyKey::from_u64_handle(cx, length - 1)?;
         delete_property_or_throw(cx, object, last_key)?;
 
-        let new_length_value = Value::from(length - 1).to_stack_with(cx);
+        let new_length_value = Value::from(length - 1).to_stack(cx);
         set(cx, object, cx.names.length(), new_length_value, true)?;
 
         Ok(first)
@@ -1301,7 +1301,7 @@ impl ArrayPrototype {
         let mut to_index = 0;
 
         // Shared between iterations
-        let mut from_key = PropertyKey::uninit().to_stack();
+        let mut from_key = PropertyKey::uninit().to_stack(cx);
 
         for i in start_index..end_index {
             from_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1318,7 +1318,7 @@ impl ArrayPrototype {
             to_index += 1;
         }
 
-        let to_index_value = Value::from(to_index).to_stack_with(cx);
+        let to_index_value = Value::from(to_index).to_stack(cx);
         set(cx, array, cx.names.length(), to_index_value, true)?;
 
         Ok(array.as_value())
@@ -1342,8 +1342,8 @@ impl ArrayPrototype {
         let this_arg = get_argument(cx, arguments, 1);
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
-        let mut index_value = Value::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
+        let mut index_value = Value::uninit().to_stack(cx);
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1385,7 +1385,7 @@ impl ArrayPrototype {
         )?;
 
         // Reuse handle between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
 
         // Copy sorted values into start of array
         for (i, value) in sorted_values.iter().enumerate() {
@@ -1444,8 +1444,8 @@ impl ArrayPrototype {
         let array = array_species_create(cx, object, actual_delete_count)?;
 
         // Shared between iterations
-        let mut from_key = PropertyKey::uninit().to_stack();
-        let mut to_key = PropertyKey::uninit().to_stack();
+        let mut from_key = PropertyKey::uninit().to_stack(cx);
+        let mut to_key = PropertyKey::uninit().to_stack(cx);
 
         for i in 0..actual_delete_count {
             from_key.replace(PropertyKey::from_u64(cx, start_index + i)?);
@@ -1456,7 +1456,7 @@ impl ArrayPrototype {
             }
         }
 
-        let actual_delete_count_value = Value::from(actual_delete_count).to_stack_with(cx);
+        let actual_delete_count_value = Value::from(actual_delete_count).to_stack(cx);
         set(
             cx,
             array,
@@ -1503,7 +1503,7 @@ impl ArrayPrototype {
             set(cx, object, to_key, *item, true)?;
         }
 
-        let new_length_value = Value::from(new_length).to_stack_with(cx);
+        let new_length_value = Value::from(new_length).to_stack(cx);
         set(cx, object, cx.names.length(), new_length_value, true)?;
 
         Ok(array.as_value())
@@ -1522,7 +1522,7 @@ impl ArrayPrototype {
         let separator = cx.names.comma().as_string();
 
         // Shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for i in 0..length {
             if i > 0 {
@@ -1555,8 +1555,8 @@ impl ArrayPrototype {
         let array = array_create(cx, length, None)?;
 
         // Keys are shared between iterations
-        let mut from_key = PropertyKey::uninit().to_stack();
-        let mut to_key = PropertyKey::uninit().to_stack();
+        let mut from_key = PropertyKey::uninit().to_stack(cx);
+        let mut to_key = PropertyKey::uninit().to_stack(cx);
 
         for i in 0..length {
             from_key.replace(PropertyKey::from_u64(cx, length - i - 1)?);
@@ -1598,7 +1598,7 @@ impl ArrayPrototype {
         )?;
 
         // Reuse handle between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
 
         // Copy sorted values into array
         for (i, value) in sorted_values.iter().enumerate() {
@@ -1659,8 +1659,8 @@ impl ArrayPrototype {
         let array = array_create(cx, new_length, None)?;
 
         // Keys are shared between iterations
-        let mut from_key = PropertyKey::uninit().to_stack();
-        let mut to_key = PropertyKey::uninit().to_stack();
+        let mut from_key = PropertyKey::uninit().to_stack(cx);
+        let mut to_key = PropertyKey::uninit().to_stack(cx);
 
         // Elements before the start index are unchanged and can be copied
         for i in 0..actual_start_index {
@@ -1734,8 +1734,8 @@ impl ArrayPrototype {
             }
 
             // Shared between iterations
-            let mut from_key = PropertyKey::uninit().to_stack();
-            let mut to_key = PropertyKey::uninit().to_stack();
+            let mut from_key = PropertyKey::uninit().to_stack(cx);
+            let mut to_key = PropertyKey::uninit().to_stack(cx);
 
             for i in (0..length).rev() {
                 from_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1755,7 +1755,7 @@ impl ArrayPrototype {
             }
         }
 
-        let new_length = Value::from(length + num_arguments).to_stack_with(cx);
+        let new_length = Value::from(length + num_arguments).to_stack(cx);
         set(cx, object, cx.names.length(), new_length, true)?;
 
         Ok(new_length)
@@ -1803,7 +1803,7 @@ impl ArrayPrototype {
         let new_value = get_argument(cx, arguments, 1);
 
         // Key is shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for i in 0..length {
             key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1828,7 +1828,7 @@ impl ArrayPrototype {
             HeapItemKind::OrdinaryObject,
             None,
         )?
-        .to_stack();
+        .to_stack(cx);
 
         let true_value = cx.bool(true);
 
@@ -1943,8 +1943,8 @@ pub fn find_via_predicate(
     this_arg: StackRoot<Value>,
 ) -> EvalResult<Option<(StackRoot<Value>, StackRoot<Value>)>> {
     // Shared between iterations
-    let mut index_key = PropertyKey::uninit().to_stack();
-    let mut index_value = Value::uninit().to_stack();
+    let mut index_key = PropertyKey::uninit().to_stack(cx);
+    let mut index_value = Value::uninit().to_stack(cx);
 
     for i in indices_iter {
         index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1978,7 +1978,7 @@ pub fn sort_indexed_properties<const IGNORE_HOLES: bool, const IS_TYPED_ARRAY: b
     compare_function: StackRoot<Value>,
 ) -> EvalResult<Vec<StackRoot<Value>>> {
     // Reuse handle between iterations
-    let mut index_key = PropertyKey::uninit().to_stack();
+    let mut index_key = PropertyKey::uninit().to_stack(cx);
 
     // Gather all non-empty values
     let mut values = vec![];

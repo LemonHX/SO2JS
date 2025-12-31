@@ -6,14 +6,14 @@ use crate::{
         error::{range_error, type_error},
         eval_result::EvalResult,
         function::get_argument,
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::HeapItemKind,
         intrinsics::array_buffer_constructor::throw_if_detached,
         object_value::ObjectValue,
         ordinary_object::object_create_from_constructor,
         realm::Realm,
         type_utilities::to_index,
-        Context, StackRoot, HeapPtr, Value,
+        Context, HeapPtr, StackRoot, Value,
     },
 };
 use alloc::format;
@@ -52,15 +52,15 @@ impl DataViewObject {
         object.byte_length = byte_length;
         object.byte_offset = byte_offset;
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn viewed_array_buffer_ptr(&self) -> HeapPtr<ArrayBufferObject> {
         self.viewed_array_buffer
     }
 
-    pub fn viewed_array_buffer(&self) -> StackRoot<ArrayBufferObject> {
-        self.viewed_array_buffer.to_stack()
+    pub fn viewed_array_buffer(&self, cx: Context) -> StackRoot<ArrayBufferObject> {
+        self.viewed_array_buffer.to_stack(cx)
     }
 
     pub fn byte_length(&self) -> Option<usize> {

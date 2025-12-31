@@ -82,9 +82,9 @@ impl GeneratorPrototype {
             HeapItemKind::OrdinaryObject,
             Intrinsic::GeneratorPrototype,
         )?
-        .to_stack();
+        .to_stack(cx);
 
-        let proto_desc = PropertyDescriptor::data(proto.to_stack().into(), true, false, false);
+        let proto_desc = PropertyDescriptor::data(proto.to_stack(cx).into(), true, false, false);
         define_property_or_throw(cx, closure.into(), cx.names.prototype(), proto_desc)?;
 
         Ok(())

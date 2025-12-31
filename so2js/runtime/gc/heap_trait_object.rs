@@ -71,9 +71,12 @@ macro_rules! heap_trait_object {
 
             #[allow(dead_code)]
             #[inline]
-            pub fn from_heap(heap_object: &$heap_object) -> $stack_object {
+            pub fn from_heap(
+                cx: $crate::runtime::Context,
+                heap_object: &$heap_object,
+            ) -> $stack_object {
                 $stack_object {
-                    data: heap_object.data.to_stack(),
+                    data: heap_object.data.to_stack(cx),
                     vtable: heap_object.vtable,
                 }
             }

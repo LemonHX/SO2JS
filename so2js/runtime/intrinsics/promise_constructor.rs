@@ -38,8 +38,8 @@ macro_rules! if_abrupt_reject_promise {
         match $crate::completion_value!(completion) {
             Ok(value) => value,
             Err(error) => {
-                call_object($cx, capability.reject(), $cx.undefined(), &[error])?;
-                return Ok(capability.promise().into());
+                call_object($cx, capability.reject($cx), $cx.undefined(), &[error])?;
+                return Ok(capability.promise($cx).into());
             }
         }
     }};
@@ -186,7 +186,7 @@ impl PromiseConstructor {
         mut function: StackRoot<ObjectValue>,
         value: Value,
     ) -> AllocResult<()> {
-        function.private_element_set(cx, cx.well_known_symbols.index().cast(), value.to_stack())
+        function.private_element_set(cx, cx.well_known_symbols.index().cast(), value.to_stack(cx))
     }
 
     fn get_values(cx: Context, function: StackRoot<ObjectValue>) -> StackRoot<ArrayObject> {
@@ -282,10 +282,10 @@ impl PromiseConstructor {
 
                     // Resolve the outer promise if all promises have resolved
                     if remaining_elements.number_data() == 0.0 {
-                        call_object(cx, capability.resolve(), cx.undefined(), &[values.into()])?;
+                        call_object(cx, capability.resolve(cx), cx.undefined(), &[values.into()])?;
                     }
 
-                    return Ok(capability.promise().as_value());
+                    return Ok(capability.promise(cx).as_value());
                 }
                 Some(next_value) => next_value,
             };
@@ -313,7 +313,7 @@ impl PromiseConstructor {
             // Call the promise's `then` with the custom resolve and default reject functions
             let next_promise = call_object(cx, resolve, constructor.into(), &[next_value])?;
 
-            let arguments = &[promise_all_resolve.into(), capability.reject().into()];
+            let arguments = &[promise_all_resolve.into(), capability.reject(cx).into()];
             invoke(cx, next_promise, cx.names.then(), arguments)?;
 
             index += 1;
@@ -340,7 +340,7 @@ impl PromiseConstructor {
         let index = Self::get_index(cx, function);
         let values = Self::get_values(cx, function);
 
-        let key = PropertyKey::from_value(cx, index)?.to_stack();
+        let key = PropertyKey::from_value(cx, index)?.to_stack(cx);
         must!(create_data_property_or_throw(
             cx,
             values.into(),
@@ -356,7 +356,7 @@ impl PromiseConstructor {
         // If all promises have been resolved then resolve the outer promise
         if remaining_elements.number_data() == 0.0 {
             let capability = Self::get_capability(cx, function);
-            return call_object(cx, capability.resolve(), cx.undefined(), &[values.into()]);
+            return call_object(cx, capability.resolve(cx), cx.undefined(), &[values.into()]);
         }
 
         Ok(cx.undefined())
@@ -394,10 +394,10 @@ impl PromiseConstructor {
 
                     // Resolve the outer promise if all promises have resolved
                     if remaining_elements.number_data() == 0.0 {
-                        call_object(cx, capability.resolve(), cx.undefined(), &[values.into()])?;
+                        call_object(cx, capability.resolve(cx), cx.undefined(), &[values.into()])?;
                     }
 
-                    return Ok(capability.promise().as_value());
+                    return Ok(capability.promise(cx).as_value());
                 }
                 Some(next_value) => next_value,
             };
@@ -492,7 +492,7 @@ impl PromiseConstructor {
         let index = Self::get_index(cx, function);
         let values = Self::get_values(cx, function);
 
-        let key = PropertyKey::from_value(cx, index)?.to_stack();
+        let key = PropertyKey::from_value(cx, index)?.to_stack(cx);
         must!(create_data_property_or_throw(
             cx,
             values.into(),
@@ -508,7 +508,7 @@ impl PromiseConstructor {
         // If all promises have been settled then resolve the outer promise
         if remaining_elements.number_data() == 0.0 {
             let capability = Self::get_capability(cx, function);
-            return call_object(cx, capability.resolve(), cx.undefined(), &[values.into()]);
+            return call_object(cx, capability.resolve(cx), cx.undefined(), &[values.into()]);
         }
 
         Ok(cx.undefined())
@@ -550,7 +550,7 @@ impl PromiseConstructor {
         let index = Self::get_index(cx, function);
         let values = Self::get_values(cx, function);
 
-        let key = PropertyKey::from_value(cx, index)?.to_stack();
+        let key = PropertyKey::from_value(cx, index)?.to_stack(cx);
         must!(create_data_property_or_throw(
             cx,
             values.into(),
@@ -566,7 +566,7 @@ impl PromiseConstructor {
         // If all promises have been settled then resolve the outer promise
         if remaining_elements.number_data() == 0.0 {
             let capability = Self::get_capability(cx, function);
-            return call_object(cx, capability.resolve(), cx.undefined(), &[values.into()]);
+            return call_object(cx, capability.resolve(cx), cx.undefined(), &[values.into()]);
         }
 
         Ok(cx.undefined())
@@ -606,10 +606,10 @@ impl PromiseConstructor {
                     // rejected.
                     if remaining_elements.number_data() == 0.0 {
                         let error = AggregateErrorObject::new(cx, errors.into())?;
-                        call_object(cx, capability.reject(), cx.undefined(), &[error.into()])?;
+                        call_object(cx, capability.reject(cx), cx.undefined(), &[error.into()])?;
                     }
 
-                    return Ok(capability.promise().as_value());
+                    return Ok(capability.promise(cx).as_value());
                 }
                 Some(next_value) => next_value,
             };
@@ -637,7 +637,7 @@ impl PromiseConstructor {
             // Call the promise's `then` with the default resolve and custom reject functions
             let next_promise = call_object(cx, resolve, constructor.into(), &[next_value])?;
 
-            let arguments = &[capability.resolve().into(), promise_any_reject.into()];
+            let arguments = &[capability.resolve(cx).into(), promise_any_reject.into()];
             invoke(cx, next_promise, cx.names.then(), arguments)?;
 
             index += 1;
@@ -664,7 +664,7 @@ impl PromiseConstructor {
         let index = Self::get_index(cx, function);
         let errors = Self::get_values(cx, function);
 
-        let key = PropertyKey::from_value(cx, index)?.to_stack();
+        let key = PropertyKey::from_value(cx, index)?.to_stack(cx);
         must!(create_data_property_or_throw(
             cx,
             errors.into(),
@@ -681,7 +681,7 @@ impl PromiseConstructor {
         if remaining_elements.number_data() == 0.0 {
             let error = AggregateErrorObject::new(cx, errors.into())?;
             let capability = Self::get_capability(cx, function);
-            return call_object(cx, capability.reject(), cx.undefined(), &[error.into()]);
+            return call_object(cx, capability.reject(cx), cx.undefined(), &[error.into()]);
         }
 
         Ok(cx.undefined())
@@ -708,11 +708,11 @@ impl PromiseConstructor {
         loop {
             let next_value = iterator_step_value(cx, iterator)?;
             match next_value {
-                None => return Ok(capability.promise().as_value()),
+                None => return Ok(capability.promise(cx).as_value()),
                 Some(next_value) => {
                     let next_promise = call_object(cx, resolve, constructor.into(), &[next_value])?;
 
-                    let arguments = &[capability.resolve().into(), capability.reject().into()];
+                    let arguments = &[capability.resolve(cx).into(), capability.reject(cx).into()];
                     invoke(cx, next_promise, cx.names.then(), arguments)?;
                 }
             }
@@ -729,9 +729,9 @@ impl PromiseConstructor {
 
         // Create a new promise and immediately reject it
         let capability = PromiseCapability::new(cx, this_value)?;
-        call_object(cx, capability.reject(), cx.undefined(), &[result])?;
+        call_object(cx, capability.reject(cx), cx.undefined(), &[result])?;
 
-        Ok(capability.promise().as_value())
+        Ok(capability.promise(cx).as_value())
     }
 
     /// Promise.resolve (https://tc39.es/ecma262/#sec-promise.resolve)
@@ -764,11 +764,11 @@ impl PromiseConstructor {
         let completion = call(cx, callback_arg, cx.undefined(), &arguments[1..]);
 
         match completion_value!(completion) {
-            Ok(value) => call_object(cx, capability.resolve(), cx.undefined(), &[value])?,
-            Err(error) => call_object(cx, capability.reject(), cx.undefined(), &[error])?,
+            Ok(value) => call_object(cx, capability.resolve(cx), cx.undefined(), &[value])?,
+            Err(error) => call_object(cx, capability.reject(cx), cx.undefined(), &[error])?,
         };
 
-        Ok(capability.promise().as_value())
+        Ok(capability.promise(cx).as_value())
     }
 
     /// Promise.withResolvers (https://tc39.es/ecma262/#sec-promise.withResolvers)
@@ -785,19 +785,19 @@ impl PromiseConstructor {
             cx,
             object,
             cx.names.promise_(),
-            capability.promise().into()
+            capability.promise(cx).into()
         ));
         must!(create_data_property_or_throw(
             cx,
             object,
             cx.names.resolve(),
-            capability.resolve().into()
+            capability.resolve(cx).into()
         ));
         must!(create_data_property_or_throw(
             cx,
             object,
             cx.names.reject(),
-            capability.reject().into()
+            capability.reject(cx).into()
         ));
 
         Ok(object.as_value())

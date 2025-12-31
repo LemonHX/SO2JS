@@ -4,7 +4,7 @@ use crate::runtime::alloc_error::AllocResult;
 
 use super::{
     accessor::Accessor,
-    gc::{StackRoot, GcVisitorExt},
+    gc::{GcVisitorExt, StackRoot},
     object_value::ObjectValue,
     value::Value,
     Context,
@@ -199,7 +199,7 @@ impl Property {
 
     pub fn from_heap(cx: Context, heap_property: &HeapProperty) -> Property {
         Property {
-            value: heap_property.value.to_stack(),
+            value: heap_property.value.to_stack(cx),
             flags: heap_property.flags,
         }
     }

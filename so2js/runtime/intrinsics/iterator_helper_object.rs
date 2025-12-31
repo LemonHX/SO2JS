@@ -81,7 +81,7 @@ impl IteratorHelperObject {
         set_uninit!(object.is_done, iterator.is_done);
         set_uninit!(object.generator_state, GeneratorState::SuspendedStart);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn new_drop(
@@ -171,14 +171,14 @@ impl IteratorHelperObject {
 
     fn iterator(&self, cx: Context) -> Iterator {
         Iterator {
-            iterator: self.iterator_object(),
-            next_method: self.next_method.to_stack(),
+            iterator: self.iterator_object(cx),
+            next_method: self.next_method.to_stack(cx),
             is_done: self.is_done,
         }
     }
 
-    pub fn iterator_object(&self) -> StackRoot<ObjectValue> {
-        self.iterator.to_stack()
+    pub fn iterator_object(&self, cx: Context) -> StackRoot<ObjectValue> {
+        self.iterator.to_stack(cx)
     }
 }
 
@@ -209,14 +209,14 @@ impl StackRoot<IteratorHelperObject> {
             // the yield when yielding an abnormal completion.
             //
             // First close the inner iterator, then close the outer iterator.
-            let inner_iterator = inner_iterator.as_ref().unwrap().0.to_stack();
+            let inner_iterator = inner_iterator.as_ref().unwrap().0.to_stack(cx);
             let backup_completion = iterator_close(cx, inner_iterator, Ok(cx.undefined()));
             match backup_completion {
-                Err(error) => iterator_close(cx, self.iterator_object(), Err(error)),
-                Ok(_) => iterator_close(cx, self.iterator_object(), Ok(cx.undefined())),
+                Err(error) => iterator_close(cx, self.iterator_object(cx), Err(error)),
+                Ok(_) => iterator_close(cx, self.iterator_object(cx), Ok(cx.undefined())),
             }
         } else {
-            iterator_close(cx, self.iterator_object(), Ok(cx.undefined()))
+            iterator_close(cx, self.iterator_object(cx), Ok(cx.undefined()))
         }
     }
 
@@ -289,7 +289,7 @@ impl StackRoot<IteratorHelperObject> {
 
         // Close the iterator if we have taken all the values
         if *remaining == 0.0 {
-            iterator_close(cx, self.iterator_object(), Ok(cx.undefined()))?;
+            iterator_close(cx, self.iterator_object(cx), Ok(cx.undefined()))?;
             return Ok(None);
         }
 
@@ -317,7 +317,7 @@ impl StackRoot<IteratorHelperObject> {
                 *counter += 1;
             }
 
-            predicate.to_stack()
+            predicate.to_stack(cx)
         } else {
             unreachable!()
         };
@@ -345,7 +345,7 @@ impl StackRoot<IteratorHelperObject> {
             let is_selected =
                 match call_object(cx, predicate, cx.undefined(), &[value, counter_value]) {
                     Err(error) => {
-                        iterator_close(cx, self.iterator_object(), Err(error))?;
+                        iterator_close(cx, self.iterator_object(cx), Err(error))?;
                         return Ok(None);
                     }
                     Ok(is_selected) => to_boolean(*is_selected),
@@ -374,7 +374,7 @@ impl StackRoot<IteratorHelperObject> {
     ) -> EvalResult<Option<StackRoot<ObjectValue>>> {
         let (mapper, counter) =
             if let IteratorHelperState::Map { mapper, counter } = self.state_mut() {
-                (mapper.to_stack(), counter)
+                (mapper.to_stack(cx), counter)
             } else {
                 unreachable!()
             };
@@ -384,7 +384,7 @@ impl StackRoot<IteratorHelperObject> {
             *counter += 1;
         }
 
-        let counter_value = Value::from(*counter).to_stack_with(cx);
+        let counter_value = Value::from(*counter).to_stack(cx);
 
         // Get the next value from the underlying iterator
         let value = match self.iterator_step_value(cx, &mut self.iterator(cx))? {
@@ -395,7 +395,7 @@ impl StackRoot<IteratorHelperObject> {
         // Run the mapper function, returning the result and closing the iterator on error
         match call_object(cx, mapper, cx.undefined(), &[value, counter_value]) {
             Err(error) => {
-                iterator_close(cx, self.iterator_object(), Err(error))?;
+                iterator_close(cx, self.iterator_object(cx), Err(error))?;
                 Ok(None)
             }
             Ok(value) => Ok(Some(
@@ -416,13 +416,13 @@ impl StackRoot<IteratorHelperObject> {
             // Set the initial inner iterator, if one exists
             if let Some((iterator, next_method)) = inner_iterator {
                 inner_iterator_opt = Some(Iterator {
-                    iterator: iterator.to_stack(),
-                    next_method: next_method.to_stack(),
+                    iterator: iterator.to_stack(cx),
+                    next_method: next_method.to_stack(cx),
                     is_done: false,
                 });
             }
 
-            mapper.to_stack()
+            mapper.to_stack(cx)
         } else {
             unreachable!()
         };

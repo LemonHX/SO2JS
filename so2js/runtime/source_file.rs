@@ -52,7 +52,7 @@ impl SourceFile {
 
         scope.contents.init_from_slice(source.contents.as_bytes());
 
-        Ok(scope.to_stack())
+        Ok(scope.to_stack(cx))
     }
 
     const CONTENTS_OFFSET: usize = field_offset!(SourceFile, contents);
@@ -63,13 +63,16 @@ impl SourceFile {
     }
 
     #[inline]
-    pub fn path(&self) -> StackRoot<FlatString> {
-        self.path.to_stack()
+    pub fn path(&self, cx: Context) -> StackRoot<FlatString> {
+        self.path.to_stack(cx)
     }
 
     #[inline]
-    pub fn display_name(&self) -> StackRoot<FlatString> {
-        self.display_name.as_ref().unwrap_or(&self.path).to_stack()
+    pub fn display_name(&self, cx: Context) -> StackRoot<FlatString> {
+        self.display_name
+            .as_ref()
+            .unwrap_or(&self.path)
+            .to_stack(cx)
     }
 
     #[inline]

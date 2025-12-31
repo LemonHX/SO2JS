@@ -511,7 +511,7 @@ impl Intrinsics {
         }
 
         // Root using the stored context pointer to avoid dereferencing object headers
-        ptr.to_stack_with(unsafe { Context::from_context_cell_ptr(self.context_ptr) })
+        ptr.to_stack(unsafe { Context::from_context_cell_ptr(self.context_ptr) })
     }
 
     // Intrinsic prototypes are created before their corresponding constructors, so we must add a

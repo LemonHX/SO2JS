@@ -88,7 +88,7 @@ impl SyntheticModule {
         realm: StackRoot<Realm>,
         default_export_value: StackRoot<Value>,
     ) -> AllocResult<StackRoot<SyntheticModule>> {
-        let default_export_name = cx.names.default.as_string().as_flat().to_stack();
+        let default_export_name = cx.names.default.as_string().as_flat().to_stack(cx);
         let mut module = Self::new(cx, realm, &[default_export_name])?;
 
         set_uninit!(
@@ -96,7 +96,7 @@ impl SyntheticModule {
             SyntheticModuleKind::DefaultExport(*default_export_value)
         );
 
-        Ok(module.to_stack())
+        Ok(module.to_stack(cx))
     }
 
     fn calculate_size_in_bytes() -> usize {
@@ -158,7 +158,7 @@ impl Module for StackRoot<SyntheticModule> {
 
         let scope_names = self.module_scope_ptr().scope_names_ptr();
         for name in scope_names.name_ptrs() {
-            exported_names.insert(name.to_stack());
+            exported_names.insert(name.to_stack(cx));
         }
     }
 
@@ -194,7 +194,7 @@ impl Module for StackRoot<SyntheticModule> {
     fn evaluate(&self, cx: Context) -> AllocResult<StackRoot<PromiseObject>> {
         let result = match self.kind {
             SyntheticModuleKind::DefaultExport(default_export_value) => {
-                self.evaluate_default_export_module(cx, default_export_value.to_stack())
+                self.evaluate_default_export_module(cx, default_export_value.to_stack(cx))
             }
         };
 

@@ -4,6 +4,7 @@
 //! that are specific to the so2js runtime.
 
 use core::mem::transmute;
+use so2js_gc::GcPtr;
 
 use crate::runtime::{PropertyKey, Value};
 
@@ -26,7 +27,7 @@ pub trait GcVisitorExt: GcVisitor {
     #[inline]
     fn visit_pointer<T>(&mut self, ptr: &mut HeapPtr<T>) {
         if !ptr.is_dangling() {
-            self.visit_raw(ptr.as_non_null().cast());
+            self.visit(ptr.as_gc_ptr_mut());
         }
     }
 
@@ -34,7 +35,7 @@ pub trait GcVisitorExt: GcVisitor {
     #[inline]
     fn visit_weak_pointer<T>(&mut self, ptr: &mut HeapPtr<T>) {
         if !ptr.is_dangling() {
-            self.visit_weak_raw(ptr.as_non_null().cast());
+            self.visit_weak(ptr.as_gc_ptr_mut());
         }
     }
 
@@ -50,11 +51,13 @@ pub trait GcVisitorExt: GcVisitor {
     #[inline]
     fn visit_value(&mut self, value: &mut Value) {
         if value.is_pointer() {
-            unsafe {
-                self.visit_raw(core::ptr::NonNull::new_unchecked(
+            // Value stores a heap pointer; GC is non-moving so a temporary GcPtr is fine.
+            let mut gc_ptr: GcPtr<u8> = unsafe {
+                GcPtr::from_non_null(core::ptr::NonNull::new_unchecked(
                     transmute::<&mut Value, &mut *mut u8>(value).cast(),
-                ));
-            }
+                ))
+            };
+            self.visit(&mut gc_ptr);
         }
     }
 
@@ -62,11 +65,12 @@ pub trait GcVisitorExt: GcVisitor {
     #[inline]
     fn visit_weak_value(&mut self, value: &mut Value) {
         if value.is_pointer() {
-            unsafe {
-                self.visit_weak_raw(core::ptr::NonNull::new_unchecked(
+            let mut gc_ptr: GcPtr<u8> = unsafe {
+                GcPtr::from_non_null(core::ptr::NonNull::new_unchecked(
                     transmute::<&mut Value, &mut *mut u8>(value).cast(),
-                ));
-            }
+                ))
+            };
+            self.visit_weak(&mut gc_ptr);
         }
     }
 

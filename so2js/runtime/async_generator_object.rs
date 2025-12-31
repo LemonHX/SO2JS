@@ -195,7 +195,7 @@ impl AsyncGeneratorObject {
     }
 
     fn peek_request(&self) -> Option<StackRoot<AsyncGeneratorRequest>> {
-        self.request_queue.map(|r| r.to_stack())
+        self.request_queue.map(|r| r.to_stack(cx))
     }
 
     fn pop_request(&mut self) -> Option<HeapPtr<AsyncGeneratorRequest>> {
@@ -298,7 +298,7 @@ pub fn async_generator_complete_step(
     debug_assert!(async_generator.request_queue.is_some());
 
     let next_request = async_generator.pop_request().unwrap();
-    let capability = next_request.capability.to_stack();
+    let capability = next_request.capability.to_stack(cx);
 
     match completion_value!(completion) {
         Ok(value) => {
@@ -375,7 +375,7 @@ pub fn async_generator_await_return(
     async_generator.state = AsyncGeneratorState::AwaitingReturn;
 
     let request = async_generator.peek_request_ptr().unwrap();
-    let completion_value = request.completion_value().to_stack();
+    let completion_value = request.completion_value().to_stack(cx);
 
     let promise_completion = coerce_to_ordinary_promise(cx, completion_value);
 
@@ -508,7 +508,7 @@ pub fn async_generator_drain_queue(
                 )?;
             }
             GeneratorCompletionType::Throw => {
-                let completion = eval_err!(request.completion_value().to_stack());
+                let completion = eval_err!(request.completion_value().to_stack(cx));
                 async_generator_complete_step(
                     cx,
                     async_generator,

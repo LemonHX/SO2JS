@@ -2,7 +2,7 @@ use crate::{
     field_offset,
     runtime::{
         alloc_error::AllocResult,
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
         Context, HeapPtr,
     },
@@ -285,7 +285,7 @@ pub trait BsHashMapField<K: Eq + Hash + Clone, V: Clone> {
         }
 
         // Save old map behind handle before allocating
-        let old_map = old_map.to_stack();
+        let old_map = old_map.to_stack(cx);
 
         // Double size leaving map 1/4 full after growing
         let new_capacity = capacity * 2;

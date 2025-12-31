@@ -58,7 +58,7 @@ impl Closure {
         set_uninit!(object.function, *function);
         set_uninit!(object.scope, *scope);
 
-        let closure = object.to_stack();
+        let closure = object.to_stack(cx);
         Self::init_common_properties(cx, closure, function, cx.current_realm())?;
 
         Ok(closure)
@@ -75,7 +75,7 @@ impl Closure {
         set_uninit!(object.function, *function);
         set_uninit!(object.scope, *scope);
 
-        let closure = object.to_stack();
+        let closure = object.to_stack(cx);
         Self::init_common_properties(cx, closure, function, cx.current_realm())?;
 
         Ok(closure)
@@ -93,7 +93,7 @@ impl Closure {
         set_uninit!(object.function, *function);
         set_uninit!(object.scope, *scope);
 
-        let closure = object.to_stack();
+        let closure = object.to_stack(cx);
         Self::init_common_properties(cx, closure, function, realm)?;
 
         Ok(closure)
@@ -112,7 +112,7 @@ impl Closure {
         set_uninit!(object.scope, *scope);
 
         // Does not need to the `name` and `length` properties as these will be set by caller
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn init_extra_fields(
@@ -130,8 +130,8 @@ impl Closure {
     }
 
     #[inline]
-    pub fn function(&self) -> StackRoot<BytecodeFunction> {
-        self.function.to_stack()
+    pub fn function(&self, cx: Context) -> StackRoot<BytecodeFunction> {
+        self.function.to_stack(cx)
     }
 
     #[inline]
@@ -140,13 +140,13 @@ impl Closure {
     }
 
     #[inline]
-    pub fn global_object(&self) -> StackRoot<ObjectValue> {
-        self.function_ptr().realm_ptr().global_object()
+    pub fn global_object(&self, cx: Context) -> StackRoot<ObjectValue> {
+        self.function_ptr().realm_ptr().global_object(cx)
     }
 
     #[inline]
-    pub fn realm(&self) -> StackRoot<Realm> {
-        self.function_ptr().realm()
+    pub fn realm(&self, cx: Context) -> StackRoot<Realm> {
+        self.function_ptr().realm(cx)
     }
 
     /// Iniialize the common properties of all functions - `name`, `length`, and `prototype` if
@@ -161,7 +161,7 @@ impl Closure {
 
         // Default to the empty string if a name was not provided
         let name = if let Some(name) = function.name {
-            PropertyKey::string_handle(cx, name.to_stack())?
+            PropertyKey::string_handle(cx, name.to_stack(cx))?
         } else {
             cx.names.empty_string()
         };
@@ -172,7 +172,7 @@ impl Closure {
             let proto = realm.get_intrinsic(Intrinsic::ObjectPrototype);
             let prototype =
                 object_create_with_proto::<ObjectValue>(cx, HeapItemKind::OrdinaryObject, proto)?
-                    .to_stack();
+                    .to_stack(cx);
 
             let desc = PropertyDescriptor::data(closure.into(), true, false, true);
             must_a!(define_property_or_throw(
@@ -320,7 +320,7 @@ impl BytecodeFunction {
         set_uninit!(object.rust_runtime_function_id, None);
         object.bytecode.init_from_slice(&bytecode);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn new_rust_runtime_function(
@@ -367,7 +367,7 @@ impl BytecodeFunction {
         set_uninit!(object.rust_runtime_function_id, Some(function_id));
         object.bytecode.init_from_slice(&[]);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     const BYTECODE_BYTE_OFFSET: usize = field_offset!(BytecodeFunction, bytecode);
@@ -397,8 +397,8 @@ impl BytecodeFunction {
     }
 
     #[inline]
-    pub fn realm(&self) -> StackRoot<Realm> {
-        self.realm.to_stack()
+    pub fn realm(&self, cx: Context) -> StackRoot<Realm> {
+        self.realm.to_stack(cx)
     }
 
     #[inline]
@@ -447,8 +447,8 @@ impl BytecodeFunction {
     }
 
     #[inline]
-    pub fn name(&self) -> Option<StackRoot<StringValue>> {
-        self.name.map(|n| n.to_stack())
+    pub fn name(&self, cx: Context) -> Option<StackRoot<StringValue>> {
+        self.name.map(|n| n.to_stack(cx))
     }
 
     #[inline]
@@ -476,7 +476,7 @@ impl DebugPrint for HeapPtr<BytecodeFunction> {
     /// Debug print this function only.
     fn debug_format(&self, printer: &mut DebugPrinter) {
         let name = if let Some(name) = self.name {
-            name.to_stack().format().unwrap()
+            name.to_stack(printer.cx).format(printer.cx).unwrap()
         } else {
             "<anonymous>".to_owned()
         };
@@ -524,7 +524,7 @@ impl DebugPrint for HeapPtr<BytecodeFunction> {
 }
 
 pub fn dump_bytecode_function(cx: Context, func: HeapPtr<BytecodeFunction>) {
-    let mut printer = DebugPrinter::new(DebugPrintMode::Verbose);
+    let mut printer = DebugPrinter::new(DebugPrintMode::Verbose, cx);
     printer.set_ignore_raw_bytes(/* ignore_raw_bytes */ true);
 
     func.debug_format(&mut printer);

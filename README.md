@@ -1,6 +1,14 @@
 # SO2 JS
 > read as `Sulphur Dioxide JS`
 
+
+- [ ] debugger
+- [ ] rust native memory allocator
+- [ ] oxc's js parser
+- [ ] crate rust's future beside js's loop
+- [ ] add promise hook
+- [ ] add compat to serde_json  
+
 SO2JS is a fork of [Brimstone](https://github.com/Hans-Halverson/brimstone) JS engine which is a JavaScript engine written from scratch in Rust, aiming to have full support for the JavaScript language.
 
 SO2 [Brimstone](https://github.com/Hans-Halverson/brimstone) Implements the [ECMAScript specification](https://tc39.es/ecma262/). Heavy inspiration is taken from the design of [V8](https://v8.dev/) and SerenityOS's [LibJS](https://github.com/LadybirdBrowser/ladybird). Brimstone chooses to implement almost all components of the engine from scratch with minimal dependencies, with the notable exception of [ICU4X](https://github.com/unicode-org/icu4x).

@@ -4,7 +4,7 @@ use crate::{
         alloc_error::AllocResult,
         bytecode::function::BytecodeFunction,
         collections::{BsArray, BsHashMap, BsHashMapField, BsVec, BsVecField, InlineArray},
-        gc::{AnyHeapItem, HeapItem, GcVisitorExt},
+        gc::{AnyHeapItem, GcVisitorExt, HeapItem},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
         module::{
             execute::module_evaluate, import_attributes::ImportAttributes, module::next_module_id,
@@ -16,7 +16,7 @@ use crate::{
         rust_vtables::extract_module_vtable,
         scope::Scope,
         string_value::FlatString,
-        Context, EvalResult, StackRoot, HeapPtr, PropertyKey, Value,
+        Context, EvalResult, HeapPtr, PropertyKey, StackRoot, Value,
     },
     set_uninit,
 };
@@ -127,7 +127,7 @@ impl SourceTextModule {
         let num_module_requests = requested_modules.len();
         let mut heap_requested_modules =
             BsArray::new_uninit(cx, HeapItemKind::ModuleRequestArray, num_module_requests)?
-                .to_stack();
+                .to_stack(cx);
         for (dst, src) in heap_requested_modules
             .as_mut_slice()
             .iter_mut()
@@ -142,7 +142,7 @@ impl SourceTextModule {
             requested_modules.len(),
             None,
         )?
-        .to_stack();
+        .to_stack(cx);
 
         // Then create the uninitialized module object
         let num_entries =
@@ -195,7 +195,7 @@ impl SourceTextModule {
             i += 1;
         }
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     const ENTRIES_OFFSET: usize = field_offset!(SourceTextModule, entries);
@@ -276,7 +276,7 @@ impl SourceTextModule {
 
     #[inline]
     pub fn cycle_root(&self) -> Option<StackRoot<SourceTextModule>> {
-        self.cycle_root_ptr().map(|root| root.to_stack())
+        self.cycle_root_ptr().map(|root| root.to_stack(cx))
     }
 
     #[inline]
@@ -301,7 +301,7 @@ impl SourceTextModule {
 
     #[inline]
     pub fn evaluation_error(&self, cx: Context) -> Option<StackRoot<Value>> {
-        self.evaluation_error_ptr().map(|error| error.to_stack())
+        self.evaluation_error_ptr().map(|error| error.to_stack(cx))
     }
 
     #[inline]
@@ -332,7 +332,7 @@ impl SourceTextModule {
     #[inline]
     pub fn async_parent_modules(&self) -> Option<StackRoot<AsyncParentModulesVec>> {
         self.async_parent_modules_ptr()
-            .map(|modules| modules.to_stack())
+            .map(|modules| modules.to_stack(cx))
     }
 
     #[inline]
@@ -342,7 +342,7 @@ impl SourceTextModule {
 
     #[inline]
     pub fn program_function(&self) -> StackRoot<BytecodeFunction> {
-        self.program_function_ptr().to_stack()
+        self.program_function_ptr().to_stack(cx)
     }
 
     #[inline]
@@ -352,7 +352,7 @@ impl SourceTextModule {
 
     #[inline]
     pub fn module_scope(&self) -> StackRoot<Scope> {
-        self.module_scope_ptr().to_stack()
+        self.module_scope_ptr().to_stack(cx)
     }
 
     #[inline]
@@ -362,12 +362,12 @@ impl SourceTextModule {
 
     #[inline]
     pub fn requested_modules(&self) -> StackRoot<ModuleRequestArray> {
-        self.requested_modules.to_stack()
+        self.requested_modules.to_stack(cx)
     }
 
     #[inline]
     pub fn loaded_modules(&self) -> StackRoot<ModuleOptionArray> {
-        self.loaded_modules.to_stack()
+        self.loaded_modules.to_stack(cx)
     }
 
     pub fn lookup_module_request_index(&self, module_request: &HeapModuleRequest) -> Option<usize> {
@@ -416,7 +416,7 @@ impl StackRoot<SourceTextModule> {
 
     #[inline]
     fn async_parent_modules_field(&self) -> AsyncParentModulesField {
-        AsyncParentModulesField(self.to_stack())
+        AsyncParentModulesField(self.to_stack(cx))
     }
 
     #[inline]
@@ -504,7 +504,7 @@ impl Module for StackRoot<SourceTextModule> {
                 // Named exports are added to the set of exported names
                 ModuleEntry::LocalExport(HeapLocalExportEntry { export_name, .. })
                 | ModuleEntry::NamedReExport(HeapNamedReExportEntry { export_name, .. }) => {
-                    exported_names.insert(export_name.to_stack());
+                    exported_names.insert(export_name.to_stack(cx));
                 }
                 ModuleEntry::DirectReExport(named_re_export) => {
                     // Add all names from the requested module to the set of exported names, excluding
@@ -553,7 +553,7 @@ impl Module for StackRoot<SourceTextModule> {
                             name: entry.local_name,
                             boxed_value,
                         },
-                        module: self.to_stack().as_dyn_module(),
+                        module: self.to_stack(cx).as_dyn_module(),
                     });
                 }
             }
@@ -774,8 +774,8 @@ impl HeapModuleRequest {
 impl ModuleRequest {
     pub fn from_heap(module_request: &HeapModuleRequest) -> ModuleRequest {
         ModuleRequest {
-            specifier: module_request.specifier.to_stack(),
-            attributes: module_request.attributes.map(|a| a.to_stack()),
+            specifier: module_request.specifier.to_stack(cx),
+            attributes: module_request.attributes.map(|a| a.to_stack(cx)),
         }
     }
 
@@ -837,8 +837,8 @@ impl ImportEntry {
     pub fn from_heap(entry: &HeapImportEntry) -> ImportEntry {
         ImportEntry {
             module_request: ModuleRequest::from_heap(&entry.module_request),
-            import_name: entry.import_name.map(|name| name.to_stack()),
-            local_name: entry.local_name.to_stack(),
+            import_name: entry.import_name.map(|name| name.to_stack(cx)),
+            local_name: entry.local_name.to_stack(cx),
             slot_index: entry.slot_index,
             is_exported: entry.is_exported,
         }
@@ -962,7 +962,7 @@ pub fn module_option_array_visit_pointers(
 ) {
     array.visit_pointers(visitor);
 
-    for module in array.as_mut_slice().iter_mut().flatten() {
+    for module in array.as_mut_slice().iter_mut().flatten(cx) {
         module.visit_pointers(visitor);
     }
 }

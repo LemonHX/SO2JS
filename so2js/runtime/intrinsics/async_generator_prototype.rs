@@ -79,11 +79,11 @@ impl AsyncGeneratorPrototype {
             let iter_result = create_iter_result_object(cx, cx.undefined(), true)?;
             must!(call_object(
                 cx,
-                capability.resolve(),
+                capability.resolve(cx),
                 cx.undefined(),
                 &[iter_result]
             ));
-            return Ok(capability.promise().as_value());
+            return Ok(capability.promise(cx).as_value());
         }
 
         async_generator.enqueue_request(cx, capability, value, GeneratorCompletionType::Normal)?;
@@ -97,7 +97,7 @@ impl AsyncGeneratorPrototype {
             debug_assert!(state.is_executing() || state == AsyncGeneratorState::AwaitingReturn);
         }
 
-        Ok(capability.promise().as_value())
+        Ok(capability.promise(cx).as_value())
     }
 
     /// %AsyncGeneratorPrototype%.return (https://tc39.es/ecma262/#sec-asyncgenerator-prototype-return)
@@ -126,7 +126,7 @@ impl AsyncGeneratorPrototype {
             debug_assert!(state.is_executing() || state == AsyncGeneratorState::AwaitingReturn);
         }
 
-        Ok(capability.promise().as_value())
+        Ok(capability.promise(cx).as_value())
     }
 
     /// %AsyncGeneratorPrototype%.throw (https://tc39.es/ecma262/#sec-asyncgenerator-prototype-throw)
@@ -154,11 +154,11 @@ impl AsyncGeneratorPrototype {
         if state == AsyncGeneratorState::Completed {
             must!(call_object(
                 cx,
-                capability.reject(),
+                capability.reject(cx),
                 cx.undefined(),
                 &[error]
             ));
-            return Ok(capability.promise().as_value());
+            return Ok(capability.promise(cx).as_value());
         }
 
         async_generator.enqueue_request(cx, capability, error, GeneratorCompletionType::Throw)?;
@@ -170,7 +170,7 @@ impl AsyncGeneratorPrototype {
             debug_assert!(state.is_executing() || state == AsyncGeneratorState::AwaitingReturn);
         }
 
-        Ok(capability.promise().as_value())
+        Ok(capability.promise(cx).as_value())
     }
 
     /// Every async generator function has a prototype property referencing an instance of the
@@ -184,9 +184,9 @@ impl AsyncGeneratorPrototype {
             HeapItemKind::OrdinaryObject,
             Intrinsic::AsyncGeneratorPrototype,
         )?
-        .to_stack();
+        .to_stack(cx);
 
-        let proto_desc = PropertyDescriptor::data(proto.to_stack().into(), true, false, false);
+        let proto_desc = PropertyDescriptor::data(proto.to_stack(cx).into(), true, false, false);
         define_property_or_throw(cx, closure.into(), cx.names.prototype(), proto_desc)?;
 
         Ok(())

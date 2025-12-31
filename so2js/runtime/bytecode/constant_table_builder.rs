@@ -35,7 +35,7 @@ impl ConstantTableEntry {
         match self {
             ConstantTableEntry::String(string) => ToValueResult::Value(string.cast()),
             ConstantTableEntry::HeapItem { item, .. } => ToValueResult::Value(item.cast()),
-            ConstantTableEntry::Double(double) => ToValueResult::Value(double.to_stack()),
+            ConstantTableEntry::Double(double) => ToValueResult::Value(double.to_stack(cx)),
             // Bytecode offsets are stored directly, not encoded as a value
             ConstantTableEntry::BytecodeOffset(offset) => {
                 ToValueResult::Raw(Value::from_raw_bits(offset as u64))
@@ -380,7 +380,7 @@ impl ConstantTableBuilder {
         // patched later. Fill them in with undefined.
         for constant in &mut constants {
             if constant.is_dangling() {
-                *constant = Value::undefined().to_stack_with(cx);
+                *constant = Value::undefined().to_stack(cx);
             }
         }
 

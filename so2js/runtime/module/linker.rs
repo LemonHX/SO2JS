@@ -94,7 +94,7 @@ impl GraphLinker {
 
         let loaded_modules = module.loaded_modules();
         for i in 0..loaded_modules.len() {
-            let required_module = DynModule::from_heap(&loaded_modules.as_slice()[i].unwrap());
+            let required_module = DynModule::from_heap(cx, &loaded_modules.as_slice()[i].unwrap());
 
             index = self.inner_link(cx, required_module, index)?;
 
@@ -177,7 +177,7 @@ fn initialize_environment(cx: Context, module: StackRoot<SourceTextModule>) -> E
                     } => {
                         // May allocate
                         let namespace_object =
-                            resolved_module.get_namespace_object(cx)?.to_stack();
+                            resolved_module.get_namespace_object(cx)?.to_stack(cx);
 
                         // The BoxedValue for namespace re-exports has not yet been created (unlike
                         // all other exports, which are actual bindings whose BoxedValue is created

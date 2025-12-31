@@ -6,16 +6,88 @@ use bitflags::bitflags;
 
 use crate::{
     runtime::{
-        alloc_error::AllocResult, arguments_object::MappedArgumentsObject,
-        module::module_namespace_object::ModuleNamespaceObject, ordinary_object::OrdinaryObject,
-        rust_vtables::extract_virtual_object_vtable, Value,
+        accessor::Accessor,
+        alloc_error::AllocResult,
+        arguments_object::{MappedArgumentsObject, UnmappedArgumentsObject},
+        array_object::ArrayObject,
+        array_properties::{DenseArrayProperties, SparseArrayProperties},
+        async_generator_object::{AsyncGeneratorObject, AsyncGeneratorRequest},
+        boxed_value::BoxedValue,
+        bytecode::{
+            constant_table::ConstantTable,
+            exception_handlers::ExceptionStackRootrs,
+            function::{BytecodeFunction, Closure},
+        },
+        class_names::ClassNames,
+        collections::{
+            array::{
+                byte_array_byte_size, module_option_array_byte_size,
+                module_request_array_byte_size, u32_array_byte_size, value_array_byte_size,
+            },
+            vec::value_vec_byte_size,
+        },
+        context::{GlobalSymbolRegistryField, ModuleCacheField},
+        for_in_iterator::ForInIterator,
+        generator_object::GeneratorObject,
+        global_names::GlobalNames,
+        intrinsics::{
+            array_buffer_constructor::ArrayBufferObject,
+            array_iterator::ArrayIterator,
+            async_from_sync_iterator_prototype::AsyncFromSyncIterator,
+            bigint_constructor::BigIntObject,
+            boolean_constructor::BooleanObject,
+            data_view_constructor::DataViewObject,
+            date_object::DateObject,
+            error_constructor::ErrorObject,
+            finalization_registry_object::{FinalizationRegistryCells, FinalizationRegistryObject},
+            iterator_constructor::WrappedValidIterator,
+            iterator_helper_object::IteratorHelperObject,
+            map_iterator::MapIterator,
+            map_object::{MapObject, MapObjectMapField},
+            number_constructor::NumberObject,
+            object_prototype::ObjectPrototype,
+            regexp_constructor::RegExpObject,
+            regexp_string_iterator::RegExpStringIterator,
+            set_iterator::SetIterator,
+            set_object::{SetObject, SetObjectSetField},
+            string_iterator::StringIterator,
+            symbol_constructor::SymbolObject,
+            typed_array::{
+                BigInt64Array, BigUInt64Array, Float16Array, Float32Array, Float64Array,
+                Int16Array, Int32Array, Int8Array, UInt16Array, UInt32Array, UInt8Array,
+                UInt8ClampedArray,
+            },
+            weak_map_object::{WeakMapObject, WeakMapObjectMapField},
+            weak_ref_constructor::WeakRefObject,
+            weak_set_object::{WeakSetObject, WeakSetObjectSetField},
+        },
+        module::{
+            import_attributes::ImportAttributes,
+            module_namespace_object::ModuleNamespaceObject,
+            source_text_module::{ExportMapField, SourceTextModule},
+            synthetic_module::SyntheticModule,
+        },
+        object_value::{NamedPropertiesMapField, ObjectValue, VirtualObject, VirtualObjectVtable},
+        promise_object::{PromiseCapability, PromiseObject, PromiseReaction},
+        proxy_object::ProxyObject,
+        realm::{GlobalScopes, LexicalNamesMapField},
+        regexp::compiled_regexp::CompiledRegExpObject,
+        rust_vtables::extract_virtual_object_vtable,
+        scope::Scope,
+        scope_names::ScopeNames,
+        source_file::SourceFile,
+        stack_trace::stack_frame_info_array_byte_size,
+        string_object::StringObject,
+        string_value::StringValue,
+        value::{BigIntValue, SymbolValue},
+        Context, Value,
     },
     set_uninit,
 };
 
 use super::{
     array_object::ArrayObject,
-    gc::{StackRoot, HeapItem, HeapPtr, GcVisitorExt},
+    gc::{AnyHeapItem, GcVisitorExt, HeapItem, HeapPtr, StackRoot},
     intrinsics::typed_array::{
         BigInt64Array, BigUInt64Array, Float16Array, Float32Array, Float64Array, Int16Array,
         Int32Array, Int8Array, UInt16Array, UInt32Array, UInt8Array, UInt8ClampedArray,
@@ -213,6 +285,117 @@ impl HeapItemDescriptor {
     pub fn is_object(&self) -> bool {
         self.flags.contains(DescFlags::IS_OBJECT)
     }
+
+    pub fn byte_size_for_item(&self, item: HeapPtr<AnyHeapItem>) -> usize {
+        match self.kind() {
+            HeapItemKind::Descriptor => item.cast::<HeapItemDescriptor>().byte_size(),
+            HeapItemKind::OrdinaryObject => item.cast::<ObjectValue>().byte_size(),
+            HeapItemKind::Proxy => item.cast::<ProxyObject>().byte_size(),
+            HeapItemKind::BooleanObject => item.cast::<BooleanObject>().byte_size(),
+            HeapItemKind::NumberObject => item.cast::<NumberObject>().byte_size(),
+            HeapItemKind::StringObject => item.cast::<StringObject>().byte_size(),
+            HeapItemKind::SymbolObject => item.cast::<SymbolObject>().byte_size(),
+            HeapItemKind::BigIntObject => item.cast::<BigIntObject>().byte_size(),
+            HeapItemKind::ArrayObject => item.cast::<ArrayObject>().byte_size(),
+            HeapItemKind::RegExpObject => item.cast::<RegExpObject>().byte_size(),
+            HeapItemKind::ErrorObject => item.cast::<ErrorObject>().byte_size(),
+            HeapItemKind::DateObject => item.cast::<DateObject>().byte_size(),
+            HeapItemKind::SetObject => item.cast::<SetObject>().byte_size(),
+            HeapItemKind::MapObject => item.cast::<MapObject>().byte_size(),
+            HeapItemKind::WeakRefObject => item.cast::<WeakRefObject>().byte_size(),
+            HeapItemKind::WeakSetObject => item.cast::<WeakSetObject>().byte_size(),
+            HeapItemKind::WeakMapObject => item.cast::<WeakMapObject>().byte_size(),
+            HeapItemKind::FinalizationRegistryObject => {
+                item.cast::<FinalizationRegistryObject>().byte_size()
+            }
+            HeapItemKind::MappedArgumentsObject => item.cast::<MappedArgumentsObject>().byte_size(),
+            HeapItemKind::UnmappedArgumentsObject => {
+                item.cast::<UnmappedArgumentsObject>().byte_size()
+            }
+            HeapItemKind::Int8Array => item.cast::<Int8Array>().byte_size(),
+            HeapItemKind::UInt8Array => item.cast::<UInt8Array>().byte_size(),
+            HeapItemKind::UInt8ClampedArray => item.cast::<UInt8ClampedArray>().byte_size(),
+            HeapItemKind::Int16Array => item.cast::<Int16Array>().byte_size(),
+            HeapItemKind::UInt16Array => item.cast::<UInt16Array>().byte_size(),
+            HeapItemKind::Int32Array => item.cast::<Int32Array>().byte_size(),
+            HeapItemKind::UInt32Array => item.cast::<UInt32Array>().byte_size(),
+            HeapItemKind::BigInt64Array => item.cast::<BigInt64Array>().byte_size(),
+            HeapItemKind::BigUInt64Array => item.cast::<BigUInt64Array>().byte_size(),
+            HeapItemKind::Float16Array => item.cast::<Float16Array>().byte_size(),
+            HeapItemKind::Float32Array => item.cast::<Float32Array>().byte_size(),
+            HeapItemKind::Float64Array => item.cast::<Float64Array>().byte_size(),
+            HeapItemKind::ArrayBufferObject => item.cast::<ArrayBufferObject>().byte_size(),
+            HeapItemKind::DataViewObject => item.cast::<DataViewObject>().byte_size(),
+            HeapItemKind::ArrayIterator => item.cast::<ArrayIterator>().byte_size(),
+            HeapItemKind::StringIterator => item.cast::<StringIterator>().byte_size(),
+            HeapItemKind::SetIterator => item.cast::<SetIterator>().byte_size(),
+            HeapItemKind::MapIterator => item.cast::<MapIterator>().byte_size(),
+            HeapItemKind::RegExpStringIterator => item.cast::<RegExpStringIterator>().byte_size(),
+            HeapItemKind::ForInIterator => item.cast::<ForInIterator>().byte_size(),
+            HeapItemKind::AsyncFromSyncIterator => item.cast::<AsyncFromSyncIterator>().byte_size(),
+            HeapItemKind::WrappedValidIterator => item.cast::<WrappedValidIterator>().byte_size(),
+            HeapItemKind::IteratorHelperObject => item.cast::<IteratorHelperObject>().byte_size(),
+            HeapItemKind::ObjectPrototype => item.cast::<ObjectPrototype>().byte_size(),
+            HeapItemKind::String => item.cast::<StringValue>().byte_size(),
+            HeapItemKind::Symbol => item.cast::<SymbolValue>().byte_size(),
+            HeapItemKind::BigInt => item.cast::<BigIntValue>().byte_size(),
+            HeapItemKind::Accessor => item.cast::<Accessor>().byte_size(),
+            HeapItemKind::Promise => item.cast::<PromiseObject>().byte_size(),
+            HeapItemKind::PromiseReaction => item.cast::<PromiseReaction>().byte_size(),
+            HeapItemKind::PromiseCapability => item.cast::<PromiseCapability>().byte_size(),
+            HeapItemKind::Realm => item.cast::<Realm>().byte_size(),
+            HeapItemKind::Closure => item.cast::<Closure>().byte_size(),
+            HeapItemKind::BytecodeFunction => item.cast::<BytecodeFunction>().byte_size(),
+            HeapItemKind::ConstantTable => item.cast::<ConstantTable>().byte_size(),
+            HeapItemKind::ExceptionStackRootrs => item.cast::<ExceptionStackRootrs>().byte_size(),
+            HeapItemKind::SourceFile => item.cast::<SourceFile>().byte_size(),
+            HeapItemKind::Scope => item.cast::<Scope>().byte_size(),
+            HeapItemKind::ScopeNames => item.cast::<ScopeNames>().byte_size(),
+            HeapItemKind::GlobalNames => item.cast::<GlobalNames>().byte_size(),
+            HeapItemKind::ClassNames => item.cast::<ClassNames>().byte_size(),
+            HeapItemKind::SourceTextModule => item.cast::<SourceTextModule>().byte_size(),
+            HeapItemKind::SyntheticModule => item.cast::<SyntheticModule>().byte_size(),
+            HeapItemKind::ModuleNamespaceObject => item.cast::<ModuleNamespaceObject>().byte_size(),
+            HeapItemKind::ImportAttributes => item.cast::<ImportAttributes>().byte_size(),
+            HeapItemKind::Generator => item.cast::<GeneratorObject>().byte_size(),
+            HeapItemKind::AsyncGenerator => item.cast::<AsyncGeneratorObject>().byte_size(),
+            HeapItemKind::AsyncGeneratorRequest => item.cast::<AsyncGeneratorRequest>().byte_size(),
+            HeapItemKind::DenseArrayProperties => item.cast::<DenseArrayProperties>().byte_size(),
+            HeapItemKind::SparseArrayProperties => item.cast::<SparseArrayProperties>().byte_size(),
+            HeapItemKind::CompiledRegExpObject => item.cast::<CompiledRegExpObject>().byte_size(),
+            HeapItemKind::BoxedValue => item.cast::<BoxedValue>().byte_size(),
+            HeapItemKind::ObjectNamedPropertiesMap => {
+                NamedPropertiesMapField::byte_size(&item.cast())
+            }
+            HeapItemKind::MapObjectValueMap => MapObjectMapField::byte_size(&item.cast()),
+            HeapItemKind::SetObjectValueSet => SetObjectSetField::byte_size(&item.cast()),
+            HeapItemKind::ExportMap => ExportMapField::byte_size(&item.cast()),
+            HeapItemKind::WeakMapObjectWeakValueMap => {
+                WeakMapObjectMapField::byte_size(&item.cast())
+            }
+            HeapItemKind::WeakSetObjectWeakValueSet => {
+                WeakSetObjectSetField::byte_size(&item.cast())
+            }
+            HeapItemKind::GlobalSymbolRegistryMap => {
+                GlobalSymbolRegistryField::byte_size(&item.cast())
+            }
+            HeapItemKind::InternedStringsSet => InternedStringsSetField::byte_size(&item.cast()),
+            HeapItemKind::LexicalNamesMap => LexicalNamesMapField::byte_size(&item.cast()),
+            HeapItemKind::ModuleCacheMap => ModuleCacheField::byte_size(&item.cast()),
+            HeapItemKind::ValueArray => value_array_byte_size(item.cast()),
+            HeapItemKind::ByteArray => byte_array_byte_size(item.cast()),
+            HeapItemKind::U32Array => u32_array_byte_size(item.cast()),
+            HeapItemKind::ModuleRequestArray => module_request_array_byte_size(item.cast()),
+            HeapItemKind::ModuleOptionArray => module_option_array_byte_size(item.cast()),
+            HeapItemKind::StackFrameInfoArray => stack_frame_info_array_byte_size(item.cast()),
+            HeapItemKind::FinalizationRegistryCells => {
+                item.cast::<FinalizationRegistryCells>().byte_size()
+            }
+            HeapItemKind::GlobalScopes => item.cast::<GlobalScopes>().byte_size(),
+            HeapItemKind::ValueVec => value_vec_byte_size(item.cast()),
+            HeapItemKind::Last => unreachable!("No objects are created with this descriptor"),
+        }
+    }
 }
 
 pub struct BaseDescriptors {
@@ -251,7 +434,7 @@ impl BaseDescriptors {
             HeapItemKind::Descriptor,
             DescFlags::empty(),
         )?
-        .to_stack();
+        .to_stack(cx);
         descriptor.descriptor = *descriptor;
         descriptors[HeapItemKind::Descriptor as usize] = *descriptor;
 

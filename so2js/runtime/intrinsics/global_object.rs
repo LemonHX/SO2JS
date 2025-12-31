@@ -34,7 +34,7 @@ pub fn set_default_global_bindings(cx: Context, realm: StackRoot<Realm>) -> Eval
 
                 define_property_or_throw(
                     cx,
-                    realm.global_object(),
+                    realm.global_object(cx),
                     $name,
                     PropertyDescriptor::data(
                         $value,
@@ -64,7 +64,7 @@ pub fn set_default_global_bindings(cx: Context, realm: StackRoot<Realm>) -> Eval
                 let value = realm.get_intrinsic(Intrinsic::$intrinsic);
                 define_property_or_throw(
                     cx,
-                    realm.global_object(),
+                    realm.global_object(cx),
                     $name,
                     PropertyDescriptor::data(value.into(), true, false, true),
                 )?;
@@ -77,7 +77,7 @@ pub fn set_default_global_bindings(cx: Context, realm: StackRoot<Realm>) -> Eval
 
         value_prop!(
             cx.names.global_this(),
-            realm.global_object().into(),
+            realm.global_object(cx).into(),
             true,
             false,
             true
@@ -369,7 +369,7 @@ fn decode<const INCLUDE_URI_UNESCAPED: bool>(
 ) -> EvalResult<StackRoot<Value>> {
     let mut decoded_string = Wtf8String::new();
 
-    let flat_string = string.flatten()?;
+    let flat_string = string.flatten(cx)?;
     let string_length = flat_string.len();
 
     let mut i = 0;
@@ -489,7 +489,7 @@ fn decode<const INCLUDE_URI_UNESCAPED: bool>(
     }
 
     Ok(FlatString::from_wtf8(cx, decoded_string.as_bytes())?
-        .to_stack()
+        .to_stack(cx)
         .as_value())
 }
 
@@ -524,7 +524,7 @@ fn encode<const INCLUDE_URI_UNESCAPED: bool>(
 ) -> EvalResult<StackRoot<Value>> {
     let mut encoded_string = Wtf8String::new();
 
-    for code_point in string.iter_code_points()? {
+    for code_point in string.iter_code_points(cx)? {
         // Very that the char is not an unpaired surrogate
         let char = match char::from_u32(code_point) {
             Some(char) => char,
@@ -570,14 +570,14 @@ fn encode<const INCLUDE_URI_UNESCAPED: bool>(
     // Safe since only ASCII characters were used
     Ok(
         FlatString::from_one_byte_slice(cx, encoded_string.as_bytes())?
-            .to_stack()
+            .to_stack(cx)
             .as_value(),
     )
 }
 
 // Additional Properties of the Global Object (https://tc39.es/ecma262/#sec-additional-properties-of-the-global-object)
 pub fn init_global_annex_b_methods(mut cx: Context, realm: StackRoot<Realm>) -> AllocResult<()> {
-    let mut global_object = realm.global_object();
+    let mut global_object = realm.global_object(cx);
 
     let escape_name = cx.alloc_string("escape")?.as_string();
     let escape_key = PropertyKey::string_not_array_index_handle(cx, escape_name)?;
@@ -601,7 +601,7 @@ pub fn escape(
 
     let mut escaped_string = Wtf8String::new();
 
-    for code_unit in string.iter_code_units()? {
+    for code_unit in string.iter_code_units(cx)? {
         let code_unit = code_unit as u32;
 
         match_u32!(match code_unit {
@@ -637,7 +637,7 @@ pub fn unescape(
 
     let mut i = 0;
     while i < length {
-        let code_unit = string.code_unit_at(i)?;
+        let code_unit = string.code_unit_at(i, cx)?;
 
         // Unescaped code unit
         if code_unit != '%' as u16 {
@@ -647,8 +647,8 @@ pub fn unescape(
         }
 
         // Escaped as %uXXXX
-        if i + 5 < length && string.code_unit_at(i + 1)? == 'u' as u16 {
-            if let Some(parsed_code_unit) = parse_hex_code_units(string, i + 2, 4)? {
+        if i + 5 < length && string.code_unit_at(i + 1, cx)? == 'u' as u16 {
+            if let Some(parsed_code_unit) = parse_hex_code_units(cx, string, i + 2, 4)? {
                 unescaped_string.push(parsed_code_unit);
                 i += 6;
                 continue;
@@ -657,7 +657,7 @@ pub fn unescape(
 
         // Escaped as %XX
         if i + 3 <= length {
-            if let Some(parsed_code_unit) = parse_hex_code_units(string, i + 1, 2)? {
+            if let Some(parsed_code_unit) = parse_hex_code_units(cx, string, i + 1, 2)? {
                 unescaped_string.push(parsed_code_unit);
                 i += 3;
                 continue;
@@ -673,6 +673,7 @@ pub fn unescape(
 }
 
 fn parse_hex_code_units(
+    cx: Context,
     string: StackRoot<StringValue>,
     start_index: u32,
     num_code_units: u32,
@@ -680,7 +681,7 @@ fn parse_hex_code_units(
     let mut value = 0;
 
     for i in 0..num_code_units {
-        let code_unit = string.code_unit_at(start_index + i)?;
+        let code_unit = string.code_unit_at(start_index + i, cx)?;
         let Some(hex_value) = get_hex_value(code_unit as u32) else {
             return Ok(None);
         };

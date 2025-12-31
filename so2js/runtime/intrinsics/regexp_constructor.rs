@@ -1,8 +1,8 @@
 use alloc::format;
-use so2js_macros::match_u32;
 use bumpalo::Bump;
-use core::mem::size_of;
 use core::error::Error;
+use core::mem::size_of;
+use so2js_macros::match_u32;
 
 use crate::{
     common::{
@@ -30,7 +30,7 @@ use crate::{
         error::{syntax_parse_error, type_error},
         eval_result::EvalResult,
         function::get_argument,
-        gc::{StackRoot, HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem, StackRoot},
         get,
         heap_item_descriptor::HeapItemKind,
         object_value::ObjectValue,
@@ -70,7 +70,7 @@ impl RegExpObject {
         // we must ensure the RegExpObject is in a valid state.
         set_uninit!(object.compiled_regexp, HeapPtr::uninit());
 
-        let object = object.to_stack();
+        let object = object.to_stack(cx);
 
         Self::define_last_index_property(cx, object)?;
 
@@ -91,7 +91,7 @@ impl RegExpObject {
 
         set_uninit!(object.compiled_regexp, *compiled_regexp);
 
-        let object = object.to_stack();
+        let object = object.to_stack(cx);
 
         Self::define_last_index_property(cx, object)?;
 
@@ -124,8 +124,8 @@ impl RegExpObject {
     }
 
     #[inline]
-    pub fn compiled_regexp(&self) -> StackRoot<CompiledRegExpObject> {
-        self.compiled_regexp.to_stack()
+    pub fn compiled_regexp(&self, cx: Context) -> StackRoot<CompiledRegExpObject> {
+        self.compiled_regexp.to_stack(cx)
     }
 
     #[inline]
@@ -134,8 +134,8 @@ impl RegExpObject {
     }
 
     #[inline]
-    pub fn escaped_pattern_source(&self) -> StackRoot<StringValue> {
-        self.compiled_regexp.escaped_pattern_source()
+    pub fn escaped_pattern_source(&self, cx: Context) -> StackRoot<StringValue> {
+        self.compiled_regexp.escaped_pattern_source(cx)
     }
 }
 
@@ -204,7 +204,7 @@ impl RegExpConstructor {
             } else {
                 // If flags are provided we must reparse pattern instead of using compiled regexp
                 // directly, since different flags may result in a different regexp.
-                let pattern_value = pattern_regexp_object.escaped_pattern_source().into();
+                let pattern_value = pattern_regexp_object.escaped_pattern_source(cx).into();
                 RegExpSource::PatternAndFlags(pattern_value, FlagsSource::Value(flags_arg))
             }
         } else if pattern_is_regexp {
@@ -241,7 +241,7 @@ impl RegExpConstructor {
 
         let mut escaped = Wtf8String::new();
 
-        for code_point in string.iter_code_points()? {
+        for code_point in string.iter_code_points(cx)? {
             // NOTE: Escaping a leading digit ensures that output corresponds with pattern text
             // which may be used after a \0 character escape or a DecimalEscape such as \1 and still
             // match S rather than be interpreted as an extension of the preceding escape sequence.
@@ -390,7 +390,7 @@ fn parse_flags(cx: Context, flags_string: StackRoot<StringValue>) -> EvalResult<
         }
     }
 
-    let flat_string = flags_string.flatten()?;
+    let flat_string = flags_string.flatten(cx)?;
     match flat_string.width() {
         StringWidth::OneByte => {
             let lexer_stream = HeapOneByteLexerStream::new(flat_string.as_one_byte_slice());
@@ -424,7 +424,7 @@ fn parse_pattern(
         }
     }
 
-    let flat_string = pattern_string.flatten()?;
+    let flat_string = pattern_string.flatten(cx)?;
     match flat_string.width() {
         StringWidth::OneByte => {
             let create_lexer_stream =
@@ -456,7 +456,7 @@ fn escape_pattern_string(
 
     // Only need to escape line terminators and forward slash
     let neeeds_escape = pattern_string
-        .iter_code_units()?
+        .iter_code_units(cx)?
         .any(|code_unit| code_unit == '/' as u16 || is_newline(code_unit as u32));
     if !neeeds_escape {
         return Ok(pattern_string);
@@ -464,7 +464,7 @@ fn escape_pattern_string(
 
     let mut escaped_string = Wtf8String::new();
 
-    for code_unit in pattern_string.iter_code_units()? {
+    for code_unit in pattern_string.iter_code_units(cx)? {
         if code_unit == '/' as u16 {
             escaped_string.push_str("\\/");
         } else if code_unit == '\n' as u16 {

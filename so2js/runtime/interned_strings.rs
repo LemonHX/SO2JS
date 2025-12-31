@@ -72,7 +72,7 @@ impl InternedStrings {
                 string.intern();
 
                 // Preserve string before potentially growing set
-                let string = string.to_stack();
+                let string = string.to_stack(cx);
 
                 cx.interned_strings
                     .strings_field()
@@ -86,15 +86,15 @@ impl InternedStrings {
 
     pub fn alloc_wtf8_str(mut cx: Context, str: &Wtf8Str) -> AllocResult<StackRoot<FlatString>> {
         let string_value = cx.alloc_wtf8_str_ptr(str)?;
-        Ok(InternedStrings::get(cx, string_value)?.to_stack())
+        Ok(InternedStrings::get(cx, string_value)?.to_stack(cx))
     }
 
     pub fn get_generator_cache_str(mut cx: Context, str: &str) -> AllocResult<StackRoot<StringValue>> {
         match cx.interned_strings.generator_cache.get(str.as_bytes()) {
-            Some(interned_string) => Ok(interned_string.as_string().to_stack()),
+            Some(interned_string) => Ok(interned_string.as_string().to_stack(cx)),
             None => {
                 let string_value = cx.alloc_string_ptr(str)?;
-                let interned_string = InternedStrings::get(cx, string_value)?.to_stack();
+                let interned_string = InternedStrings::get(cx, string_value)?.to_stack(cx);
 
                 cx.interned_strings
                     .generator_cache
@@ -110,10 +110,10 @@ impl InternedStrings {
         str: &Wtf8Str,
     ) -> AllocResult<StackRoot<StringValue>> {
         match cx.interned_strings.generator_cache.get(str) {
-            Some(interned_string) => Ok(interned_string.as_string().to_stack()),
+            Some(interned_string) => Ok(interned_string.as_string().to_stack(cx)),
             None => {
                 let string_value = cx.alloc_wtf8_str_ptr(str)?;
-                let interned_string = InternedStrings::get(cx, string_value)?.to_stack();
+                let interned_string = InternedStrings::get(cx, string_value)?.to_stack(cx);
 
                 cx.interned_strings
                     .generator_cache

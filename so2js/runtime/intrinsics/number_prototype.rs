@@ -62,7 +62,7 @@ impl NumberPrototype {
         let num_fraction_digits = to_integer_or_infinity(cx, fraction_digits_arg)?;
 
         if !number.is_finite() {
-            return Ok(to_string(cx, number_value.to_stack())?.as_value());
+            return Ok(to_string(cx, number_value.to_stack(cx))?.as_value());
         }
 
         if !(0.0..=100.0).contains(&num_fraction_digits) {
@@ -192,12 +192,12 @@ impl NumberPrototype {
 
         let precision_arg = get_argument(cx, arguments, 0);
         if precision_arg.is_undefined() {
-            return Ok(to_string(cx, number_value.to_stack())?.as_value());
+            return Ok(to_string(cx, number_value.to_stack(cx))?.as_value());
         }
 
         let precision = to_integer_or_infinity(cx, precision_arg)?;
         if !number_value.as_number().is_finite() {
-            return Ok(to_string(cx, number_value.to_stack())?.as_value());
+            return Ok(to_string(cx, number_value.to_stack(cx))?.as_value());
         }
 
         let precision = precision as i64;
@@ -367,7 +367,7 @@ impl NumberPrototype {
         }
 
         Ok(FlatString::from_one_byte_slice(cx, &result_bytes)?
-            .to_stack()
+            .to_stack(cx)
             .as_value())
     }
 
@@ -378,7 +378,7 @@ impl NumberPrototype {
         _: &[StackRoot<Value>],
     ) -> EvalResult<StackRoot<Value>> {
         let number_value = this_number_value(cx, this_value)?;
-        Ok(number_value.to_stack())
+        Ok(number_value.to_stack(cx))
     }
 }
 

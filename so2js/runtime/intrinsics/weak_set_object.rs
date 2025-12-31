@@ -6,12 +6,12 @@ use crate::{
         alloc_error::AllocResult,
         collections::{BsHashSet, BsHashSetField},
         eval_result::EvalResult,
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::HeapItemKind,
         object_value::ObjectValue,
         ordinary_object::object_create_from_constructor,
         value::{ValueCollectionKey, ValueCollectionKeyStackRoot},
-        Context, StackRoot, HeapPtr, Value,
+        Context, HeapPtr, StackRoot, Value,
     },
     set_uninit,
 };
@@ -37,7 +37,7 @@ impl WeakSetObject {
         constructor: StackRoot<ObjectValue>,
     ) -> EvalResult<StackRoot<WeakSetObject>> {
         let weak_set_data =
-            WeakValueSet::new_initial(cx, HeapItemKind::WeakSetObjectWeakValueSet)?.to_stack();
+            WeakValueSet::new_initial(cx, HeapItemKind::WeakSetObjectWeakValueSet)?.to_stack(cx);
 
         let mut object = object_create_from_constructor::<WeakSetObject>(
             cx,
@@ -48,7 +48,7 @@ impl WeakSetObject {
 
         set_uninit!(object.weak_set_data, *weak_set_data);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn weak_set_data(&self) -> HeapPtr<WeakValueSet> {
@@ -70,7 +70,7 @@ impl StackRoot<WeakSetObject> {
     }
 
     pub fn insert(&self, cx: Context, item: StackRoot<Value>) -> AllocResult<bool> {
-        let item_handle = ValueCollectionKeyStackRoot::new(item)?;
+        let item_handle = ValueCollectionKeyStackRoot::new(cx, item)?;
 
         Ok(self
             .weak_set_data_field()

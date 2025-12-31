@@ -8,7 +8,7 @@ use crate::{
         collections::index_map::GcSafeEntriesIter,
         error::type_error,
         eval_result::EvalResult,
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::HeapItemKind,
         iterator::create_iter_result_object,
         object_value::ObjectValue,
@@ -16,7 +16,7 @@ use crate::{
         property::Property,
         realm::Realm,
         value::{Value, ValueCollectionKey},
-        Context, StackRoot, HeapPtr,
+        Context, HeapPtr, StackRoot,
     },
     set_uninit,
 };
@@ -60,14 +60,14 @@ impl MapIterator {
         set_uninit!(object.kind, kind);
         set_uninit!(object.is_done, false);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     cast_from_value_fn!(MapIterator, "Map Iterator");
 
-    fn get_iter(&self) -> GcSafeEntriesIter<ValueCollectionKey, Value> {
+    fn get_iter(&self, cx: Context) -> GcSafeEntriesIter<ValueCollectionKey, Value> {
         GcSafeEntriesIter::<ValueCollectionKey, Value>::from_parts(
-            self.map.to_stack(),
+            self.map.to_stack(cx),
             self.next_entry_index,
         )
     }
@@ -128,7 +128,7 @@ impl MapIteratorPrototype {
         }
 
         // Perform a single iteration, mutating iterator object
-        let mut iter = map_iterator.get_iter();
+        let mut iter = map_iterator.get_iter(cx);
         let iter_result = iter.next();
         map_iterator.store_iter(iter);
 
@@ -140,19 +140,19 @@ impl MapIteratorPrototype {
             Some((key, value)) => match map_iterator.kind {
                 MapIteratorKind::Key => {
                     let key_value: Value = key.into();
-                    let key_handle = key_value.to_stack();
+                    let key_handle = key_value.to_stack(cx);
 
                     Ok(create_iter_result_object(cx, key_handle, false)?)
                 }
                 MapIteratorKind::Value => {
-                    let value_handle = value.to_stack();
+                    let value_handle = value.to_stack(cx);
 
                     Ok(create_iter_result_object(cx, value_handle, false)?)
                 }
                 MapIteratorKind::KeyAndValue => {
                     let key_value: Value = key.into();
-                    let key_handle = key_value.to_stack();
-                    let value_handle = value.to_stack();
+                    let key_handle = key_value.to_stack(cx);
+                    let value_handle = value.to_stack(cx);
                     let result_pair = create_array_from_list(cx, &[key_handle, value_handle])?;
 
                     Ok(create_iter_result_object(cx, result_pair.into(), false)?)

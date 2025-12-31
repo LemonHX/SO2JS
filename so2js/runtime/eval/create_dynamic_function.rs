@@ -67,11 +67,11 @@ pub fn create_dynamic_function(
     } else if arg_count == 1 {
         args[0]
     } else {
-        params_string.push_wtf8_str(&to_string(cx, args[0])?.to_wtf8_string()?);
+        params_string.push_wtf8_str(&to_string(cx, args[0])?.to_wtf8_string(cx)?);
 
         for arg in &args[1..(args.len() - 1)] {
             params_string.push_char(',');
-            params_string.push_wtf8_str(&to_string(cx, *arg)?.to_wtf8_string()?);
+            params_string.push_wtf8_str(&to_string(cx, *arg)?.to_wtf8_string(cx)?);
         }
 
         args[args.len() - 1]
@@ -83,7 +83,7 @@ pub fn create_dynamic_function(
         let mut builder = Wtf8String::new();
 
         builder.push_char('\n');
-        builder.push_wtf8_str(&body_string.to_wtf8_string()?);
+        builder.push_wtf8_str(&body_string.to_wtf8_string(cx)?);
         builder.push_char('\n');
 
         builder
@@ -104,7 +104,7 @@ pub fn create_dynamic_function(
     };
 
     // Use the file path of the active source file
-    let file_path = cx.vm().current_source_file().path().to_string();
+    let file_path = cx.vm().current_source_file().path(cx).to_string();
 
     // Make sure that parameter list and body are valid by themselves. Only need to check that they
     // parse correctly, full analysis will be performed on entire function text.
@@ -172,7 +172,7 @@ pub fn create_dynamic_function(
     };
 
     // Dynamic functions are always in the global scope
-    let global_scope = realm.default_global_scope();
+    let global_scope = realm.default_global_scope(cx);
     let closure = Closure::new_with_proto(cx, bytecode_function, global_scope, proto)?;
 
     if is_generator {

@@ -46,7 +46,7 @@ impl WeakRefObject {
 
         set_uninit!(object.weak_ref_target, *value);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn weak_ref_target(&self) -> Value {

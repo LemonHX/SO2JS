@@ -1,5 +1,3 @@
-mod handle;
-mod heap;
 mod heap_item;
 mod heap_trait_object;
 mod heap_visitor;
@@ -9,11 +7,10 @@ mod pointer;
 pub use heap_visitor::GcVisitorExt;
 pub use so2js_gc::GcVisitor;
 
-pub use handle::{
+pub use crate::runtime::stack::{
     Escapable, StackRoot, StackRootContents, StackRootContext, StackRootScope, StackRootScopeGuard,
     ToStackRootContents,
 };
-pub use heap::Heap;
 pub use heap_item::{AnyHeapItem, HeapItem, IsHeapItem};
 // HeapPtr is our own wrapper around so2js_gc::GcPtr
 pub use pointer::HeapPtr;

@@ -113,7 +113,7 @@ impl Heap {
     /// # Arguments
     /// * `ctx` - The runtime context for GC operations
     pub fn alloc<T>(&mut self, ctx: &mut impl GcContext) -> AllocResult<GcPtr<T>> {
-        self.alloc_with_size(ctx, core::mem::size_of::<T>())
+        self.alloc_with_size(ctx, core::mem::size_of::<T>(), core::mem::align_of::<T>())
     }
 
     /// Allocate memory with the given size
@@ -130,16 +130,19 @@ impl Heap {
         &mut self,
         ctx: &mut impl GcContext,
         size: usize,
+        align: usize,
     ) -> AllocResult<GcPtr<T>> {
         // Advance incremental GC if in progress
         if self.gc_in_progress() {
             self.gc_step(ctx);
         }
 
-        let layout = GcHeader::layout_for_size(size);
+        // Require payload alignment not to exceed header alignment to avoid UB.
+        if align > GcHeader::ALIGN {
+            return Err(AllocError);
+        }
 
-        // Get context pointer for the GcHeader
-        let context_ptr = ctx.as_context_ptr();
+        let layout = GcHeader::layout_for_size(size);
 
         unsafe {
             // Allocate memory
@@ -150,7 +153,7 @@ impl Heap {
 
             // Initialize GcHeader
             let header = ptr as *mut GcHeader;
-            header.write(GcHeader::new(size, context_ptr));
+            header.write(GcHeader::new(size));
             let header_nn = NonNull::new_unchecked(header);
 
             // During GC, new objects are BLACK (won't be collected this cycle)
@@ -505,9 +508,18 @@ impl<'a> Marker<'a> {
 }
 
 impl<'a> GcVisitor for Marker<'a> {
-    fn visit_raw(&mut self, ptr: NonNull<u8>) {
+    fn visit<T>(&mut self, ptr: &mut GcPtr<T>) {
+        if ptr.is_dangling() {
+            return;
+        }
+
+        let object_ptr = ptr.as_ptr() as *mut u8;
+        if object_ptr.is_null() {
+            return;
+        }
+
         unsafe {
-            let header = GcHeader::from_object_ptr(ptr.as_ptr());
+            let header = GcHeader::from_object_ptr(object_ptr);
             if (*header).color() == GcColor::White {
                 (*header).set_color(GcColor::Gray);
                 self.gray_queue
@@ -516,7 +528,7 @@ impl<'a> GcVisitor for Marker<'a> {
         }
     }
 
-    fn visit_weak_raw(&mut self, _ptr: NonNull<u8>) {
+    fn visit_weak<T>(&mut self, _ptr: &mut GcPtr<T>) {
         // Weak pointers are not traced during marking.
         // They will be processed later in the WeakRefProcessing phase.
     }

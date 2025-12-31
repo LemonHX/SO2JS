@@ -45,7 +45,7 @@ impl UnmappedArgumentsObject {
             HeapItemKind::UnmappedArgumentsObject,
             Intrinsic::ObjectPrototype,
         )?
-        .to_stack())
+        .to_stack(cx))
     }
 }
 
@@ -97,7 +97,7 @@ impl MappedArgumentsObject {
             object.mapped_parameters.as_mut_slice()[i] = is_mapped;
         }
 
-        let object = object.to_stack();
+        let object = object.to_stack(cx);
 
         Self::init_properties(cx, object, callee, arguments)?;
 
@@ -111,7 +111,7 @@ impl MappedArgumentsObject {
         arguments: &[StackRoot<Value>],
     ) -> EvalResult<()> {
         // Property key is shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
 
         // Set indexed argument properties
         for (i, argument) in arguments.iter().enumerate() {
@@ -125,7 +125,7 @@ impl MappedArgumentsObject {
         }
 
         // Set length property
-        let length_value = Value::from(arguments.len()).to_stack();
+        let length_value = Value::from(arguments.len()).to_stack(cx);
         let length_desc = PropertyDescriptor::data(length_value, true, false, true);
         must!(define_property_or_throw(
             cx,
@@ -184,7 +184,7 @@ impl MappedArgumentsObject {
     }
 
     fn get_mapped_argument(&self, cx: Context, index: usize) -> StackRoot<Value> {
-        self.scope.get_slot(index).to_stack()
+        self.scope.get_slot(index).to_stack(cx)
     }
 
     fn set_mapped_argument(&mut self, index: usize, value: StackRoot<Value>) {
@@ -324,7 +324,7 @@ pub fn create_unmapped_arguments_object(
     ));
 
     // Property key is shared between iterations
-    let mut index_key = PropertyKey::uninit().to_stack();
+    let mut index_key = PropertyKey::uninit().to_stack(cx);
 
     // Set indexed argument properties
     for (i, argument) in arguments.iter().enumerate() {

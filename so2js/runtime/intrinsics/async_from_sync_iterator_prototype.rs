@@ -7,7 +7,7 @@ use crate::{
         error::type_error_value,
         eval_result::EvalResult,
         function::get_argument,
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::HeapItemKind,
         intrinsics::promise_prototype::perform_promise_then,
         iterator::{
@@ -18,7 +18,7 @@ use crate::{
         ordinary_object::object_create,
         promise_object::{coerce_to_ordinary_promise, PromiseCapability},
         realm::Realm,
-        Context, StackRoot, HeapPtr, Value,
+        Context, HeapPtr, StackRoot, Value,
     },
     set_uninit,
 };
@@ -48,15 +48,15 @@ impl AsyncFromSyncIterator {
         set_uninit!(object.iterator, *iterator.iterator);
         set_uninit!(object.next_method, *iterator.next_method);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
-    fn iterator(&self) -> StackRoot<ObjectValue> {
-        self.iterator.to_stack()
+    fn iterator(&self, cx: Context) -> StackRoot<ObjectValue> {
+        self.iterator.to_stack(cx)
     }
 
     fn next_method(&self, cx: Context) -> StackRoot<Value> {
-        self.next_method.to_stack()
+        self.next_method.to_stack(cx)
     }
 }
 
@@ -100,7 +100,7 @@ impl AsyncFromSyncIteratorPrototype {
         let capability = must!(PromiseCapability::new(cx, promise_constructor.into()));
 
         let async_iterator = this_value.as_object().cast::<AsyncFromSyncIterator>();
-        let sync_iterator = async_iterator.iterator();
+        let sync_iterator = async_iterator.iterator(cx);
 
         let value = if arguments.is_empty() {
             None
@@ -110,7 +110,7 @@ impl AsyncFromSyncIteratorPrototype {
 
         let iter_result_completion = iterator_next(
             cx,
-            async_iterator.iterator(),
+            async_iterator.iterator(cx),
             async_iterator.next_method(cx),
             value,
         );
@@ -136,7 +136,7 @@ impl AsyncFromSyncIteratorPrototype {
         let capability = must!(PromiseCapability::new(cx, promise_constructor.into()));
 
         let async_iterator = this_value.as_object().cast::<AsyncFromSyncIterator>();
-        let sync_iterator = async_iterator.iterator();
+        let sync_iterator = async_iterator.iterator(cx);
 
         let return_method_completion = get_method(cx, sync_iterator.into(), cx.names.return_());
         let return_method = if_abrupt_reject_promise!(cx, return_method_completion, capability);
@@ -147,12 +147,12 @@ impl AsyncFromSyncIteratorPrototype {
             let iter_result = create_iter_result_object(cx, value, true)?;
             must!(call_object(
                 cx,
-                capability.resolve(),
+                capability.resolve(cx),
                 cx.undefined(),
                 &[iter_result]
             ));
 
-            return Ok(capability.promise().as_value());
+            return Ok(capability.promise(cx).as_value());
         }
 
         // If return method is present then call it, passing in value if necessary
@@ -170,12 +170,12 @@ impl AsyncFromSyncIteratorPrototype {
             let error = type_error_value(cx, "return method must return an object")?;
             must!(call_object(
                 cx,
-                capability.reject(),
+                capability.reject(cx),
                 cx.undefined(),
                 &[error]
             ));
 
-            return Ok(capability.promise().as_value());
+            return Ok(capability.promise(cx).as_value());
         }
 
         async_from_sync_iterator_continuation(
@@ -197,7 +197,7 @@ impl AsyncFromSyncIteratorPrototype {
         let capability = must!(PromiseCapability::new(cx, promise_constructor.into()));
 
         let async_iterator = this_value.as_object().cast::<AsyncFromSyncIterator>();
-        let sync_iterator = async_iterator.iterator();
+        let sync_iterator = async_iterator.iterator(cx);
 
         let throw_method_completion = get_method(cx, sync_iterator.into(), cx.names.throw());
         let throw_method = if_abrupt_reject_promise!(cx, throw_method_completion, capability);
@@ -212,12 +212,12 @@ impl AsyncFromSyncIteratorPrototype {
             let error = type_error_value(cx, "throw method is not present")?;
             must!(call_object(
                 cx,
-                capability.reject(),
+                capability.reject(cx),
                 cx.undefined(),
                 &[error]
             ));
 
-            return Ok(capability.promise().as_value());
+            return Ok(capability.promise(cx).as_value());
         }
 
         // If throw method is present then call it, passing in value if necessary
@@ -235,12 +235,12 @@ impl AsyncFromSyncIteratorPrototype {
             let error = type_error_value(cx, "throw method must return an object")?;
             must!(call_object(
                 cx,
-                capability.reject(),
+                capability.reject(cx),
                 cx.undefined(),
                 &[error]
             ));
 
-            return Ok(capability.promise().as_value());
+            return Ok(capability.promise(cx).as_value());
         }
 
         async_from_sync_iterator_continuation(
@@ -320,7 +320,7 @@ fn async_from_sync_iterator_continuation(
         Some(capability),
     )?;
 
-    Ok(capability.promise().as_value())
+    Ok(capability.promise(cx).as_value())
 }
 
 pub fn create_continuing_iter_result_object(

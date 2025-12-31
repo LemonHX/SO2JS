@@ -62,7 +62,7 @@ impl ErrorObject {
         skip_current_frame: bool,
     ) -> AllocResult<StackRoot<ErrorObject>> {
         let mut error =
-            object_create::<ErrorObject>(cx, HeapItemKind::ErrorObject, prototype)?.to_stack();
+            object_create::<ErrorObject>(cx, HeapItemKind::ErrorObject, prototype)?.to_stack(cx);
 
         set_uninit!(error.is_stack_overflow, false);
 
@@ -83,7 +83,7 @@ impl ErrorObject {
             HeapItemKind::ErrorObject,
             prototype,
         )?
-        .to_stack();
+        .to_stack(cx);
 
         set_uninit!(error.is_stack_overflow, false);
 
@@ -123,7 +123,7 @@ impl StackRoot<ErrorObject> {
         match self.stack_trace_state {
             StackTraceState::Generated(cached_stack_trace) => Ok(cached_stack_trace),
             StackTraceState::StackFrameInfo(stack_frame_info) => {
-                let stack_trace = create_stack_trace(cx, stack_frame_info.to_stack())?;
+                let stack_trace = create_stack_trace(cx, stack_frame_info.to_stack(cx))?;
                 self.stack_trace_state = StackTraceState::Generated(stack_trace);
                 Ok(stack_trace)
             }

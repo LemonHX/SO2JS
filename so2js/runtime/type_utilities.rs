@@ -162,7 +162,7 @@ pub fn to_number(cx: Context, value_handle: StackRoot<Value>) -> EvalResult<Stac
             match value.as_pointer().descriptor().kind() {
                 // May allocate
                 HeapItemKind::String => {
-                    Ok(string_to_number(value_handle.as_string())?.to_stack_with(cx))
+                    Ok(string_to_number(value_handle.as_string())?.to_stack(cx))
                 }
                 HeapItemKind::Symbol => type_error(cx, "symbol cannot be converted to number"),
                 HeapItemKind::BigInt => type_error(cx, "BigInt cannot be converted to number"),
@@ -640,7 +640,7 @@ pub fn canonical_numeric_string_index_string(
 
         // If string representations are equal, must be canonical numeric index
         let number_string = must_a!(to_string(cx, number_value));
-        if key_string.equals(&number_string)? {
+        if key_string.equals(&number_string, cx)? {
             if !is_integral_number(*number_value) {
                 return Ok(None);
             }
@@ -730,7 +730,7 @@ pub fn is_array(cx: Context, value: StackRoot<Value>) -> EvalResult<bool> {
             return type_error(cx, "operation attempted on revoked proxy");
         }
 
-        return is_array(cx, proxy.target().unwrap().into());
+        return is_array(cx, proxy.target(cx).unwrap().into());
     }
 
     Ok(false)
@@ -902,7 +902,7 @@ fn same_value_non_numeric(
             match kind1 {
                 HeapItemKind::String => {
                     // May allocate
-                    return v1_handle.as_string().equals(&v2_handle.as_string());
+                    return v1_handle.as_string().equals(&v2_handle.as_string(), cx);
                 }
                 HeapItemKind::BigInt => {
                     return Ok(v1.as_bigint().bigint().eq(&v2.as_bigint().bigint()))
@@ -1005,7 +1005,7 @@ pub fn is_less_than(
                 // May allocate
                 return Ok(x_handle
                     .as_string()
-                    .compare(&y_handle.as_string())?
+                    .compare(&y_handle.as_string(), cx)?
                     .is_lt()
                     .into());
             } else if y_kind == HeapItemKind::BigInt {
@@ -1198,7 +1198,7 @@ pub fn is_loosely_equal(
                     // Only strings and BigInts may have the same value but different bit patterns
                     HeapItemKind::String => {
                         // May allocate
-                        Ok(v1_handle.as_string().equals(&v2_handle.as_string())?)
+                        Ok(v1_handle.as_string().equals(&v2_handle.as_string(), cx)?)
                     }
                     HeapItemKind::BigInt => {
                         Ok(v1.as_bigint().bigint().eq(&v2.as_bigint().bigint()))

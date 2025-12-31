@@ -31,7 +31,7 @@ use super::{
     },
     collections::{BsHashMap, BsHashMapField},
     error::BsResult,
-    gc::{GcVisitorExt, Heap, StackRootContext},
+    gc::{AnyHeapItem, GcVisitorExt, HeapPtr, StackRootContext},
     heap_item_descriptor::{BaseDescriptors, HeapItemKind},
     interned_strings::InternedStrings,
     intrinsics::{intrinsics::Intrinsic, rust_runtime::RustRuntimeFunctionRegistry},
@@ -46,8 +46,10 @@ use super::{
     string_value::FlatString,
     tasks::TaskQueue,
     value::SymbolValue,
-    EvalResult, HeapPtr, StackRoot, Value,
+    EvalResult, StackRoot, Value,
 };
+
+use so2js_gc::GcContext as SoGcContext;
 
 /// Top level context for the JS runtime. Contains the heap, execution contexts, etc.
 /// Must never be moved, as there may be internal pointers held.
@@ -69,7 +71,7 @@ pub struct Context {
 
 pub struct ContextCell {
     pub sys: Option<Box<dyn crate::sys::Sys>>,
-    pub heap: Heap,
+    pub heap: so2js_gc::Heap,
     /// StackRoot context for managing stack handles
     pub handle_context: StackRootContext,
     global_symbol_registry: HeapPtr<GlobalSymbolRegistry>,
@@ -151,14 +153,12 @@ impl Context {
     fn new(options: Rc<Options>, sys: Option<Box<dyn crate::sys::Sys>>) -> AllocResult<Context> {
         let mut cx_cell = Box::new(ContextCell {
             sys,
-            heap: Heap::new(options.heap_size),
+            heap: so2js_gc::Heap::new(),
             handle_context: StackRootContext::new(),
             global_symbol_registry: HeapPtr::uninit(),
             names: BuiltinNames::uninit(),
             well_known_symbols: BuiltinSymbols::uninit(),
             base_descriptors: BaseDescriptors::uninit_empty(),
-            // pass this ptr later
-            rust_runtime_functions: RustRuntimeFunctionRegistry::new(),
             vm: None,
             initial_realm: HeapPtr::uninit(),
             task_queue: TaskQueue::new(),
@@ -182,6 +182,8 @@ impl Context {
             // initial heap has been set up switch to a PRNG seeded from a random source.
             rand: StdRng::from_seed([0; 32]),
             // ===
+            // pass this ptr later
+            rust_runtime_functions: RustRuntimeFunctionRegistry::new(),
             runtime_functions_sorted_by_pointer: Vec::new(),
         });
 
@@ -258,7 +260,7 @@ impl Context {
 
     #[inline]
     pub fn initial_realm(&self) -> StackRoot<Realm> {
-        self.initial_realm_ptr().to_stack()
+        self.initial_realm_ptr().to_stack(*self)
     }
 
     pub fn evaluate_script(&mut self, source: Rc<Source>) -> BsResult<StackRoot<Value>> {
@@ -341,10 +343,10 @@ impl Context {
         debug_assert!(!promise.is_pending());
 
         if let Some(value) = promise.rejected_value() {
-            return eval_err!(value.to_stack());
+            return eval_err!(value.to_stack(*self));
         }
         if let Some(value) = promise.fulfilled_value() {
-            return Ok(value.to_stack());
+            return Ok(value.to_stack(*self));
         } else {
             unreachable!()
         }
@@ -386,11 +388,61 @@ impl Context {
     }
 
     pub fn alloc_uninit<T>(&self) -> AllocResult<HeapPtr<T>> {
-        Heap::alloc_uninit::<T>(*self)
+        self.alloc_uninit_with_size::<T>(core::mem::size_of::<T>())
     }
 
     pub fn alloc_uninit_with_size<T>(&self, size: usize) -> AllocResult<HeapPtr<T>> {
-        Heap::alloc_uninit_with_size::<T>(*self, size)
+        let mut cx = *self;
+
+        #[cfg(feature = "gc_stress_test")]
+        if cx.heap.gc_stress_test {
+            cx.run_gc();
+        }
+
+        let result = {
+            let heap = &mut cx.heap;
+            // SAFETY: we only alias `cx` through a raw pointer for the duration of the call,
+            // matching the previous logical behavior without holding two mutable borrows.
+            unsafe {
+                heap.alloc_with_size::<T>(
+                    &mut *(&mut cx as *mut Context),
+                    size,
+                    core::mem::align_of::<T>(),
+                )
+            }
+        };
+
+        match result {
+            Ok(gc_ptr) => Ok(HeapPtr::from_gc_ptr(gc_ptr)),
+            Err(_) => {
+                cx.run_gc();
+
+                let retry = {
+                    let heap = &mut cx.heap;
+                    // SAFETY: same aliasing rationale as above.
+                    unsafe {
+                        heap.alloc_with_size::<T>(
+                            &mut *(&mut cx as *mut Context),
+                            size,
+                            core::mem::align_of::<T>(),
+                        )
+                    }
+                };
+
+                match retry {
+                    Ok(gc_ptr) => Ok(HeapPtr::from_gc_ptr(gc_ptr)),
+                    Err(_) => {
+                        #[cfg(feature = "alloc_error")]
+                        {
+                            return Err(crate::runtime::alloc_error::AllocError::oom());
+                        }
+
+                        #[cfg(not(feature = "alloc_error"))]
+                        panic!("Ran out of heap memory");
+                    }
+                }
+            }
+        }
     }
 
     #[inline]
@@ -405,7 +457,7 @@ impl Context {
 
     #[inline]
     pub fn current_realm(&self) -> StackRoot<Realm> {
-        self.current_realm_ptr().to_stack()
+        self.current_realm_ptr().to_stack(*self)
     }
 
     /// Return an intrinsic for the current realm.
@@ -420,11 +472,11 @@ impl Context {
     }
 
     pub fn current_function(&mut self) -> StackRoot<ObjectValue> {
-        self.vm().closure().to_stack().into()
+        self.vm().closure().to_stack(*self).into()
     }
 
     pub fn current_new_target(&mut self) -> Option<StackRoot<ObjectValue>> {
-        let new_target_index = self.vm().closure().function().new_target_index();
+        let new_target_index = self.vm().closure().function(*self).new_target_index();
         if let Some(index) = new_target_index {
             let new_target = self.vm().get_register_at_index(index);
             if new_target.is_undefined() {
@@ -432,7 +484,7 @@ impl Context {
             }
 
             debug_assert!(new_target.is_object());
-            Some(new_target.as_object().to_stack())
+            Some(new_target.as_object().to_stack(*self))
         } else {
             None
         }
@@ -475,17 +527,17 @@ impl Context {
 
     #[inline]
     pub fn alloc_string(&mut self, str: &str) -> AllocResult<StackRoot<FlatString>> {
-        Ok(self.alloc_string_ptr(str)?.to_stack())
+        Ok(self.alloc_string_ptr(str)?.to_stack(*self))
     }
 
     #[inline]
     pub fn alloc_wtf8_string(&mut self, str: &Wtf8String) -> AllocResult<StackRoot<FlatString>> {
-        Ok(self.alloc_wtf8_string_ptr(str)?.to_stack())
+        Ok(self.alloc_wtf8_string_ptr(str)?.to_stack(*self))
     }
 
     #[inline]
     pub fn alloc_wtf8_str(&mut self, str: &Wtf8Str) -> AllocResult<StackRoot<FlatString>> {
-        Ok(self.alloc_wtf8_str_ptr(str)?.to_stack())
+        Ok(self.alloc_wtf8_str_ptr(str)?.to_stack(*self))
     }
 
     #[inline]
@@ -534,12 +586,12 @@ impl Context {
 
     #[inline]
     pub fn smi(&self, value: i32) -> StackRoot<Value> {
-        Value::smi(value).to_stack_with(*self)
+        Value::smi(value).to_stack(*self)
     }
 
     #[inline]
     pub fn number(&self, value: f64) -> StackRoot<Value> {
-        Value::number(value).to_stack_with(*self)
+        Value::number(value).to_stack(*self)
     }
 
     /// Visit all heap roots for a garbage collection. This optionally visits pointers that are
@@ -596,6 +648,44 @@ impl Context {
     #[cfg(feature = "gc_stress_test")]
     pub fn enable_gc_stress_test(&mut self) {
         self.heap.gc_stress_test = true;
+    }
+
+    /// Run a full garbage collection cycle
+    pub fn run_gc(&mut self) {
+        let heap = &mut self.heap;
+        let cx: *mut Context = self;
+
+        // SAFETY: we temporarily alias `self` through a raw pointer while holding an exclusive
+        // borrow of `heap`, mirroring the previous logical ownership without overlapping borrows.
+        unsafe {
+            heap.start_gc(&mut *cx);
+            heap.finish_gc(&mut *cx);
+        }
+    }
+
+    /// Run one incremental GC step. Returns true if GC still in progress.
+    pub fn gc_step(&mut self) -> bool {
+        let heap = &mut self.heap;
+        let cx: *mut Context = self;
+
+        // SAFETY: same aliasing rationale as run_gc.
+        unsafe { heap.gc_step(&mut *cx) }
+    }
+}
+
+impl SoGcContext for Context {
+    fn visit_roots(&mut self, visitor: &mut impl so2js_gc::GcVisitor) {
+        self.visit_roots_for_gc(visitor);
+    }
+
+    fn trace_object(&mut self, ptr: *mut u8, visitor: &mut impl so2js_gc::GcVisitor) {
+        let mut heap_item = HeapPtr::<AnyHeapItem>::from_ptr(ptr as *mut AnyHeapItem);
+        let kind = heap_item.descriptor().kind();
+        heap_item.visit_pointers_for_kind(visitor, kind);
+    }
+
+    fn process_weak_refs(&mut self, _heap: &so2js_gc::Heap) {
+        // TODO: Implement weak reference processing
     }
 }
 

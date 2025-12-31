@@ -7,14 +7,14 @@ use crate::{
         error::{range_error, type_error},
         eval_result::EvalResult,
         function::get_argument,
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         get,
         heap_item_descriptor::HeapItemKind,
         object_value::ObjectValue,
         ordinary_object::object_create_from_constructor,
         realm::Realm,
         type_utilities::to_index,
-        Context, StackRoot, HeapPtr, Value,
+        Context, HeapPtr, StackRoot, Value,
     },
     set_uninit,
 };
@@ -80,7 +80,7 @@ impl ArrayBufferObject {
         }
 
         // Save object pointer behind handle as we are about to allocate
-        let mut object = object.to_stack();
+        let mut object = object.to_stack(cx);
 
         object.data = if let Some(data) = data {
             // If requested size matches the underlying data block then simply reuse it
@@ -134,8 +134,8 @@ impl ArrayBufferObject {
         self.data.as_mut().unwrap().as_mut_slice()
     }
 
-    pub fn data_opt(&self) -> Option<StackRoot<ByteArray>> {
-        self.data.map(|data| data.to_stack())
+    pub fn data_opt(&self, cx: Context) -> Option<StackRoot<ByteArray>> {
+        self.data.map(|data| data.to_stack(cx))
     }
 
     pub fn set_data(&mut self, data: HeapPtr<ByteArray>) {
@@ -263,7 +263,7 @@ pub fn array_buffer_copy_and_detach(
         array_buffer_constructor,
         new_byte_length,
         new_max_byte_length,
-        array_buffer.data_opt(),
+        array_buffer.data_opt(cx),
     )?;
 
     // Finally detach the original buffer

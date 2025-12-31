@@ -1,5 +1,5 @@
-use alloc::vec;
 use alloc::format;
+use alloc::vec;
 use hashbrown::HashSet;
 
 use crate::{
@@ -12,12 +12,12 @@ use super::{
     abstract_operations::{define_property_or_throw, has_own_property, is_extensible},
     builtin_function::BuiltinFunction,
     collections::InlineArray,
-    gc::{HeapItem, GcVisitorExt},
+    gc::{GcVisitorExt, HeapItem},
     heap_item_descriptor::HeapItemDescriptor,
     object_value::ObjectValue,
     scope_names::ScopeNames,
     string_value::FlatString,
-    Context, EvalResult, StackRoot, HeapPtr, PropertyDescriptor, PropertyKey, Realm, Value,
+    Context, EvalResult, HeapPtr, PropertyDescriptor, PropertyKey, Realm, StackRoot, Value,
 };
 
 #[repr(C)]
@@ -58,7 +58,7 @@ impl GlobalNames {
             global_names.names.set_unchecked(i, **name);
         }
 
-        Ok(global_names.to_stack())
+        Ok(global_names.to_stack(cx))
     }
 
     fn calculate_size_in_bytes(num_names: usize) -> usize {
@@ -67,7 +67,7 @@ impl GlobalNames {
     }
 
     pub fn scope_names(&self) -> StackRoot<ScopeNames> {
-        self.scope_names.to_stack()
+        self.scope_names.to_stack(cx)
     }
 }
 
@@ -129,7 +129,7 @@ fn global_declaration_instantiation(
     // Check whether any lexical names conflict with existing global names
     let mut lexical_names = vec![];
     for name_ptr in global_names.scope_names().name_ptrs() {
-        lexical_names.push(name_ptr.to_stack());
+        lexical_names.push(name_ptr.to_stack(cx));
     }
     realm.can_declare_lexical_names(cx, &lexical_names)?;
 

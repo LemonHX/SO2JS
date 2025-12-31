@@ -9,14 +9,14 @@ use crate::{
         error::type_error,
         eval_result::EvalResult,
         function::get_argument,
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::HeapItemKind,
         object_value::ObjectValue,
         ordinary_object::object_create,
         realm::Realm,
         type_utilities::to_string,
         value::SymbolValue,
-        Context, StackRoot, HeapPtr, Value,
+        Context, HeapPtr, StackRoot, Value,
     },
     set_uninit,
 };
@@ -44,11 +44,11 @@ impl SymbolObject {
 
         set_uninit!(object.symbol_data, *symbol_data);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
-    pub fn symbol_data(&self) -> StackRoot<SymbolValue> {
-        self.symbol_data.to_stack()
+    pub fn symbol_data(&self, cx: Context) -> StackRoot<SymbolValue> {
+        self.symbol_data.to_stack(cx)
     }
 }
 
@@ -149,9 +149,9 @@ impl SymbolConstructor {
         arguments: &[StackRoot<Value>],
     ) -> EvalResult<StackRoot<Value>> {
         let argument = get_argument(cx, arguments, 0);
-        let string_key = to_string(cx, argument)?.flatten()?;
+        let string_key = to_string(cx, argument)?.flatten(cx)?;
         if let Some(symbol_value) = cx.global_symbol_registry().get(&string_key) {
-            return Ok(symbol_value.to_stack().into());
+            return Ok(symbol_value.to_stack(cx).into());
         }
 
         let new_symbol = SymbolValue::new(
@@ -180,7 +180,7 @@ impl SymbolConstructor {
 
         for (string, symbol) in cx.global_symbol_registry().iter_gc_unsafe() {
             if symbol.ptr_eq(&symbol_value) {
-                return Ok(string.to_stack().as_value());
+                return Ok(string.to_stack(cx).as_value());
             }
         }
 

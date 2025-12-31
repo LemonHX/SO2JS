@@ -11,8 +11,8 @@ use crate::{
         heap_item_descriptor::HeapItemKind,
         interned_strings::InternedStrings,
         intrinsics::{
-            intrinsics::Intrinsic,
-            promise_prototype::perform_promise_then, rust_runtime::RustRuntimeFunction,
+            intrinsics::Intrinsic, promise_prototype::perform_promise_then,
+            rust_runtime::RustRuntimeFunction,
         },
         module::{
             module::{DynModule, ModuleEnum},
@@ -21,7 +21,7 @@ use crate::{
         object_value::ObjectValue,
         promise_object::{PromiseCapability, PromiseObject},
         string_value::FlatString,
-        to_string, Context, EvalResult, StackRoot, PropertyKey, Value,
+        to_string, Context, EvalResult, PropertyKey, StackRoot, Value,
     },
 };
 use alloc::string::ToString;
@@ -66,7 +66,7 @@ pub fn execute_module(
             perform_promise_then(cx, promise, on_resolve.into(), on_reject.into(), None)?;
 
             // Guaranteed to be a PromiseObject since created with the Promise constructor
-            Ok(capability.promise().cast::<PromiseObject>())
+            Ok(capability.promise(cx).cast::<PromiseObject>())
         }
         None => {
             todo!()
@@ -104,9 +104,9 @@ fn get_dyn_module(cx: Context, function: StackRoot<ObjectValue>) -> DynModule {
     );
 
     if item.descriptor().kind() == HeapItemKind::SourceTextModule {
-        item.cast::<SourceTextModule>().to_stack().as_dyn_module()
+        item.cast::<SourceTextModule>().to_stack(cx).as_dyn_module()
     } else {
-        item.cast::<SyntheticModule>().to_stack().as_dyn_module()
+        item.cast::<SyntheticModule>().to_stack(cx).as_dyn_module()
     }
 }
 
@@ -152,7 +152,7 @@ pub fn load_requested_modules_static_resolve(
     if let Err(error) = completion_value!(module.link(cx)) {
         must!(call_object(
             cx,
-            capability.reject(),
+            capability.reject(cx),
             cx.undefined(),
             &[error]
         ));
@@ -186,7 +186,7 @@ pub fn load_requested_modules_reject(
     let error = get_argument(cx, arguments, 0);
     must!(call_object(
         cx,
-        capability.reject(),
+        capability.reject(cx),
         cx.undefined(),
         &[error]
     ));
@@ -241,7 +241,7 @@ impl GraphEvaluator {
 
         if let Some(capability) = module.top_level_capability_ptr() {
             // Was created with promise constructor
-            return Ok(capability.promise().cast::<PromiseObject>());
+            return Ok(capability.promise(cx).cast::<PromiseObject>());
         }
 
         let promise_constructor = cx.get_intrinsic(Intrinsic::PromiseConstructor);
@@ -262,7 +262,7 @@ impl GraphEvaluator {
                     debug_assert!(module.state() == ModuleState::Evaluated);
                     must_a!(call_object(
                         cx,
-                        capability.resolve(),
+                        capability.resolve(cx),
                         cx.undefined(),
                         &[cx.undefined()]
                     ));
@@ -281,7 +281,7 @@ impl GraphEvaluator {
 
                 must_a!(call_object(
                     cx,
-                    capability.reject(),
+                    capability.reject(cx),
                     cx.undefined(),
                     &[error]
                 ));
@@ -289,7 +289,7 @@ impl GraphEvaluator {
         }
 
         // Known to be a PromiseObject since created with the Promise constructor
-        Ok(capability.promise().cast::<PromiseObject>())
+        Ok(capability.promise(cx).cast::<PromiseObject>())
     }
 
     /// InnerModuleEvaluation (https://tc39.es/ecma262/#sec-innermoduleevaluation)
@@ -306,7 +306,7 @@ impl GraphEvaluator {
 
                 // Propagate rejected value as error
                 return if let Some(rejected_value) = promise.rejected_value() {
-                    eval_err!(rejected_value.to_stack())
+                    eval_err!(rejected_value.to_stack(cx))
                 } else {
                     Ok(index)
                 };
@@ -342,7 +342,7 @@ impl GraphEvaluator {
 
         let loaded_modules = module.loaded_modules();
         for i in 0..loaded_modules.len() {
-            let required_module = DynModule::from_heap(&loaded_modules.as_slice()[i].unwrap());
+            let required_module = DynModule::from_heap(cx, &loaded_modules.as_slice()[i].unwrap());
 
             index = self.inner_evaluate(cx, required_module, index)?;
 
@@ -424,7 +424,7 @@ fn execute_async_module(mut cx: Context, module: StackRoot<SourceTextModule>) ->
     let capability = must_a!(PromiseCapability::new(cx, promise_constructor.into()));
 
     // Known to be a PromiseObject since it was created by the intrinsic Promise constructor
-    let promise = capability.promise().cast::<PromiseObject>();
+    let promise = capability.promise(cx).cast::<PromiseObject>();
 
     let on_resolve = callback(cx, async_module_execution_fulfilled)?;
     set_module(cx, on_resolve, module)?;
@@ -469,7 +469,7 @@ pub fn async_module_execution_fulfilled(
         debug_assert!(module.cycle_root_ptr().unwrap().ptr_eq(&module));
         must!(call_object(
             cx,
-            capability.resolve(),
+            capability.resolve(cx),
             cx.undefined(),
             &[cx.undefined()]
         ));
@@ -477,7 +477,7 @@ pub fn async_module_execution_fulfilled(
 
     // Gather available ancestors
     let mut ancestors = HashMap::new();
-    gather_available_ancestors(module, &mut ancestors);
+    gather_available_ancestors(cx, module, &mut ancestors);
 
     // Sort ancestors by the order [[AsyncEvaluation]] was set
     let mut ancestors = ancestors.into_values().collect::<Vec<_>>();
@@ -508,7 +508,7 @@ pub fn async_module_execution_fulfilled(
             debug_assert!(ancestor.cycle_root_ptr().unwrap().ptr_eq(&ancestor));
             must!(call_object(
                 cx,
-                capability.resolve(),
+                capability.resolve(cx),
                 cx.undefined(),
                 &[cx.undefined()]
             ));
@@ -520,6 +520,7 @@ pub fn async_module_execution_fulfilled(
 
 /// GatherAvailableAncestors (https://tc39.es/ecma262/#sec-gather-available-ancestors)
 fn gather_available_ancestors(
+    cx: Context,
     module: StackRoot<SourceTextModule>,
     gathered: &mut HashMap<ModuleId, StackRoot<SourceTextModule>>,
 ) {
@@ -537,14 +538,14 @@ fn gather_available_ancestors(
                 debug_assert!(parent_module.is_async_evaluation());
                 debug_assert!(parent_module.pending_async_dependencies() > 0);
 
-                let mut parent_module = parent_module.to_stack();
+                let mut parent_module = parent_module.to_stack(cx);
                 parent_module.dec_pending_async_dependencies();
 
                 if parent_module.pending_async_dependencies() == 0 {
                     gathered.insert(parent_module.id(), parent_module);
 
                     if !parent_module.has_top_level_await() {
-                        gather_available_ancestors(parent_module, gathered);
+                        gather_available_ancestors(cx, parent_module, gathered);
                     }
                 }
 
@@ -590,7 +591,7 @@ fn async_module_execution_rejected(
         debug_assert!(module.cycle_root_ptr().unwrap().ptr_eq(&module));
         must_a!(call_object(
             cx,
-            capability.reject(),
+            capability.reject(cx),
             cx.undefined(),
             &[error]
         ));
@@ -632,11 +633,11 @@ pub fn dynamic_import(
             let error = type_error_value(cx, "Dynamic import not supported in this context")?;
             must!(call_object(
                 cx,
-                capability.reject(),
+                capability.reject(cx),
                 cx.undefined(),
                 &[error]
             ));
-            return Ok(capability.promise());
+            return Ok(capability.promise(cx));
         }
     };
     let mut attribute_pairs = vec![];
@@ -646,11 +647,11 @@ pub fn dynamic_import(
             let error = type_error_value(cx, "Import options must be an object")?;
             must!(call_object(
                 cx,
-                capability.reject(),
+                capability.reject(cx),
                 cx.undefined(),
                 &[error]
             ));
-            return Ok(capability.promise());
+            return Ok(capability.promise(cx));
         }
 
         let attributes_object_completion = get(cx, options.as_object(), cx.names.with());
@@ -662,11 +663,11 @@ pub fn dynamic_import(
                 let error = type_error_value(cx, "Import attributes must be an object")?;
                 must!(call_object(
                     cx,
-                    capability.reject(),
+                    capability.reject(cx),
                     cx.undefined(),
                     &[error]
                 ));
-                return Ok(capability.promise());
+                return Ok(capability.promise(cx));
             }
 
             let entries_completion = enumerable_own_property_names(
@@ -679,28 +680,28 @@ pub fn dynamic_import(
             for entry in entries {
                 // Entry is gaurenteed to be an array with two elements
                 let entry = entry.as_object();
-                let key = must!(get(cx, entry, PropertyKey::from_u8(0).to_stack()));
-                let value = must!(get(cx, entry, PropertyKey::from_u8(1).to_stack()));
+                let key = must!(get(cx, entry, PropertyKey::from_u8(0).to_stack(cx)));
+                let value = must!(get(cx, entry, PropertyKey::from_u8(1).to_stack(cx)));
 
                 if !value.is_string() {
                     let error = type_error_value(cx, "Import attribute values must be strings")?;
                     must!(call_object(
                         cx,
-                        capability.reject(),
+                        capability.reject(cx),
                         cx.undefined(),
                         &[error]
                     ));
-                    return Ok(capability.promise());
+                    return Ok(capability.promise(cx));
                 }
 
                 // Intern the key and value strings
                 let key_string = must!(to_string(cx, key));
-                let key_flat_string = key_string.flatten()?;
-                let key_interned_string = InternedStrings::get(cx, *key_flat_string)?.to_stack();
+                let key_flat_string = key_string.flatten(cx)?;
+                let key_interned_string = InternedStrings::get(cx, *key_flat_string)?.to_stack(cx);
 
-                let value_flat_string = value.as_string().flatten()?;
+                let value_flat_string = value.as_string().flatten(cx)?;
                 let value_interned_string =
-                    InternedStrings::get(cx, *value_flat_string)?.to_stack();
+                    InternedStrings::get(cx, *value_flat_string)?.to_stack(cx);
 
                 attribute_pairs.push((key_interned_string, value_interned_string));
             }
@@ -716,8 +717,8 @@ pub fn dynamic_import(
         None
     };
 
-    let specifier = specifier.flatten()?;
-    let specifier = InternedStrings::get(cx, *specifier)?.to_stack();
+    let specifier = specifier.flatten(cx)?;
+    let specifier = InternedStrings::get(cx, *specifier)?.to_stack(cx);
 
     let module_request = ModuleRequest {
         specifier,
@@ -732,7 +733,7 @@ pub fn dynamic_import(
     );
     continue_dynamic_import(cx, capability, load_completion)?;
 
-    Ok(capability.promise())
+    Ok(capability.promise(cx))
 }
 
 /// ContinueDynamicImport (https://tc39.es/ecma262/#sec-ContinueDynamicImport)
@@ -746,7 +747,7 @@ fn continue_dynamic_import(
         Err(error) => {
             must_a!(call_object(
                 cx,
-                capability.reject(),
+                capability.reject(cx),
                 cx.undefined(),
                 &[error]
             ));
@@ -781,7 +782,7 @@ pub fn load_requested_modules_dynamic_resolve(
     if let Err(error) = completion_value!(module.link(cx)) {
         must!(call_object(
             cx,
-            capability.reject(),
+            capability.reject(cx),
             cx.undefined(),
             &[error]
         ));
@@ -796,7 +797,7 @@ pub fn load_requested_modules_dynamic_resolve(
         if module.state() == ModuleState::Evaluated && module.evaluation_error_ptr().is_some() {
             must!(call_object(
                 cx,
-                capability.reject(),
+                capability.reject(cx),
                 cx.undefined(),
                 &[module.evaluation_error(cx).unwrap()]
             ));
@@ -834,11 +835,11 @@ pub fn module_evaluate_dynamic_resolve(
     let mut module = get_dyn_module(cx, current_function);
     let capability = get_capability(cx, current_function);
 
-    let namespace_object = module.get_namespace_object(cx)?.to_stack();
+    let namespace_object = module.get_namespace_object(cx)?.to_stack(cx);
 
     must!(call_object(
         cx,
-        capability.resolve(),
+        capability.resolve(cx),
         cx.undefined(),
         &[namespace_object.into()]
     ));

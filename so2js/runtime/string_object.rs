@@ -61,7 +61,7 @@ impl StringObject {
 
         set_uninit!(object.string_data, string_data);
 
-        let object = object.to_stack();
+        let object = object.to_stack(cx);
 
         Self::set_length_property(object, cx, string_length)?;
 
@@ -85,7 +85,7 @@ impl StringObject {
 
         set_uninit!(object.string_data, string_data);
 
-        let object = object.to_stack();
+        let object = object.to_stack(cx);
 
         Self::set_length_property(object, cx, string_length)?;
 
@@ -105,7 +105,7 @@ impl StringObject {
 
         set_uninit!(object.string_data, string_data);
 
-        let object = object.to_stack();
+        let object = object.to_stack(cx);
 
         Self::set_length_property(object, cx, string_length)?;
 
@@ -118,7 +118,7 @@ impl StringObject {
         length: u32,
     ) -> AllocResult<()> {
         // String objects have an immutable length property
-        let length_value = Value::from(length).to_stack_with(cx);
+        let length_value = Value::from(length).to_stack(cx);
         string.as_object().set_property(
             cx,
             cx.names.length(),
@@ -126,8 +126,8 @@ impl StringObject {
         )
     }
 
-    pub fn string_data(&self) -> StackRoot<StringValue> {
-        self.string_data.to_stack()
+    pub fn string_data(&self, cx: Context) -> StackRoot<StringValue> {
+        self.string_data.to_stack(cx)
     }
 }
 

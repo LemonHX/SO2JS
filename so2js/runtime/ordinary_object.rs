@@ -2,7 +2,7 @@ use super::{
     abstract_operations::{call_object, create_data_property, get, get_function_realm},
     accessor::Accessor,
     eval_result::EvalResult,
-    gc::{StackRoot, HeapPtr},
+    gc::{HeapPtr, StackRoot},
     heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
     intrinsics::intrinsics::Intrinsic,
     object_value::{ObjectValue, VirtualObject},
@@ -35,8 +35,11 @@ impl From<OrdinaryObject> for ObjectValue {
 
 impl ObjectValue {
     /// OrdinaryGetPrototypeOf (https://tc39.es/ecma262/#sec-ordinarygetprototypeof)
-    pub fn ordinary_get_prototype_of(&self) -> EvalResult<Option<StackRoot<ObjectValue>>> {
-        Ok(self.prototype().map(|p| p.to_stack()))
+    pub fn ordinary_get_prototype_of(
+        &self,
+        cx: Context,
+    ) -> EvalResult<Option<StackRoot<ObjectValue>>> {
+        Ok(self.prototype().map(|p| p.to_stack(cx)))
     }
 
     /// OrdinaryIsExtensible (https://tc39.es/ecma262/#sec-ordinaryisextensible)
@@ -173,8 +176,8 @@ pub fn ordinary_get_own_property(
             {
                 let accessor_value = value.as_pointer().cast::<Accessor>();
                 Some(PropertyDescriptor::accessor(
-                    accessor_value.get.map(|f| f.to_stack()),
-                    accessor_value.set.map(|f| f.to_stack()),
+                    accessor_value.get.map(|f| f.to_stack(cx)),
+                    accessor_value.set.map(|f| f.to_stack(cx)),
                     property.is_enumerable(),
                     property.is_configurable(),
                 ))
@@ -521,7 +524,7 @@ pub fn ordinary_own_property_keys(
     let mut keys: Vec<StackRoot<Value>> = vec![];
 
     ordinary_filtered_own_indexed_property_keys(cx, object, &mut keys, |_| true)?;
-    ordinary_own_string_symbol_property_keys(object, &mut keys);
+    ordinary_own_string_symbol_property_keys(cx, object, &mut keys);
 
     Ok(keys)
 }
@@ -536,7 +539,7 @@ pub fn ordinary_filtered_own_indexed_property_keys<F: Fn(usize) -> bool>(
     // Return array index properties in numerical order
     let array_properties = object.array_properties();
     if let Some(dense_properties) = array_properties.as_dense_opt() {
-        let dense_properties = dense_properties.to_stack();
+        let dense_properties = dense_properties.to_stack(cx);
         for (index, value) in dense_properties.iter().enumerate() {
             if filter(index) && !value.is_empty() {
                 let index_string = cx.alloc_string(&index.to_string())?;
@@ -559,13 +562,14 @@ pub fn ordinary_filtered_own_indexed_property_keys<F: Fn(usize) -> bool>(
 
 #[inline]
 pub fn ordinary_own_string_symbol_property_keys(
+    cx: Context,
     object: StackRoot<ObjectValue>,
     keys: &mut Vec<StackRoot<Value>>,
 ) {
     // Safe since we do not allocate on managed heap during iteration
     object.iter_named_property_keys_gc_unsafe(|property_key| {
         if property_key.is_string() {
-            keys.push(property_key.as_string().to_stack().into());
+            keys.push(property_key.as_string().to_stack(cx).into());
         }
     });
 
@@ -573,7 +577,7 @@ pub fn ordinary_own_string_symbol_property_keys(
     object.iter_named_properties_gc_unsafe(|property_key, property| {
         // Make sure not to include private properties
         if property_key.is_symbol() && !property.is_private() {
-            keys.push(property_key.as_symbol().to_stack().into());
+            keys.push(property_key.as_symbol().to_stack(cx).into());
         }
     });
 }
@@ -585,7 +589,7 @@ pub fn ordinary_object_create(cx: Context) -> AllocResult<StackRoot<ObjectValue>
     let proto = cx.get_intrinsic_ptr(Intrinsic::ObjectPrototype);
     object_ordinary_init(cx, object, descriptor, Some(proto));
 
-    Ok(object.to_stack())
+    Ok(object.to_stack(cx))
 }
 
 pub fn object_create<T>(

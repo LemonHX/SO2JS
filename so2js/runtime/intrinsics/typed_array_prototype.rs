@@ -163,7 +163,7 @@ impl TypedArrayPrototype {
         _: &[StackRoot<Value>],
     ) -> EvalResult<StackRoot<Value>> {
         let typed_array = require_typed_array(cx, this_value)?;
-        Ok(typed_array.viewed_array_buffer().as_value())
+        Ok(typed_array.viewed_array_buffer(cx).as_value())
     }
 
     /// get %TypedArray%.prototype.byteLength (https://tc39.es/ecma262/#sec-get-%typedarray%.prototype.bytelength)
@@ -181,7 +181,7 @@ impl TypedArrayPrototype {
 
         let byte_length = typed_array_byte_length(&typed_array_record);
 
-        Ok(Value::from(byte_length).to_stack_with(cx))
+        Ok(Value::from(byte_length).to_stack(cx))
     }
 
     /// get %TypedArray%.prototype.byteOffset (https://tc39.es/ecma262/#sec-get-%typedarray%.prototype.byteoffset)
@@ -197,7 +197,7 @@ impl TypedArrayPrototype {
             return Ok(cx.zero());
         }
 
-        Ok(Value::from(typed_array.byte_offset()).to_stack())
+        Ok(Value::from(typed_array.byte_offset()).to_stack(cx))
     }
 
     /// %TypedArray%.prototype.copyWithin (https://tc39.es/ecma262/#sec-%typedarray%.prototype.copywithin)
@@ -365,8 +365,8 @@ impl TypedArrayPrototype {
         let this_arg = get_argument(cx, arguments, 1);
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
-        let mut index_value = Value::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
+        let mut index_value = Value::uninit().to_stack(cx);
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -439,7 +439,7 @@ impl TypedArrayPrototype {
         let end_index = u64::min(end_index, typed_array_length(&typed_array_record) as u64);
 
         // Shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for i in start_index..end_index {
             key.replace(PropertyKey::from_u64(cx, i)?);
@@ -472,8 +472,8 @@ impl TypedArrayPrototype {
         let mut kept_values = vec![];
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
-        let mut index_value = Value::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
+        let mut index_value = Value::uninit().to_stack(cx);
 
         // First collect all values that pass the predicate
         for i in 0..length {
@@ -492,11 +492,11 @@ impl TypedArrayPrototype {
 
         // Then create a new array that contains the kept values
         let num_kept_values = kept_values.len();
-        let num_kept_values_value = Value::from(num_kept_values).to_stack_with(cx);
+        let num_kept_values_value = Value::from(num_kept_values).to_stack(cx);
         let array = typed_array_species_create_object(cx, typed_array, &[num_kept_values_value])?;
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
 
         for (i, value) in kept_values.into_iter().enumerate() {
             index_key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -641,8 +641,8 @@ impl TypedArrayPrototype {
         let this_arg = get_argument(cx, arguments, 1);
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
-        let mut index_value = Value::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
+        let mut index_value = Value::uninit().to_stack(cx);
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -690,7 +690,7 @@ impl TypedArrayPrototype {
         };
 
         // Shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for i in start_index..length {
             key.replace(PropertyKey::from_u64(cx, i)?);
@@ -737,14 +737,14 @@ impl TypedArrayPrototype {
         };
 
         // Shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for i in start_index..length {
             key.replace(PropertyKey::from_u64(cx, i)?);
             if must!(has_property(cx, object, key)) {
                 let element = must!(get(cx, object, key));
                 if is_strictly_equal(search_element, element)? {
-                    return Ok(Value::from(i).to_stack_with(cx));
+                    return Ok(Value::from(i).to_stack(cx));
                 }
             }
         }
@@ -774,7 +774,7 @@ impl TypedArrayPrototype {
         let mut joined = cx.names.empty_string().as_string();
 
         // Shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for i in 0..length {
             if i > 0 {
@@ -846,14 +846,14 @@ impl TypedArrayPrototype {
         };
 
         // Shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for i in (0..=start_index).rev() {
             key.replace(PropertyKey::from_u64(cx, i)?);
             if must!(has_property(cx, object, key)) {
                 let element = must!(get(cx, object, key));
                 if is_strictly_equal(search_element, element)? {
-                    return Ok(Value::from(i).to_stack_with(cx));
+                    return Ok(Value::from(i).to_stack(cx));
                 }
             }
         }
@@ -876,7 +876,7 @@ impl TypedArrayPrototype {
 
         let length = typed_array_length(&typed_array_record);
 
-        Ok(Value::from(length).to_stack_with(cx))
+        Ok(Value::from(length).to_stack(cx))
     }
 
     /// %TypedArray%.prototype.map (https://tc39.es/ecma262/#sec-%typedarray%.prototype.map)
@@ -899,12 +899,12 @@ impl TypedArrayPrototype {
         let callback_function = callback_function.as_object();
         let this_arg = get_argument(cx, arguments, 1);
 
-        let length_value = Value::from(length).to_stack_with(cx);
+        let length_value = Value::from(length).to_stack(cx);
         let array = typed_array_species_create_object(cx, typed_array, &[length_value])?;
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
-        let mut index_value = Value::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
+        let mut index_value = Value::uninit().to_stack(cx);
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -951,8 +951,8 @@ impl TypedArrayPrototype {
         };
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
-        let mut index_value = Value::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
+        let mut index_value = Value::uninit().to_stack(cx);
 
         for i in initial_index..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -998,8 +998,8 @@ impl TypedArrayPrototype {
         };
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
-        let mut index_value = Value::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
+        let mut index_value = Value::uninit().to_stack(cx);
 
         for i in (0..=initial_index).rev() {
             index_key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -1032,8 +1032,8 @@ impl TypedArrayPrototype {
         let mut upper = length.wrapping_sub(1);
 
         // Shared between iterations
-        let mut lower_key = PropertyKey::uninit().to_stack();
-        let mut upper_key = PropertyKey::uninit().to_stack();
+        let mut lower_key = PropertyKey::uninit().to_stack(cx);
+        let mut upper_key = PropertyKey::uninit().to_stack(cx);
 
         while lower != middle {
             lower_key.replace(PropertyKey::from_u64(cx, lower)?);
@@ -1089,7 +1089,7 @@ impl TypedArrayPrototype {
         target_offset: f64,
         source: DynTypedArray,
     ) -> EvalResult<()> {
-        let mut target_buffer = target.viewed_array_buffer();
+        let mut target_buffer = target.viewed_array_buffer(cx);
 
         let target_record = make_typed_array_with_buffer_witness_record(target);
         if is_typed_array_out_of_bounds(&target_record) {
@@ -1097,7 +1097,7 @@ impl TypedArrayPrototype {
         }
         let target_length = typed_array_length(&target_record) as u64;
 
-        let mut source_buffer = source.viewed_array_buffer();
+        let mut source_buffer = source.viewed_array_buffer(cx);
 
         let source_record = make_typed_array_with_buffer_witness_record(source);
         if is_typed_array_out_of_bounds(&source_record) {
@@ -1187,7 +1187,7 @@ impl TypedArrayPrototype {
         let offset = offset as u64;
 
         // Keys are shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for i in 0..source_length {
             key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1243,7 +1243,7 @@ impl TypedArrayPrototype {
         };
 
         let count = end_index.saturating_sub(start_index);
-        let count_value = Value::from(count).to_stack_with(cx);
+        let count_value = Value::from(count).to_stack(cx);
         let new_typed_array = typed_array_species_create(cx, typed_array, &[count_value])?;
         let array = new_typed_array.into_object_value();
 
@@ -1262,8 +1262,8 @@ impl TypedArrayPrototype {
         // If types are different then must call get and set and convert types
         if typed_array.kind() != new_typed_array.kind() {
             // Shared between iterations
-            let mut from_key = PropertyKey::uninit().to_stack();
-            let mut to_key = PropertyKey::uninit().to_stack();
+            let mut from_key = PropertyKey::uninit().to_stack(cx);
+            let mut to_key = PropertyKey::uninit().to_stack(cx);
 
             let mut current_index = start_index;
             for i in 0..count {
@@ -1277,8 +1277,8 @@ impl TypedArrayPrototype {
             }
         } else {
             // Otherwse copy bytes directly instead of performing any conversions
-            let mut source_buffer = typed_array.viewed_array_buffer();
-            let mut target_buffer = new_typed_array.viewed_array_buffer();
+            let mut source_buffer = typed_array.viewed_array_buffer(cx);
+            let mut target_buffer = new_typed_array.viewed_array_buffer(cx);
             let element_size = typed_array.element_size();
 
             let source_byte_offset = typed_array.byte_offset();
@@ -1323,8 +1323,8 @@ impl TypedArrayPrototype {
         let this_arg = get_argument(cx, arguments, 1);
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
-        let mut index_value = Value::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
+        let mut index_value = Value::uninit().to_stack(cx);
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -1367,7 +1367,7 @@ impl TypedArrayPrototype {
         )?;
 
         // Reuse handle between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
 
         // Copy sorted values into array
         for (i, value) in sorted_values.iter().enumerate() {
@@ -1385,7 +1385,7 @@ impl TypedArrayPrototype {
         arguments: &[StackRoot<Value>],
     ) -> EvalResult<StackRoot<Value>> {
         let typed_array = require_typed_array(cx, this_value)?;
-        let buffer = typed_array.viewed_array_buffer();
+        let buffer = typed_array.viewed_array_buffer(cx);
 
         let source_record = make_typed_array_with_buffer_witness_record(typed_array);
         let source_length = if is_typed_array_out_of_bounds(&source_record) {
@@ -1428,7 +1428,7 @@ impl TypedArrayPrototype {
         let element_size = typed_array.element_size();
         let source_byte_offset = typed_array.byte_offset();
         let begin_byte_offset = source_byte_offset + (start_index as usize) * element_size;
-        let begin_byte_offset_value = Value::from(begin_byte_offset).to_stack_with(cx);
+        let begin_byte_offset_value = Value::from(begin_byte_offset).to_stack(cx);
 
         let subarray = if typed_array.array_length().is_none() && end_argument.is_undefined() {
             typed_array_species_create_object(
@@ -1437,7 +1437,7 @@ impl TypedArrayPrototype {
                 &[buffer.into(), begin_byte_offset_value],
             )?
         } else {
-            let new_length_value = Value::from(new_length).to_stack_with(cx);
+            let new_length_value = Value::from(new_length).to_stack(cx);
             typed_array_species_create_object(
                 cx,
                 typed_array,
@@ -1468,7 +1468,7 @@ impl TypedArrayPrototype {
                 result = StringValue::concat(cx, result, separator)?;
             }
 
-            let key = PropertyKey::from_u64(cx, i as u64)?.to_stack();
+            let key = PropertyKey::from_u64(cx, i as u64)?.to_stack(cx);
             let next_element = must!(get(cx, object, key));
 
             if !next_element.is_nullish() {
@@ -1497,8 +1497,8 @@ impl TypedArrayPrototype {
         let array = typed_array_create_same_type(cx, typed_array, length)?;
 
         // Keys are shared between iterations
-        let mut from_key = PropertyKey::uninit().to_stack();
-        let mut to_key = PropertyKey::uninit().to_stack();
+        let mut from_key = PropertyKey::uninit().to_stack(cx);
+        let mut to_key = PropertyKey::uninit().to_stack(cx);
 
         for i in 0..length {
             from_key.replace(PropertyKey::from_u64(cx, length - i - 1)?);
@@ -1538,7 +1538,7 @@ impl TypedArrayPrototype {
         )?;
 
         // Reuse handle between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
 
         // Copy sorted values into array
         for (i, value) in sorted_values.iter().enumerate() {
@@ -1615,7 +1615,7 @@ impl TypedArrayPrototype {
         let array = typed_array_create_same_type(cx, typed_array, length as u64)?;
 
         // Key is shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for i in 0..(length as u64) {
             key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1797,7 +1797,7 @@ fn typed_array_create_same_type(
     };
 
     let constructor = cx.get_intrinsic(constructor_instrinsic);
-    let length_value = Value::from(length).to_stack_with(cx);
+    let length_value = Value::from(length).to_stack(cx);
 
     typed_array_create_from_constructor_object(cx, constructor, &[length_value])
 }

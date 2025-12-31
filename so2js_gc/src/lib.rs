@@ -15,14 +15,12 @@
 #![no_std]
 extern crate alloc;
 
-mod constants;
 mod gc_header;
 mod gray_queue;
 mod heap;
 mod pointer;
 mod visitor;
 
-pub use constants::*;
 pub use gc_header::{GcColor, GcHeader, GcPhase};
 pub use heap::{AllocError, AllocResult, Heap, Marker};
 pub use pointer::GcPtr;

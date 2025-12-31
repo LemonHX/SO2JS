@@ -116,7 +116,7 @@ impl ForInIterator {
 impl StackRoot<ForInIterator> {
     /// Return the next string key in the iteration, or undefined if there are no more keys.
     pub fn next(&mut self, cx: Context) -> EvalResult<Value> {
-        let object = self.object.to_stack();
+        let object = self.object.to_stack(cx);
 
         // Find the next property that has not been deleted
         loop {
@@ -124,7 +124,7 @@ impl StackRoot<ForInIterator> {
                 return Ok(Value::undefined());
             }
 
-            let key = self.keys.get_unchecked(self.index).to_stack();
+            let key = self.keys.get_unchecked(self.index).to_stack(cx);
             let property_key = PropertyKey::string_handle(cx, key)?;
 
             self.index += 1;

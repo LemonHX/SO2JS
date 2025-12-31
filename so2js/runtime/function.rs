@@ -67,7 +67,7 @@ pub fn set_function_length(
     func: StackRoot<ObjectValue>,
     length: u32,
 ) -> AllocResult<()> {
-    let length_value = Value::from(length).to_stack_with(cx);
+    let length_value = Value::from(length).to_stack(cx);
     let desc = PropertyDescriptor::data(length_value, false, false, true);
     must_a!(define_property_or_throw(cx, func, cx.names.length(), desc));
 
@@ -81,7 +81,7 @@ pub fn set_function_length_maybe_infinity(
     length: Option<usize>,
 ) -> EvalResult<()> {
     let length = if let Some(length) = length {
-        Value::from(length).to_stack_with(cx)
+        Value::from(length).to_stack(cx)
     } else {
         cx.number(f64::INFINITY)
     };

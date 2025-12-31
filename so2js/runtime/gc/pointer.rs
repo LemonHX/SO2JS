@@ -3,7 +3,7 @@ use core::{
     ptr::NonNull,
 };
 
-use super::{StackRootContents, IsHeapItem, ToStackRootContents};
+use super::{IsHeapItem, StackRootContents, ToStackRootContents};
 
 /// For direct references to heap pointers, such as references to other heap items stored within a
 /// heap item. May not be held on stack during a GC (which can occur during any heap allocation).
@@ -38,6 +38,18 @@ impl<T> HeapPtr<T> {
     #[inline]
     pub fn cast_mut<U>(&mut self) -> &mut HeapPtr<U> {
         unsafe { core::mem::transmute(self) }
+    }
+
+    /// Borrow the inner GC pointer for visitor interoperability.
+    #[inline]
+    pub fn as_gc_ptr_mut(&mut self) -> &mut so2js_gc::GcPtr<T> {
+        &mut self.0
+    }
+
+    /// Borrow the inner GC pointer immutably.
+    #[inline]
+    pub fn as_gc_ptr(&self) -> &so2js_gc::GcPtr<T> {
+        &self.0
     }
 
     #[inline]

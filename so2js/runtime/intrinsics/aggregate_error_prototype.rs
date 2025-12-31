@@ -28,6 +28,6 @@ impl AggregateErrorPrototype {
             cx.names.aggregate_error().as_string().into(),
         )?;
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 }

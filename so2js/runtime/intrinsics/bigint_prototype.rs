@@ -82,7 +82,7 @@ fn this_bigint_value(cx: Context, value: StackRoot<Value>) -> EvalResult<StackRo
     if value.is_object() {
         let object_value = value.as_object();
         if object_value.is_bigint_object() {
-            return Ok(object_value.cast::<BigIntObject>().bigint_data());
+            return Ok(object_value.cast::<BigIntObject>().bigint_data(cx));
         }
     }
 

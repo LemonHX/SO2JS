@@ -42,7 +42,7 @@ pub fn generate_template_object(
         must_a!(array_create_in_realm(cx, realm, num_strings as u64, None)).as_object();
 
     // Property key is shared between iterations
-    let mut index_key = PropertyKey::uninit().to_stack();
+    let mut index_key = PropertyKey::uninit().to_stack(cx);
 
     for (i, quasi) in lit.quasis.iter().enumerate() {
         index_key.replace(PropertyKey::array_index(cx, i as u32)?);
@@ -571,7 +571,7 @@ pub fn eval_shift_right_logical(
     // Shift modulus 32
     let shift = right_u32 & 0x1F;
 
-    Ok(Value::from(left_smi >> shift).to_stack_with(cx))
+    Ok(Value::from(left_smi >> shift).to_stack(cx))
 }
 
 /// InstanceofOperator (https://tc39.es/ecma262/#sec-instanceofoperator)

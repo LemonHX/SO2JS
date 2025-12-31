@@ -92,7 +92,7 @@ impl DataViewPrototype {
         _: &[StackRoot<Value>],
     ) -> EvalResult<StackRoot<Value>> {
         let data_view = require_is_data_view(cx, this_value)?;
-        Ok(data_view.viewed_array_buffer().as_value())
+        Ok(data_view.viewed_array_buffer(cx).as_value())
     }
 
     /// get DataView.prototype.byteLength (https://tc39.es/ecma262/#sec-get-dataview.prototype.bytelength)
@@ -110,7 +110,7 @@ impl DataViewPrototype {
 
         let byte_length = get_view_byte_length(&data_view_record);
 
-        Ok(Value::from(byte_length).to_stack_with(cx))
+        Ok(Value::from(byte_length).to_stack(cx))
     }
 
     /// get DataView.prototype.byteOffset (https://tc39.es/ecma262/#sec-get-dataview.prototype.byteoffset)
@@ -126,7 +126,7 @@ impl DataViewPrototype {
             return type_error(cx, "DataView is out of bounds");
         }
 
-        Ok(Value::from(data_view.byte_offset()).to_stack())
+        Ok(Value::from(data_view.byte_offset()).to_stack(cx))
     }
 
     /// DataView.prototype.getBigInt64 (https://tc39.es/ecma262/#sec-dataview.prototype.getbigint64)

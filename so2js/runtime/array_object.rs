@@ -47,7 +47,7 @@ impl ArrayObject {
 
         set_uninit!(array.is_length_writable, true);
 
-        Ok(array.to_stack())
+        Ok(array.to_stack(cx))
     }
 }
 
@@ -91,7 +91,7 @@ impl VirtualObject for StackRoot<ArrayObject> {
         key: StackRoot<PropertyKey>,
     ) -> EvalResult<Option<PropertyDescriptor>> {
         if key.is_string() && key.as_string().equals(&cx.names.length().as_string())? {
-            let length_value = Value::from(self.as_object().array_properties_length()).to_stack();
+            let length_value = Value::from(self.as_object().array_properties_length()).to_stack(cx);
             return Ok(Some(PropertyDescriptor::data(
                 length_value,
                 self.is_length_writable,
@@ -151,7 +151,7 @@ pub fn array_create_in_realm(
 
     let mut array_object = ArrayObject::new(cx, proto)?;
 
-    let length_value = Value::from(length as u32).to_stack_with(cx);
+    let length_value = Value::from(length as u32).to_stack(cx);
     let length_desc = PropertyDescriptor::data(length_value, true, false, false);
     must!(array_object.define_own_property(cx, cx.names.length(), length_desc));
 
@@ -202,7 +202,7 @@ pub fn array_species_create(
         return type_error(cx, "expected array constructor");
     }
 
-    let length_value = Value::from(length).to_stack_with(cx);
+    let length_value = Value::from(length).to_stack(cx);
     construct(cx, constructor.as_object(), &[length_value], None)
 }
 
@@ -257,7 +257,7 @@ pub fn create_array_from_list(
     let array = must_a!(array_create(cx, 0, None));
 
     // Property key is shared between iterations
-    let mut key = PropertyKey::uninit().to_stack();
+    let mut key = PropertyKey::uninit().to_stack(cx);
 
     for (index, element) in elements.iter().enumerate() {
         // TODO: StackRoot keys out of u32 range

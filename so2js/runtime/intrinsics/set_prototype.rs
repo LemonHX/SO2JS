@@ -152,7 +152,7 @@ impl SetPrototype {
         let key = get_argument(cx, arguments, 0);
 
         // May allocate
-        let set_key = ValueCollectionKey::from(key)?;
+        let set_key = ValueCollectionKey::from(cx, key)?;
 
         let existed = set.set_data_ptr().remove(&set_key);
 
@@ -175,7 +175,7 @@ impl SetPrototype {
         let other_set_record = get_set_record(cx, other)?;
 
         // Create a copy of this set
-        let new_set_data = ValueSet::new_from_set(cx, this_set.set_data())?.to_stack();
+        let new_set_data = ValueSet::new_from_set(cx, this_set.set_data(cx))?.to_stack(cx);
         let new_set = SetObject::new_from_set(cx, new_set_data)?;
 
         if this_set.set_data_ptr().num_entries_occupied() as f64 <= other_set_record.size {
@@ -186,7 +186,7 @@ impl SetPrototype {
             // StackRoot is shared between iterations
             let mut item_handle = StackRoot::<Value>::empty(cx);
 
-            for (item, _) in new_set.set_data().iter_gc_safe() {
+            for (item, _) in new_set.set_data(cx).iter_gc_safe() {
                 item_handle.replace(item.get());
 
                 let in_other = call_object(
@@ -198,7 +198,7 @@ impl SetPrototype {
 
                 if in_other.is_true() {
                     // May allocate
-                    let set_key = ValueCollectionKey::from(item_handle)?;
+                    let set_key = ValueCollectionKey::from(cx, item_handle)?;
                     new_set.set_data_ptr().remove(&set_key);
                 }
             }
@@ -210,9 +210,10 @@ impl SetPrototype {
                 other_set_record.keys_method,
                 &mut |cx, key| {
                     // May allocate
-                    let key = match ValueCollectionKey::from(canonicalize_keyed_collection_key(
-                        cx, key,
-                    )) {
+                    let key = match ValueCollectionKey::from(
+                        cx,
+                        canonicalize_keyed_collection_key(cx, key),
+                    ) {
                         Ok(key) => key,
                         // Propagate allocation errors upwards
                         Err(err) => return Some(Err(err.into())),
@@ -268,7 +269,7 @@ impl SetPrototype {
 
         // Must use gc and invalidation safe iteration since arbitrary code can be executed between
         // iterations.
-        for (value, _) in set.set_data().iter_gc_safe() {
+        for (value, _) in set.set_data(cx).iter_gc_safe() {
             value_handle.replace(value.into());
 
             let arguments = [value_handle, value_handle, this_value];
@@ -293,7 +294,7 @@ impl SetPrototype {
         let value = get_argument(cx, arguments, 0);
 
         // May allocate
-        let set_value = ValueCollectionKey::from(value)?;
+        let set_value = ValueCollectionKey::from(cx, value)?;
 
         Ok(cx.bool(set.set_data_ptr().contains(&set_value)))
     }
@@ -314,7 +315,7 @@ impl SetPrototype {
         let other_set_record = get_set_record(cx, other)?;
 
         // Create an empty set
-        let new_set_data = SetObjectSetField::new(cx, ValueSet::MIN_CAPACITY)?.to_stack();
+        let new_set_data = SetObjectSetField::new(cx, ValueSet::MIN_CAPACITY)?.to_stack(cx);
         let new_set = SetObject::new_from_set(cx, new_set_data)?;
 
         if this_set.set_data_ptr().num_entries_occupied() as f64 <= other_set_record.size {
@@ -325,7 +326,7 @@ impl SetPrototype {
             // StackRoot is shared between iterations
             let mut item_handle = StackRoot::<Value>::empty(cx);
 
-            for (item, _) in this_set.set_data().iter_gc_safe() {
+            for (item, _) in this_set.set_data(cx).iter_gc_safe() {
                 item_handle.replace(item.get());
 
                 let in_other = call_object(
@@ -350,7 +351,7 @@ impl SetPrototype {
                     let key = canonicalize_keyed_collection_key(cx, key);
 
                     // May allocate
-                    let set_key = match ValueCollectionKey::from(key) {
+                    let set_key = match ValueCollectionKey::from(cx, key) {
                         Ok(key) => key,
                         // Propagate allocation errors upwards
                         Err(err) => return Some(Err(err.into())),
@@ -392,7 +393,7 @@ impl SetPrototype {
             // StackRoot is shared between iterations
             let mut item_handle = StackRoot::<Value>::empty(cx);
 
-            for (item, _) in this_set.set_data().iter_gc_safe() {
+            for (item, _) in this_set.set_data(cx).iter_gc_safe() {
                 item_handle.replace(item.get());
 
                 let in_other = call_object(
@@ -420,7 +421,7 @@ impl SetPrototype {
                 let item = iterator_value(cx, iter_result)?;
 
                 // May allocate
-                let set_key = ValueCollectionKey::from(item)?;
+                let set_key = ValueCollectionKey::from(cx, item)?;
 
                 // Return as soon as we find an element of the other set that is in this set
                 if this_set.set_data_ptr().contains(&set_key) {
@@ -461,7 +462,7 @@ impl SetPrototype {
         // StackRoot is shared between iterations
         let mut item_handle = StackRoot::<Value>::empty(cx);
 
-        for (item, _) in this_set.set_data().iter_gc_safe() {
+        for (item, _) in this_set.set_data(cx).iter_gc_safe() {
             item_handle.replace(item.get());
 
             let in_other = call_object(
@@ -511,7 +512,7 @@ impl SetPrototype {
             let item = iterator_value(cx, iter_result)?;
 
             // May allocate
-            let set_key = ValueCollectionKey::from(item)?;
+            let set_key = ValueCollectionKey::from(cx, item)?;
 
             // Return as soon as we find an element of the other set that is not in this set
             if !this_set.set_data_ptr().contains(&set_key) {
@@ -537,7 +538,7 @@ impl SetPrototype {
             return type_error(cx, "size accessor must be called on set");
         };
 
-        Ok(Value::from(set.set_data_ptr().num_entries_occupied()).to_stack())
+        Ok(Value::from(set.set_data_ptr().num_entries_occupied()).to_stack(cx))
     }
 
     /// Set.prototype.symmetricDifference (https://tc39.es/ecma262/#sec-set.prototype.symmetricdifference)
@@ -556,7 +557,7 @@ impl SetPrototype {
         let other_set_record = get_set_record(cx, other)?;
 
         // Create a copy of this set
-        let new_set_data = ValueSet::new_from_set(cx, this_set.set_data())?.to_stack();
+        let new_set_data = ValueSet::new_from_set(cx, this_set.set_data(cx))?.to_stack(cx);
         let new_set = SetObject::new_from_set(cx, new_set_data)?;
 
         // Iterate through keys of other set and add or remove them from the new set to ensure that
@@ -569,7 +570,7 @@ impl SetPrototype {
                 let key = canonicalize_keyed_collection_key(cx, key);
 
                 // May allocate
-                let collection_key = match ValueCollectionKey::from(key) {
+                let collection_key = match ValueCollectionKey::from(cx, key) {
                     Ok(key) => key,
                     // Propagate allocation errors upwards
                     Err(err) => return Some(Err(err.into())),
@@ -608,7 +609,7 @@ impl SetPrototype {
         let other_set_record = get_set_record(cx, other)?;
 
         // Create a copy of this set
-        let new_set_data = ValueSet::new_from_set(cx, this_set.set_data())?.to_stack();
+        let new_set_data = ValueSet::new_from_set(cx, this_set.set_data(cx))?.to_stack(cx);
         let new_set = SetObject::new_from_set(cx, new_set_data)?;
 
         // Iterate through keys of other set and add them to the new set

@@ -145,7 +145,7 @@ impl ObjectConstructor {
                     HeapItemKind::OrdinaryObject,
                     Intrinsic::ObjectPrototype,
                 )?;
-                return Ok(new_object.to_stack().as_value());
+                return Ok(new_object.to_stack(cx).as_value());
             }
         }
 
@@ -172,7 +172,7 @@ impl ObjectConstructor {
         }
 
         // Shared between iterations
-        let mut property_key = PropertyKey::uninit().to_stack();
+        let mut property_key = PropertyKey::uninit().to_stack(cx);
 
         for argument in &arguments[1..] {
             if !argument.is_nullish() {
@@ -215,7 +215,7 @@ impl ObjectConstructor {
             HeapItemKind::OrdinaryObject,
             proto,
         )?
-        .to_stack();
+        .to_stack(cx);
 
         let properties = get_argument(cx, arguments, 1);
         if properties.is_undefined() {
@@ -253,7 +253,7 @@ impl ObjectConstructor {
         let mut descriptors = vec![];
 
         for key_value in keys {
-            let key = must!(PropertyKey::from_value(cx, key_value)).to_stack();
+            let key = must!(PropertyKey::from_value(cx, key_value)).to_stack(cx);
             let prop_desc = properties.get_own_property(cx, key)?;
             if let Some(prop_desc) = prop_desc {
                 if let Some(true) = prop_desc.is_enumerable {
@@ -379,7 +379,7 @@ impl ObjectConstructor {
         let descriptors = ordinary_object_create(cx)?;
 
         // Shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for key_value in keys {
             key.replace(must!(PropertyKey::from_value(cx, key_value)));
@@ -475,7 +475,7 @@ impl ObjectConstructor {
             HeapItemKind::OrdinaryObject,
             None,
         )?
-        .to_stack();
+        .to_stack(cx);
 
         for group in groups {
             let property_key = group.key.cast::<PropertyKey>();

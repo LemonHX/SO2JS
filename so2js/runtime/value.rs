@@ -9,7 +9,10 @@ use crate::{field_offset, runtime::alloc_error::AllocResult, set_uninit};
 use super::{
     context::Context,
     debug_print::{DebugPrint, DebugPrinter},
-    gc::{AnyHeapItem, GcVisitorExt, StackRoot, StackRootContents, HeapItem, HeapPtr, ToStackRootContents},
+    gc::{
+        AnyHeapItem, GcVisitorExt, HeapItem, HeapPtr, StackRoot, StackRootContents,
+        ToStackRootContents,
+    },
     heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
     object_value::ObjectValue,
     string_value::{FlatString, StringValue},
@@ -414,13 +417,13 @@ impl Value {
     }
 }
 
-impl core::fmt::Debug for Value {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut dp = DebugPrinter::new(super::debug_print::DebugPrintMode::Short);
-        let df = self.debug_format(&mut dp);
-        write!(f, "{}", dp.finish())
-    }
-}
+// impl core::fmt::Debug for Value {
+//     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+//         let mut dp = DebugPrinter::new(super::debug_print::DebugPrintMode::Short);
+//         let df = self.debug_format(&mut dp);
+//         write!(f, "{}", dp.finish())
+//     }
+// }
 
 impl ToStackRootContents for Value {
     type Impl = Value;
@@ -582,7 +585,7 @@ impl SymbolValue {
         description: Option<StackRoot<StringValue>>,
         is_private: bool,
     ) -> AllocResult<StackRoot<SymbolValue>> {
-        let description = description.map(|d| d.flatten()).transpose()?;
+        let description = description.map(|d| d.flatten(cx)).transpose()?;
         let mut symbol = cx.alloc_uninit::<SymbolValue>()?;
 
         set_uninit!(
@@ -593,15 +596,15 @@ impl SymbolValue {
         set_uninit!(symbol.hash_code, cx.rand.random::<u32>());
         set_uninit!(symbol.is_private, is_private);
 
-        Ok(symbol.to_stack())
+        Ok(symbol.to_stack(cx))
     }
 
     pub fn description_ptr(&self) -> Option<HeapPtr<FlatString>> {
         self.description
     }
 
-    pub fn description(&self) -> Option<StackRoot<FlatString>> {
-        self.description.map(|d| d.to_stack())
+    pub fn description(&self, cx: Context) -> Option<StackRoot<FlatString>> {
+        self.description.map(|d| d.to_stack(cx))
     }
 
     pub fn is_private(&self) -> bool {
@@ -691,7 +694,7 @@ impl BigIntValue {
     const DIGITS_OFFSET: usize = field_offset!(BigIntValue, digits);
 
     pub fn new(cx: Context, value: BigInt) -> AllocResult<StackRoot<BigIntValue>> {
-        Ok(Self::new_ptr(cx, value)?.to_stack())
+        Ok(Self::new_ptr(cx, value)?.to_stack(cx))
     }
 
     pub fn new_ptr(cx: Context, value: BigInt) -> AllocResult<HeapPtr<BigIntValue>> {
@@ -756,9 +759,9 @@ pub struct ValueCollectionKey(Value);
 
 impl ValueCollectionKey {
     // May allocate due to string flattening so do not implement From<Value> directly.
-    pub fn from(value: StackRoot<Value>) -> AllocResult<Self> {
+    pub fn from(cx: Context, value: StackRoot<Value>) -> AllocResult<Self> {
         if value.is_string() {
-            let flat_string = value.as_string().flatten()?;
+            let flat_string = value.as_string().flatten(cx)?;
             return Ok(ValueCollectionKey(*flat_string.as_value()));
         }
 
@@ -832,9 +835,9 @@ pub struct ValueCollectionKeyStackRoot(StackRoot<Value>);
 
 impl ValueCollectionKeyStackRoot {
     /// Identical to ValueCollectionKey::from but stores a handle instead.
-    pub fn new(value: StackRoot<Value>) -> AllocResult<Self> {
+    pub fn new(cx: Context, value: StackRoot<Value>) -> AllocResult<Self> {
         if value.is_string() {
-            let flat_string = value.as_string().flatten()?;
+            let flat_string = value.as_string().flatten(cx)?;
             return Ok(ValueCollectionKeyStackRoot(flat_string.as_string().into()));
         }
 

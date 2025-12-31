@@ -71,7 +71,7 @@ impl WeakSetPrototype {
         let value = get_argument(cx, arguments, 0);
 
         // May allocate
-        let set_key = ValueCollectionKey::from(value)?;
+        let set_key = ValueCollectionKey::from(cx, value)?;
 
         let removed_value = weak_set_object.weak_set_data().remove(&set_key);
 
@@ -94,7 +94,7 @@ impl WeakSetPrototype {
         let value = get_argument(cx, arguments, 0);
 
         // May allocate
-        let set_key = ValueCollectionKey::from(value)?;
+        let set_key = ValueCollectionKey::from(cx, value)?;
 
         let has_value = weak_set_object.weak_set_data().contains(&set_key);
 

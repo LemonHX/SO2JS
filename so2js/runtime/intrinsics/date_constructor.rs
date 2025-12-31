@@ -136,7 +136,7 @@ impl DateConstructor {
 
         Ok(
             DateObject::new_from_constructor(cx, new_target, date_value)?
-                .to_stack()
+                .to_stack(cx)
                 .into(),
         )
     }
@@ -147,7 +147,7 @@ impl DateConstructor {
         _: StackRoot<Value>,
         _: &[StackRoot<Value>],
     ) -> EvalResult<StackRoot<Value>> {
-        Ok(Value::from(get_current_unix_time(&cx)).to_stack())
+        Ok(Value::from(get_current_unix_time(&cx)).to_stack(cx))
     }
 
     /// Date.parse (https://tc39.es/ecma262/#sec-date.parse)
@@ -160,7 +160,7 @@ impl DateConstructor {
         let string = to_string(cx, string_arg)?;
 
         if let Some(date_value) = parse_string_to_date(string)? {
-            Ok(Value::from(date_value).to_stack_with(cx))
+            Ok(Value::from(date_value).to_stack(cx))
         } else {
             Ok(cx.nan())
         }
@@ -225,6 +225,6 @@ impl DateConstructor {
         let final_time = make_time(hour, minute, second, millisecond);
         let final_date = make_date(final_day, final_time);
 
-        Ok(Value::from(time_clip(final_date)).to_stack())
+        Ok(Value::from(time_clip(final_date)).to_stack(cx))
     }
 }

@@ -90,7 +90,7 @@ impl ArrayConstructor {
                 1
             };
 
-            let int_len_value = Value::from(int_len).to_stack_with(cx);
+            let int_len_value = Value::from(int_len).to_stack(cx);
             must!(set(
                 cx,
                 array.into(),
@@ -104,7 +104,7 @@ impl ArrayConstructor {
             let array = array_create(cx, arguments.len() as u64, Some(proto))?;
 
             // Property key is shared between iterations
-            let mut key = PropertyKey::uninit().to_stack();
+            let mut key = PropertyKey::uninit().to_stack(cx);
 
             for index in 0..arguments.len() {
                 key.replace(PropertyKey::array_index(cx, index as u32)?);
@@ -148,7 +148,7 @@ impl ArrayConstructor {
             };
 
             // StackRoot is shared between iterations
-            let mut key = PropertyKey::uninit().to_stack();
+            let mut key = PropertyKey::uninit().to_stack(cx);
             let mut index_value: StackRoot<Value> = StackRoot::empty(cx);
             let mut i = 0;
 
@@ -187,7 +187,7 @@ impl ArrayConstructor {
                 None
             })?;
 
-            let length_value = Value::from(i).to_stack_with(cx);
+            let length_value = Value::from(i).to_stack(cx);
             set(cx, array, cx.names.length(), length_value, true)?;
 
             return Ok(array.as_value());
@@ -196,7 +196,7 @@ impl ArrayConstructor {
         // Otherwise assume items arg is array like and copy elements from it
         let array_like = must!(to_object(cx, items_arg));
         let length = length_of_array_like(cx, array_like)?;
-        let length_value = Value::from(length).to_stack_with(cx);
+        let length_value = Value::from(length).to_stack(cx);
 
         let array = if is_constructor_value(this_value) {
             construct(cx, this_value.as_object(), &[length_value], None)?
@@ -205,7 +205,7 @@ impl ArrayConstructor {
         };
 
         // StackRoots are shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
         let mut index_value: StackRoot<Value> = StackRoot::empty(cx);
 
         // Copy elements from items array
@@ -246,7 +246,7 @@ impl ArrayConstructor {
         arguments: &[StackRoot<Value>],
     ) -> EvalResult<StackRoot<Value>> {
         let length = arguments.len();
-        let length_value = Value::from(length).to_stack_with(cx);
+        let length_value = Value::from(length).to_stack(cx);
 
         let array = if is_constructor_value(this_value) {
             construct(cx, this_value.as_object(), &[length_value], None)?
@@ -254,7 +254,7 @@ impl ArrayConstructor {
             array_create(cx, length as u64, None)?.into()
         };
 
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         for index in 0..length {
             key.replace(PropertyKey::array_index(cx, index as u32)?);

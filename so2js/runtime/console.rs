@@ -83,12 +83,12 @@ fn new_heap_source_info(
 ) -> AllocResult<Option<SourceInfo>> {
     let (mut source_file, line, col) =
         if let Some((source_file, line, col)) = &stack_trace_info.source_file_line_col {
-            (source_file.to_stack(), *line, *col)
+            (source_file.to_stack(cx), *line, *col)
         } else {
             return Ok(None);
         };
 
-    let name = source_file.display_name().to_string();
+    let name = source_file.display_name(cx).to_string();
     let snippet = source_file.get_line(cx, line - 1)?;
 
     Ok(Some(SourceInfo::new(name, line, col, snippet)))

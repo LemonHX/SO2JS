@@ -2,9 +2,9 @@ use crate::{
     field_offset,
     runtime::{
         alloc_error::AllocResult,
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
-        Context, StackRoot, HeapPtr,
+        Context, HeapPtr, StackRoot,
     },
     set_uninit,
 };
@@ -453,7 +453,7 @@ pub trait BsIndexMapField<K: Eq + Hash + Clone, V: Clone> {
         }
 
         // Save old map behind handle before allocating
-        let mut old_map = old_map.to_stack();
+        let mut old_map = old_map.to_stack(cx);
 
         // Capacity jumps from 0 to min capacity
         let new_capacity;

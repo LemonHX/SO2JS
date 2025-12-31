@@ -206,7 +206,8 @@ impl StringPrototype {
             return Ok(cx.undefined());
         }
 
-        let code_unit_string = FlatString::from_code_unit(cx, string.code_unit_at(index as u32)?)?;
+        let code_unit_string =
+            FlatString::from_code_unit(cx, string.code_unit_at(index as u32, cx)?)?;
 
         Ok(code_unit_string.as_value())
     }
@@ -227,7 +228,8 @@ impl StringPrototype {
             return Ok(cx.names.empty_string().as_string().as_value());
         }
 
-        let char_string = FlatString::from_code_unit(cx, string.code_unit_at(position as u32)?)?;
+        let char_string =
+            FlatString::from_code_unit(cx, string.code_unit_at(position as u32, cx)?)?;
 
         Ok(char_string.as_value())
     }
@@ -248,7 +250,7 @@ impl StringPrototype {
             return Ok(cx.nan());
         }
 
-        let code_unit = string.code_unit_at(position as u32)?;
+        let code_unit = string.code_unit_at(position as u32, cx)?;
         Ok(cx.smi(code_unit as i32))
     }
 
@@ -268,7 +270,7 @@ impl StringPrototype {
             return Ok(cx.undefined());
         }
 
-        let code_point = string.code_point_at(position as u32)?;
+        let code_point = string.code_point_at(position as u32, cx)?;
         Ok(cx.smi(code_point as i32))
     }
 
@@ -324,7 +326,7 @@ impl StringPrototype {
             None => return Ok(cx.bool(false)),
         };
 
-        let ends_with_string = string.substring_equals(search_string, start_index)?;
+        let ends_with_string = string.substring_equals(search_string, start_index, cx)?;
 
         Ok(cx.bool(ends_with_string))
     }
@@ -356,7 +358,7 @@ impl StringPrototype {
             return Ok(cx.bool(false));
         }
 
-        let found_search_string = string.find(search_string, pos)?.is_some();
+        let found_search_string = string.find(search_string, pos, cx)?.is_some();
         Ok(cx.bool(found_search_string))
     }
 
@@ -380,9 +382,9 @@ impl StringPrototype {
             return Ok(cx.negative_one());
         }
 
-        match string.find(search_string, pos)? {
+        match string.find(search_string, pos, cx)? {
             None => Ok(cx.negative_one()),
-            Some(index) => Ok(Value::from(index).to_stack_with(cx)),
+            Some(index) => Ok(Value::from(index).to_stack(cx)),
         }
     }
 
@@ -395,7 +397,7 @@ impl StringPrototype {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
-        Ok(cx.bool(string.is_well_formed()?))
+        Ok(cx.bool(string.is_well_formed(cx)?))
     }
 
     /// String.prototype.lastIndexOf (https://tc39.es/ecma262/#sec-string.prototype.lastindexof)
@@ -421,9 +423,9 @@ impl StringPrototype {
 
         let string_end = pos.clamp(0.0, string.len() as f64) as u32;
 
-        match string.rfind(search_string, string_end)? {
+        match string.rfind(search_string, string_end, cx)? {
             None => Ok(cx.negative_one()),
-            Some(index) => Ok(Value::from(index).to_stack_with(cx)),
+            Some(index) => Ok(Value::from(index).to_stack(cx)),
         }
     }
 
@@ -439,8 +441,8 @@ impl StringPrototype {
         let other_arg = get_argument(cx, arguments, 0);
         let other_string = to_string(cx, other_arg)?;
 
-        let wtf8_string = string.to_wtf8_string()?;
-        let wtf8_other_string = other_string.to_wtf8_string()?;
+        let wtf8_string = string.to_wtf8_string(cx)?;
+        let wtf8_other_string = other_string.to_wtf8_string(cx)?;
         let comparison = ICU
             .collator
             .as_borrowed()
@@ -510,7 +512,7 @@ impl StringPrototype {
                 } else {
                     let flags_string = to_string(cx, flags_string)?;
 
-                    flags_string_contains(flags_string, 'g' as u32)?
+                    flags_string_contains(flags_string, 'g' as u32, cx)?
                 };
 
                 if !has_global_flag {
@@ -557,7 +559,7 @@ impl StringPrototype {
         let form = if form_arg.is_undefined() {
             NormalizationForm::NFC
         } else {
-            let form_string = *to_string(cx, form_arg)?.flatten()?;
+            let form_string = *to_string(cx, form_arg)?.flatten(cx)?;
             if form_string == cx.names.nfc.as_string().as_flat() {
                 NormalizationForm::NFC
             } else if form_string == cx.names.nfd.as_string().as_flat() {
@@ -719,7 +721,7 @@ impl StringPrototype {
         };
 
         // Find the first match of the search string in the target string
-        let matched_position = target_string.find(search_string, 0)?;
+        let matched_position = target_string.find(search_string, 0, cx)?;
         let matched_position = if let Some(matched_position) = matched_position {
             matched_position
         } else {
@@ -729,7 +731,7 @@ impl StringPrototype {
         let replacement_string = match replace_value {
             // If replace argument is a function, replacement is the result of calling that function
             ReplaceValue::Function(replace_function) => {
-                let matched_position_value = Value::from(matched_position).to_stack_with(cx);
+                let matched_position_value = Value::from(matched_position).to_stack(cx);
                 let replacement = call_object(
                     cx,
                     replace_function,
@@ -800,7 +802,7 @@ impl StringPrototype {
 
                 let flags_string = to_string(cx, flags_value)?;
 
-                if !flags_string_contains(flags_string, 'g' as u32)? {
+                if !flags_string_contains(flags_string, 'g' as u32, cx)? {
                     return type_error(
                         cx,
                         "String.prototype.replaceAll expects RegExp with global flag",
@@ -827,10 +829,10 @@ impl StringPrototype {
         let mut matched_positions = vec![];
         let advance_by = u32::max(1, search_string.len());
 
-        let mut matched_position = target_string.find(search_string, 0)?;
+        let mut matched_position = target_string.find(search_string, 0, cx)?;
         while let Some(position) = matched_position {
             matched_positions.push(position);
-            matched_position = target_string.find(search_string, position + advance_by)?;
+            matched_position = target_string.find(search_string, position + advance_by, cx)?;
         }
 
         let mut string_parts = vec![];
@@ -847,7 +849,7 @@ impl StringPrototype {
             let replacement_string = match replace_value {
                 // If replace argument is a function, replacement is the result of calling that function
                 ReplaceValue::Function(replace_function) => {
-                    let matched_position_value = Value::from(matched_position).to_stack_with(cx);
+                    let matched_position_value = Value::from(matched_position).to_stack(cx);
                     let replacement = call_object(
                         cx,
                         replace_function,
@@ -1036,7 +1038,7 @@ impl StringPrototype {
 
         // Find the index of the first separator
         let mut i = 0;
-        let mut next_separator_index_opt = string.find(separator, i)?;
+        let mut next_separator_index_opt = string.find(separator, i, cx)?;
 
         while let Some(next_separator_index) = next_separator_index_opt {
             // Add the substring up until the next separator
@@ -1057,7 +1059,7 @@ impl StringPrototype {
                 break;
             }
 
-            next_separator_index_opt = string.find(separator, i)?;
+            next_separator_index_opt = string.find(separator, i, cx)?;
         }
 
         // Now that the last separator has the rest of the string is the last substring
@@ -1109,7 +1111,7 @@ impl StringPrototype {
             return Ok(cx.bool(false));
         }
 
-        let starts_with_string = string.substring_equals(search_string, start_index)?;
+        let starts_with_string = string.substring_equals(search_string, start_index, cx)?;
 
         Ok(cx.bool(starts_with_string))
     }
@@ -1185,7 +1187,7 @@ impl StringPrototype {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
-        Ok(string.to_well_formed(cx)?.to_stack().as_value())
+        Ok(string.to_well_formed(cx)?.to_stack(cx).as_value())
     }
 
     /// String.prototype.trim (https://tc39.es/ecma262/#sec-string.prototype.trim)
@@ -1233,7 +1235,7 @@ impl StringPrototype {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
-        let flat_string = string.flatten()?;
+        let flat_string = string.flatten(cx)?;
 
         Ok(StringIterator::new(cx, flat_string)?.as_value())
     }
@@ -1290,7 +1292,7 @@ impl StringPrototype {
         attribute_and_value: Option<(&str, StackRoot<Value>)>,
     ) -> EvalResult<StackRoot<StringValue>> {
         let object = require_object_coercible(cx, value)?;
-        let string = to_string(cx, object)?.to_wtf8_string()?;
+        let string = to_string(cx, object)?.to_wtf8_string(cx)?;
 
         let mut html = Wtf8String::new();
 
@@ -1298,7 +1300,7 @@ impl StringPrototype {
         html.push_str(tag);
 
         if let Some((attribute, value)) = attribute_and_value {
-            let value_string = to_string(cx, value)?.to_wtf8_string()?;
+            let value_string = to_string(cx, value)?.to_wtf8_string(cx)?;
 
             html.push_char(' ');
             html.push_str(attribute);
@@ -1468,7 +1470,7 @@ fn this_string_value(cx: Context, value: StackRoot<Value>) -> EvalResult<StackRo
     if value.is_object() {
         let object_value = value.as_object();
         if let Some(string_object) = object_value.as_string_object() {
-            return Ok(string_object.string_data().as_value());
+            return Ok(string_object.string_data(cx).as_value());
         }
     }
 
@@ -1571,14 +1573,14 @@ fn normalize_string<I: Iterator<Item = char>>(
     string: StackRoot<StringValue>,
     f: impl Fn(CharIterator) -> I,
 ) -> AllocResult<StackRoot<StringValue>> {
-    let parts = to_valid_string_parts(*string.flatten()?);
+    let parts = to_valid_string_parts(*string.flatten(cx)?);
 
     let mut normalized_string = Wtf8String::new();
 
     for part in parts {
         match part {
             StringPart::ValidRange(start, end) => {
-                let iter = CharIterator::new(string.iter_slice_code_points(start, end)?);
+                let iter = CharIterator::new(string.iter_slice_code_points(start, end, cx)?);
                 for code_point in f(iter) {
                     normalized_string.push(code_point as CodePoint);
                 }
@@ -1591,7 +1593,7 @@ fn normalize_string<I: Iterator<Item = char>>(
 
     Ok(FlatString::from_wtf8(cx, normalized_string.as_bytes())?
         .as_string()
-        .to_stack())
+        .to_stack(cx))
 }
 
 /// Replace argument may be either a function or string
@@ -1657,7 +1659,7 @@ impl SubstitutionTemplateParser {
         cx: Context,
         template: StackRoot<StringValue>,
     ) -> AllocResult<SubstitutionTemplate> {
-        let template = template.flatten()?;
+        let template = template.flatten(cx)?;
         let template_length = template.len();
 
         while self.pos < template_length {
@@ -1823,7 +1825,7 @@ impl SubstitutionTemplate {
                             let second_digit_char = (index % 10) as u32 + '0' as u32;
                             let second_digit_string =
                                 FlatString::from_code_point(cx, second_digit_char)?;
-                            string_parts.push(second_digit_string.as_string().to_stack());
+                            string_parts.push(second_digit_string.as_string().to_stack(cx));
 
                             continue;
                         }

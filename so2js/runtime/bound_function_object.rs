@@ -159,7 +159,7 @@ impl BoundFunctionObject {
         let mut all_arguments = vec![];
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_key = PropertyKey::uninit().to_stack(cx);
         let num_bound_arguments = length_of_array_like(cx, bound_arguments.into())?;
 
         // OPTIMIZATION: Much room for optimization of bound arguments instead of using array and

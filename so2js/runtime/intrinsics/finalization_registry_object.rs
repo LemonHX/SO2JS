@@ -38,7 +38,7 @@ impl FinalizationRegistryObject {
         cleanup_callback: StackRoot<ObjectValue>,
     ) -> EvalResult<StackRoot<FinalizationRegistryObject>> {
         let cells = FinalizationRegistryCells::new(cx, FinalizationRegistryCells::MIN_CAPACITY)?
-            .to_stack();
+            .to_stack(cx);
         let mut object = object_create_from_constructor::<FinalizationRegistryObject>(
             cx,
             constructor,
@@ -49,7 +49,7 @@ impl FinalizationRegistryObject {
         set_uninit!(object.cells, *cells);
         set_uninit!(object.cleanup_callback, *cleanup_callback);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn cells(&self) -> HeapPtr<FinalizationRegistryCells> {
@@ -157,7 +157,7 @@ impl FinalizationRegistryCells {
         }
 
         // Save old cells pointer behind handle across allcation
-        let old_cells = old_cells.to_stack();
+        let old_cells = old_cells.to_stack(cx);
         let mut new_cells = FinalizationRegistryCells::new(cx, new_capacity)?;
         let old_cells = *old_cells;
 

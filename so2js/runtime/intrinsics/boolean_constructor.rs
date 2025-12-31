@@ -40,7 +40,7 @@ impl BooleanObject {
 
         set_uninit!(object.boolean_data, boolean_data);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn new_from_constructor(
@@ -57,7 +57,7 @@ impl BooleanObject {
 
         set_uninit!(object.boolean_data, boolean_data);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn new_with_proto(
@@ -70,7 +70,7 @@ impl BooleanObject {
 
         set_uninit!(object.boolean_data, boolean_data);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn boolean_data(&self) -> bool {

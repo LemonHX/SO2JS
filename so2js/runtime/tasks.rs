@@ -153,8 +153,8 @@ impl Callback1Task {
     }
 
     fn execute(&self, mut cx: Context) -> EvalResult<()> {
-        let func = self.func.to_stack();
-        let arg = self.arg.to_stack();
+        let func = self.func.to_stack(cx);
+        let arg = self.arg.to_stack(cx);
 
         // Realm is only used to create errors before setting up the stack frame (e.g. non-callable
         // a stack overflow). Create these errors in the default realm for this context.
@@ -189,8 +189,8 @@ impl AwaitResumeTask {
     }
 
     fn execute(&self, mut cx: Context) -> EvalResult<()> {
-        let generator = self.generator.to_stack();
-        let completion_value = self.result.to_stack();
+        let generator = self.generator.to_stack(cx);
+        let completion_value = self.result.to_stack(cx);
         let completion_type = match self.kind {
             PromiseReactionKind::Fulfill => GeneratorCompletionType::Normal,
             PromiseReactionKind::Reject => GeneratorCompletionType::Throw,
@@ -253,12 +253,12 @@ impl PromiseThenReactionTask {
         let realm = self.realm.unwrap_or_else(|| cx.initial_realm_ptr());
 
         cx.with_initial_realm_stack_frame(realm, |cx| {
-            let result = self.result.to_stack();
-            let capability = self.capability.map(|c| c.to_stack());
+            let result = self.result.to_stack(cx);
+            let capability = self.capability.map(|c| c.to_stack(cx));
 
             // Call the handler if it exists on the result value
             let handler_result = if let Some(handler) = self.handler {
-                let handler = handler.to_stack();
+                let handler = handler.to_stack(cx);
                 call_object(cx, handler, cx.undefined(), &[result])
             } else {
                 // If no handler was provided treat the handler result as a default normal or throw
@@ -318,9 +318,9 @@ impl PromiseThenSettleTask {
 
     fn execute(&self, mut cx: Context) -> EvalResult<()> {
         cx.with_initial_realm_stack_frame(self.realm, |cx| {
-            let then_function = self.then_function.to_stack();
-            let resolution = self.resolution.to_stack().into();
-            let promise = self.promise.to_stack();
+            let then_function = self.then_function.to_stack(cx);
+            let resolution = self.resolution.to_stack(cx).into();
+            let promise = self.promise.to_stack(cx);
 
             execute_then(cx, then_function, resolution, promise)?;
 

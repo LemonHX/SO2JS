@@ -97,7 +97,7 @@ impl MapPrototype {
         let key = get_argument(cx, arguments, 0);
 
         // May allocate
-        let map_key = ValueCollectionKey::from(key)?;
+        let map_key = ValueCollectionKey::from(cx, key)?;
 
         let existed = map.map_data().remove(&map_key);
 
@@ -145,7 +145,7 @@ impl MapPrototype {
 
         // Must use gc and invalidation safe iteration since arbitrary code can be executed between
         // iterations.
-        for (key, value) in map.map_data().to_stack().iter_gc_safe() {
+        for (key, value) in map.map_data().to_stack(cx).iter_gc_safe() {
             key_handle.replace(key.into());
             value_handle.replace(value);
 
@@ -171,10 +171,10 @@ impl MapPrototype {
         let key = get_argument(cx, arguments, 0);
 
         // May allocate
-        let map_key = ValueCollectionKey::from(key)?;
+        let map_key = ValueCollectionKey::from(cx, key)?;
 
         match map.map_data().get(&map_key) {
-            Some(value) => Ok(value.to_stack()),
+            Some(value) => Ok(value.to_stack(cx)),
             None => Ok(cx.undefined()),
         }
     }
@@ -194,7 +194,7 @@ impl MapPrototype {
         let key = get_argument(cx, arguments, 0);
 
         // May allocate
-        let map_key = ValueCollectionKey::from(key)?;
+        let map_key = ValueCollectionKey::from(cx, key)?;
 
         Ok(cx.bool(map.map_data().contains_key(&map_key)))
     }
@@ -251,7 +251,7 @@ impl MapPrototype {
             return type_error(cx, "size accessor must be called on map");
         };
 
-        Ok(Value::from(map.map_data().num_entries_occupied()).to_stack())
+        Ok(Value::from(map.map_data().num_entries_occupied()).to_stack(cx))
     }
 
     /// Map.prototype.values (https://tc39.es/ecma262/#sec-map.prototype.values)

@@ -8,7 +8,7 @@ use crate::{
         collections::{index_map::GcSafeEntriesIter, BsIndexMap},
         error::type_error,
         eval_result::EvalResult,
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::HeapItemKind,
         iterator::create_iter_result_object,
         object_value::ObjectValue,
@@ -16,7 +16,7 @@ use crate::{
         property::Property,
         realm::Realm,
         value::ValueCollectionKey,
-        Context, StackRoot, HeapPtr, Value,
+        Context, HeapPtr, StackRoot, Value,
     },
     set_uninit,
 };
@@ -56,14 +56,14 @@ impl SetIterator {
         set_uninit!(object.kind, kind);
         set_uninit!(object.is_done, false);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     cast_from_value_fn!(SetIterator, "Set Iterator");
 
-    fn get_iter(&self) -> GcSafeEntriesIter<ValueCollectionKey, ()> {
+    fn get_iter(&self, cx: Context) -> GcSafeEntriesIter<ValueCollectionKey, ()> {
         GcSafeEntriesIter::<ValueCollectionKey, ()>::from_parts(
-            self.set.to_stack(),
+            self.set.to_stack(cx),
             self.next_entry_index,
         )
     }
@@ -125,7 +125,7 @@ impl SetIteratorPrototype {
         }
 
         // Perform a single iteration, mutating iterator object
-        let mut iter = set_iterator.get_iter();
+        let mut iter = set_iterator.get_iter(cx);
         let iter_result = iter.next();
         set_iterator.store_iter(iter);
 
@@ -136,7 +136,7 @@ impl SetIteratorPrototype {
             }
             Some((value, _)) => {
                 let value_value: Value = value.into();
-                let value_handle = value_value.to_stack();
+                let value_handle = value_value.to_stack(cx);
 
                 match set_iterator.kind {
                     SetIteratorKind::Value => {

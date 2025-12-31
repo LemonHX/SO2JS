@@ -8,10 +8,10 @@ use crate::{
 
 use super::{
     collections::InlineArray,
-    gc::{HeapItem, GcVisitorExt},
+    gc::{GcVisitorExt, HeapItem},
     heap_item_descriptor::HeapItemDescriptor,
     string_value::{FlatString, StringValue},
-    Context, StackRoot, HeapPtr,
+    Context, HeapPtr, StackRoot,
 };
 
 #[repr(C)]
@@ -88,7 +88,7 @@ impl ScopeNames {
             )
         };
 
-        Ok(scope_names.to_stack())
+        Ok(scope_names.to_stack(cx))
     }
 
     const NAMES_OFFSET: usize = field_offset!(ScopeNames, names);

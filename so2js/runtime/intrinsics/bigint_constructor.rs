@@ -11,7 +11,7 @@ use crate::{
         error::{range_error, type_error},
         eval_result::EvalResult,
         function::get_argument,
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::HeapItemKind,
         object_value::ObjectValue,
         ordinary_object::object_create,
@@ -20,7 +20,7 @@ use crate::{
             is_integral_number, to_bigint, to_index, to_primitive, ToPrimitivePreferredType,
         },
         value::BigIntValue,
-        Context, StackRoot, HeapPtr, Value,
+        Context, HeapPtr, StackRoot, Value,
     },
     set_uninit,
 };
@@ -48,11 +48,11 @@ impl BigIntObject {
 
         set_uninit!(object.bigint_data, *bigint_data);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
-    pub fn bigint_data(&self) -> StackRoot<BigIntValue> {
-        self.bigint_data.to_stack()
+    pub fn bigint_data(&self, cx: Context) -> StackRoot<BigIntValue> {
+        self.bigint_data.to_stack(cx)
     }
 }
 

@@ -172,11 +172,11 @@ impl StringConstructor {
             return Ok(cx.names.empty_string().as_string().as_value());
         }
 
-        let mut result = cx.names.empty_string.as_string().to_stack();
+        let mut result = cx.names.empty_string.as_string().to_stack(cx);
         let mut next_index = 0;
 
         // Key is shared between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         loop {
             key.replace(PropertyKey::from_u64(cx, next_index)?);

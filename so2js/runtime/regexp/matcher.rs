@@ -22,8 +22,8 @@ use crate::{
         LexerStream, SavedLexerStreamState,
     },
     runtime::{
-        alloc_error::AllocResult, regexp::instruction::OpCode, string_value::StringValue, StackRoot,
-        HeapPtr,
+        alloc_error::AllocResult, regexp::instruction::OpCode, string_value::StringValue, HeapPtr,
+        StackRoot,
     },
 };
 use alloc::vec;
@@ -739,7 +739,7 @@ pub fn run_matcher(
     start_index: u32,
 ) -> AllocResult<Option<Match>> {
     // May allocate, after this point no more allocations can occur
-    let flat_string = target_string.flatten()?;
+    let flat_string = target_string.flatten(cx)?;
 
     let regexp = *regexp;
 

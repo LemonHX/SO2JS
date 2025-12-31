@@ -5,13 +5,13 @@ use crate::{
     runtime::{
         alloc_error::AllocResult,
         collections::{BsIndexMap, BsIndexMapField},
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::HeapItemKind,
         intrinsics::intrinsics::Intrinsic,
         object_value::ObjectValue,
         ordinary_object::object_create_from_constructor,
         value::{ValueCollectionKey, ValueCollectionKeyStackRoot},
-        Context, EvalResult, StackRoot, HeapPtr, Value,
+        Context, EvalResult, HeapPtr, StackRoot, Value,
     },
     set_uninit,
 };
@@ -31,8 +31,8 @@ impl MapObject {
         constructor: StackRoot<ObjectValue>,
     ) -> EvalResult<StackRoot<MapObject>> {
         // Allocate and place behind handle before allocating environment
-        let map_data =
-            ValueMap::new(cx, HeapItemKind::MapObjectValueMap, ValueMap::MIN_CAPACITY)?.to_stack();
+        let map_data = ValueMap::new(cx, HeapItemKind::MapObjectValueMap, ValueMap::MIN_CAPACITY)?
+            .to_stack(cx);
 
         let mut object = object_create_from_constructor::<MapObject>(
             cx,
@@ -43,7 +43,7 @@ impl MapObject {
 
         set_uninit!(object.map_data, *map_data);
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     pub fn map_data(&self) -> HeapPtr<ValueMap> {
@@ -62,7 +62,7 @@ impl StackRoot<MapObject> {
         key: StackRoot<Value>,
         value: StackRoot<Value>,
     ) -> AllocResult<bool> {
-        let key_handle = ValueCollectionKeyStackRoot::new(key)?;
+        let key_handle = ValueCollectionKeyStackRoot::new(cx, key)?;
 
         Ok(self
             .map_data_field()

@@ -50,7 +50,7 @@ impl WeakMapPrototype {
         let value = get_argument(cx, arguments, 0);
 
         // May allocate
-        let map_key = ValueCollectionKey::from(value)?;
+        let map_key = ValueCollectionKey::from(cx, value)?;
 
         let removed_value = weak_map_object.weak_map_data().remove(&map_key);
 
@@ -73,14 +73,14 @@ impl WeakMapPrototype {
         let key = get_argument(cx, arguments, 0);
 
         // May allocate
-        let map_key = ValueCollectionKey::from(key)?;
+        let map_key = ValueCollectionKey::from(cx, key)?;
 
         let weak_map_data = weak_map_object.weak_map_data();
         let value_opt = weak_map_data.get(&map_key);
 
         match value_opt {
             None => Ok(cx.undefined()),
-            Some(value) => Ok(value.to_stack()),
+            Some(value) => Ok(value.to_stack(cx)),
         }
     }
 
@@ -100,7 +100,7 @@ impl WeakMapPrototype {
         let key = get_argument(cx, arguments, 0);
 
         // May allocate
-        let map_key = ValueCollectionKey::from(key)?;
+        let map_key = ValueCollectionKey::from(cx, key)?;
 
         let has_key = weak_map_object.weak_map_data().contains_key(&map_key);
 

@@ -104,7 +104,7 @@ impl JSONObject {
             let mut value = value.as_object();
 
             // Key is shared between iterations
-            let mut key = PropertyKey::uninit().to_stack();
+            let mut key = PropertyKey::uninit().to_stack(cx);
 
             if is_array(cx, value.into())? {
                 let length = length_of_array_like(cx, value)?;
@@ -162,7 +162,7 @@ impl JSONObject {
                 let mut property_keys = vec![];
 
                 // Share key between iterations
-                let mut key = PropertyKey::uninit().to_stack();
+                let mut key = PropertyKey::uninit().to_stack(cx);
 
                 let replacer_array = replacer_arg.as_object();
                 let length = length_of_array_like(cx, replacer_array)?;
@@ -235,7 +235,7 @@ impl JSONObject {
         } else if space_value.is_string() {
             let space_string = space_value.as_string();
             if space_string.len() <= 10 {
-                space_string.to_wtf8_string()?
+                space_string.to_wtf8_string(cx)?
             } else {
                 space_string.substring(cx, 0, 10)?.to_wtf8_string()
             }
@@ -485,13 +485,13 @@ impl JSONValue {
         let value = match self {
             Self::Null => cx.null(),
             Self::Boolean(b) => cx.bool(*b),
-            Self::Number(n) => Value::from(*n).to_stack_with(cx),
+            Self::Number(n) => Value::from(*n).to_stack(cx),
             Self::String(s) => cx.alloc_wtf8_string(s)?.into(),
             Self::Array(values) => {
                 let array = must_a!(array_create(cx, 0, None));
 
                 // Key is shared between iterations
-                let mut key = PropertyKey::uninit().to_stack();
+                let mut key = PropertyKey::uninit().to_stack(cx);
 
                 for (i, value) in values.iter().enumerate() {
                     key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -506,7 +506,7 @@ impl JSONValue {
 
                 // Key is shared between iterations
                 let mut key_value: StackRoot<Value> = StackRoot::empty(cx);
-                let mut key = PropertyKey::uninit().to_stack();
+                let mut key = PropertyKey::uninit().to_stack(cx);
 
                 for (key_string, value) in properties {
                     key_value.replace(cx.alloc_wtf8_string_ptr(key_string)?.as_string().into());
@@ -593,7 +593,7 @@ impl JSONSerializer {
             } else if let Some(boolean_object) = value_object.as_boolean_object() {
                 value = cx.bool(boolean_object.boolean_data());
             } else if let Some(bigint_object) = value_object.as_bigint_object() {
-                value = bigint_object.bigint_data().into()
+                value = bigint_object.bigint_data(cx).into()
             }
         }
 
@@ -606,7 +606,7 @@ impl JSONSerializer {
                 self.builder.push_str("false");
             }
         } else if value.is_string() {
-            self.serialize_json_string(value.as_string())?;
+            self.serialize_json_string(value.as_string(), cx)?;
         } else if value.is_number() {
             let number = value.as_number();
             if number.is_finite() {
@@ -631,10 +631,14 @@ impl JSONSerializer {
     }
 
     /// QuoteJSONString (https://tc39.es/ecma262/#sec-quotejsonstring)
-    fn serialize_json_string(&mut self, string: StackRoot<StringValue>) -> AllocResult<()> {
+    fn serialize_json_string(
+        &mut self,
+        string: StackRoot<StringValue>,
+        cx: Context,
+    ) -> AllocResult<()> {
         self.builder.push_char('"');
 
-        for code_point in string.iter_code_points()? {
+        for code_point in string.iter_code_points(cx)? {
             // Escape characters
             if code_point == '\x08' as u32 {
                 self.builder.push_str("\\b")
@@ -698,7 +702,7 @@ impl JSONSerializer {
             let property_key_values = enumerable_own_property_names(cx, object, KeyOrValue::Key)?;
             for property_key_value in property_key_values {
                 let property_key = PropertyKey::from_value(cx, property_key_value)?;
-                keys.push(property_key.to_stack());
+                keys.push(property_key.to_stack(cx));
             }
         };
 
@@ -731,7 +735,7 @@ impl JSONSerializer {
             }
 
             // Serialize the key and value separated by a colon
-            self.serialize_json_string(string_key.as_string())?;
+            self.serialize_json_string(string_key.as_string(), cx)?;
 
             self.builder.push_char(':');
             if !self.gap.is_empty() {
@@ -774,7 +778,7 @@ impl JSONSerializer {
         self.indent += 1;
 
         // Share key between iterations
-        let mut key = PropertyKey::uninit().to_stack();
+        let mut key = PropertyKey::uninit().to_stack(cx);
 
         let length = length_of_array_like(cx, array)?;
         for i in 0..length {

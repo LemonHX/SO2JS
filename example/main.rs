@@ -186,13 +186,13 @@ impl ConsoleObject {
         let log = cx.alloc_string("log").unwrap().as_string();
         object.intrinsic_func(
             cx,
-            PropertyKey::string(cx, log).unwrap().to_stack(),
+            PropertyKey::string(cx, log).unwrap().to_stack(cx),
             Self::log,
             1,
             realm,
         )?;
 
-        Ok(object.to_stack())
+        Ok(object.to_stack(cx))
     }
 
     /// Install the GC object on the realm's global object.

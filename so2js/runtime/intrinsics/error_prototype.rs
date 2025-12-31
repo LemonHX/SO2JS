@@ -4,9 +4,9 @@ use crate::runtime::{
     object_value::ObjectValue, realm::Realm, string_value::StringValue, to_console_string,
     type_utilities::to_string, Context, StackRoot, Value,
 };
+use alloc::format;
 use alloc::string::String;
 use alloc::string::ToString;
-use alloc::format;
 
 pub struct ErrorPrototype;
 
@@ -94,7 +94,7 @@ impl ErrorPrototype {
 /// Format an error object into a one line string containing name and message
 fn format_error_one_line(cx: Context, error: StackRoot<ErrorObject>) -> AllocResult<String> {
     let name = error_name(cx, error);
-    let name_str = name.format().unwrap_or_default();
+    let name_str = name.format(cx).unwrap_or_default();
 
     Ok(match error_message(cx, error)? {
         Some(message) => format!("{name_str}: {message}"),
