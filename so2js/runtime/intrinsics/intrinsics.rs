@@ -253,7 +253,7 @@ impl Intrinsics {
         macro_rules! register_intrinsic {
             ($intrinsic_name:ident, $struct_name:ident) => {{
                 // Each intrinsic may use many handles during initialization
-                handle_scope_guard!(cx);
+                js_stack_scope_guard!(cx);
 
                 let intrinsic_object = $struct_name::new(cx, realm)?;
 

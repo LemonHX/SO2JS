@@ -524,7 +524,7 @@ impl VM {
                 ($get_instr:ident) => {{
                     let instr = $get_instr!(YieldInstruction);
 
-                    handle_scope_guard!(self.cx());
+                    js_stack_scope_guard!(self.cx());
 
                     let generator_object = self.read_register(instr.generator()).as_object();
                     let yield_value = self.read_register(instr.yield_value());
@@ -593,7 +593,7 @@ impl VM {
                 ($get_instr:ident) => {{
                     let instr = $get_instr!(AwaitInstruction);
 
-                    handle_scope_guard!(self.cx());
+                    js_stack_scope_guard!(self.cx());
 
                     let return_promise_or_generator =
                         self.read_register_to_handle(instr.return_promise_or_generator());
@@ -657,7 +657,7 @@ impl VM {
                     let instr = $get_instr!(GeneratorStartInstruction);
                     let generator_reg = instr.generator();
 
-                    handle_scope_guard!(self.cx());
+                    js_stack_scope_guard!(self.cx());
 
                     // Set the PC to the next instruction to execute
                     self.set_pc_after(instr);

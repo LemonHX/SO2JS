@@ -151,9 +151,9 @@ pub struct StackRootScope {
 impl StackRootScope {
     #[inline]
     pub fn new<F: FnOnce(Context) -> R, R: Escapable>(cx: Context, f: F) -> R {
-        let handle_scope = Self::enter(cx);
+        let stack_scope = Self::enter(cx);
         let result = f(cx);
-        handle_scope.escape(cx, result)
+        stack_scope.escape(cx, result)
     }
 
     #[inline]
@@ -231,14 +231,14 @@ impl StackRootScope {
 
 /// A guard which enters a handle scope and exits it when dropped. Does not escape any values.
 pub struct StackRootScopeGuard {
-    handle_scope: StackRootScope,
+    stack_scope: StackRootScope,
 }
 
 impl StackRootScopeGuard {
     #[inline]
     pub fn new(cx: Context) -> StackRootScopeGuard {
         StackRootScopeGuard {
-            handle_scope: StackRootScope::enter(cx),
+            stack_scope: StackRootScope::enter(cx),
         }
     }
 }
@@ -246,7 +246,7 @@ impl StackRootScopeGuard {
 impl Drop for StackRootScopeGuard {
     #[inline]
     fn drop(&mut self) {
-        self.handle_scope.exit_non_consuming();
+        self.stack_scope.exit_non_consuming();
     }
 }
 

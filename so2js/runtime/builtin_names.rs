@@ -41,7 +41,7 @@ macro_rules! builtin_names {
         impl Context {
             pub fn init_builtin_names(&mut self) -> AllocResult<()> {
                 $({
-                    handle_scope_guard!(*self);
+                    js_stack_scope_guard!(*self);
                     self.names.$rust_name = {
                         let string_value = self.alloc_string($js_name)?.as_string();
                         PropertyKey::string_not_array_index(*self, string_value)?
@@ -505,7 +505,7 @@ macro_rules! builtin_symbols {
         impl Context {
             pub fn init_builtin_symbols(&mut self) -> AllocResult<()> {
                 $({
-                    handle_scope_guard!(*self);
+                    js_stack_scope_guard!(*self);
                     self.well_known_symbols.$rust_name = {
                         let description = self.alloc_string($description)?.as_string();
                         *PropertyKey::symbol(SymbolValue::new(*self, Some(description), /* is_private */ false)?)

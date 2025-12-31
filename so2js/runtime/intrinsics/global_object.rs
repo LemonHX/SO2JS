@@ -17,7 +17,7 @@ use crate::{
         string_value::{FlatString, StringValue},
         to_string,
         type_utilities::{to_int32, to_number},
-        Context, EvalResult, StackRoot, PropertyKey, Realm, Value,
+        Context, EvalResult, PropertyKey, Realm, StackRoot, Value,
     },
 };
 use alloc::format;
@@ -30,7 +30,7 @@ pub fn set_default_global_bindings(cx: Context, realm: StackRoot<Realm>) -> Eval
     js_stack_scope!(cx, {
         macro_rules! value_prop {
             ($name:expr, $value:expr, $is_writable:expr, $is_enumerable:expr, $is_configurable:expr) => {{
-                handle_scope_guard!(cx);
+                js_stack_scope_guard!(cx);
 
                 define_property_or_throw(
                     cx,
@@ -48,7 +48,7 @@ pub fn set_default_global_bindings(cx: Context, realm: StackRoot<Realm>) -> Eval
 
         macro_rules! func_prop {
             ($str_name:expr, $func_name:expr, $length:expr) => {{
-                handle_scope_guard!(cx);
+                js_stack_scope_guard!(cx);
 
                 let func_object =
                     BuiltinFunction::create(cx, $func_name, $length, $str_name, realm, None)?
@@ -59,7 +59,7 @@ pub fn set_default_global_bindings(cx: Context, realm: StackRoot<Realm>) -> Eval
 
         macro_rules! intrinsic_prop {
             ($name:expr, $intrinsic:ident) => {{
-                handle_scope_guard!(cx);
+                js_stack_scope_guard!(cx);
 
                 let value = realm.get_intrinsic(Intrinsic::$intrinsic);
                 define_property_or_throw(
