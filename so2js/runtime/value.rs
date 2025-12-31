@@ -9,7 +9,7 @@ use crate::{field_offset, runtime::alloc_error::AllocResult, set_uninit};
 use super::{
     context::Context,
     debug_print::{DebugPrint, DebugPrinter},
-    gc::{AnyHeapItem, Handle, HandleContents, HeapItem, HeapPtr, HeapVisitor, ToHandleContents},
+    gc::{AnyHeapItem, GcVisitorExt, StackRoot, StackRootContents, HeapItem, HeapPtr, ToStackRootContents},
     heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
     object_value::ObjectValue,
     string_value::{FlatString, StringValue},
@@ -422,11 +422,11 @@ impl core::fmt::Debug for Value {
     }
 }
 
-impl ToHandleContents for Value {
+impl ToStackRootContents for Value {
     type Impl = Value;
 
     #[inline]
-    fn to_handle_contents(value: Value) -> HandleContents {
+    fn to_handle_contents(value: Value) -> StackRootContents {
         value.as_raw_bits() as usize
     }
 }
@@ -579,9 +579,9 @@ pub struct SymbolValue {
 impl SymbolValue {
     pub fn new(
         mut cx: Context,
-        description: Option<Handle<StringValue>>,
+        description: Option<StackRoot<StringValue>>,
         is_private: bool,
-    ) -> AllocResult<Handle<SymbolValue>> {
+    ) -> AllocResult<StackRoot<SymbolValue>> {
         let description = description.map(|d| d.flatten()).transpose()?;
         let mut symbol = cx.alloc_uninit::<SymbolValue>()?;
 
@@ -593,15 +593,15 @@ impl SymbolValue {
         set_uninit!(symbol.hash_code, cx.rand.random::<u32>());
         set_uninit!(symbol.is_private, is_private);
 
-        Ok(symbol.to_handle())
+        Ok(symbol.to_stack())
     }
 
     pub fn description_ptr(&self) -> Option<HeapPtr<FlatString>> {
         self.description
     }
 
-    pub fn description(&self) -> Option<Handle<FlatString>> {
-        self.description.map(|d| d.to_handle())
+    pub fn description(&self) -> Option<StackRoot<FlatString>> {
+        self.description.map(|d| d.to_stack())
     }
 
     pub fn is_private(&self) -> bool {
@@ -642,24 +642,24 @@ impl PartialEq for HeapPtr<SymbolValue> {
 
 impl Eq for HeapPtr<SymbolValue> {}
 
-impl hash::Hash for Handle<SymbolValue> {
+impl hash::Hash for StackRoot<SymbolValue> {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         (**self).hash(state)
     }
 }
 
-impl PartialEq for Handle<SymbolValue> {
+impl PartialEq for StackRoot<SymbolValue> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         (**self).eq(&**other)
     }
 }
 
-impl Eq for Handle<SymbolValue> {}
+impl Eq for StackRoot<SymbolValue> {}
 
-impl From<Handle<SymbolValue>> for Handle<ObjectValue> {
-    fn from(value: Handle<SymbolValue>) -> Self {
+impl From<StackRoot<SymbolValue>> for StackRoot<ObjectValue> {
+    fn from(value: StackRoot<SymbolValue>) -> Self {
         value.cast()
     }
 }
@@ -669,7 +669,7 @@ impl HeapItem for HeapPtr<SymbolValue> {
         size_of::<SymbolValue>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
         visitor.visit_pointer_opt(&mut self.description);
     }
@@ -690,8 +690,8 @@ pub struct BigIntValue {
 impl BigIntValue {
     const DIGITS_OFFSET: usize = field_offset!(BigIntValue, digits);
 
-    pub fn new(cx: Context, value: BigInt) -> AllocResult<Handle<BigIntValue>> {
-        Ok(Self::new_ptr(cx, value)?.to_handle())
+    pub fn new(cx: Context, value: BigInt) -> AllocResult<StackRoot<BigIntValue>> {
+        Ok(Self::new_ptr(cx, value)?.to_stack())
     }
 
     pub fn new_ptr(cx: Context, value: BigInt) -> AllocResult<HeapPtr<BigIntValue>> {
@@ -733,8 +733,8 @@ impl DebugPrint for HeapPtr<BigIntValue> {
     }
 }
 
-impl From<Handle<BigIntValue>> for Handle<ObjectValue> {
-    fn from(value: Handle<BigIntValue>) -> Self {
+impl From<StackRoot<BigIntValue>> for StackRoot<ObjectValue> {
+    fn from(value: StackRoot<BigIntValue>) -> Self {
         value.cast()
     }
 }
@@ -744,7 +744,7 @@ impl HeapItem for HeapPtr<BigIntValue> {
         BigIntValue::calculate_size_in_bytes(self.len)
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
     }
 }
@@ -756,7 +756,7 @@ pub struct ValueCollectionKey(Value);
 
 impl ValueCollectionKey {
     // May allocate due to string flattening so do not implement From<Value> directly.
-    pub fn from(value: Handle<Value>) -> AllocResult<Self> {
+    pub fn from(value: StackRoot<Value>) -> AllocResult<Self> {
         if value.is_string() {
             let flat_string = value.as_string().flatten()?;
             return Ok(ValueCollectionKey(*flat_string.as_value()));
@@ -773,7 +773,7 @@ impl ValueCollectionKey {
         &mut self.0
     }
 
-    pub fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    pub fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_value(&mut self.0)
     }
 }
@@ -828,17 +828,17 @@ impl hash::Hash for ValueCollectionKey {
 }
 
 #[derive(Clone, Copy)]
-pub struct ValueCollectionKeyHandle(Handle<Value>);
+pub struct ValueCollectionKeyStackRoot(StackRoot<Value>);
 
-impl ValueCollectionKeyHandle {
+impl ValueCollectionKeyStackRoot {
     /// Identical to ValueCollectionKey::from but stores a handle instead.
-    pub fn new(value: Handle<Value>) -> AllocResult<Self> {
+    pub fn new(value: StackRoot<Value>) -> AllocResult<Self> {
         if value.is_string() {
             let flat_string = value.as_string().flatten()?;
-            return Ok(ValueCollectionKeyHandle(flat_string.as_string().into()));
+            return Ok(ValueCollectionKeyStackRoot(flat_string.as_string().into()));
         }
 
-        Ok(ValueCollectionKeyHandle(value))
+        Ok(ValueCollectionKeyStackRoot(value))
     }
 
     pub fn get(&self) -> ValueCollectionKey {

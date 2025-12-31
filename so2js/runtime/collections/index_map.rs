@@ -2,9 +2,9 @@ use crate::{
     field_offset,
     runtime::{
         alloc_error::AllocResult,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
-        Context, Handle, HeapPtr,
+        Context, StackRoot, HeapPtr,
     },
     set_uninit,
 };
@@ -87,7 +87,7 @@ impl<K: Eq + Hash + Clone, V: Clone> BsIndexMap<K, V> {
     }
 
     /// Create a new map whose entries are copied from the provided map.
-    pub fn new_from_map(cx: Context, map: Handle<Self>) -> AllocResult<HeapPtr<Self>> {
+    pub fn new_from_map(cx: Context, map: StackRoot<Self>) -> AllocResult<HeapPtr<Self>> {
         let size = Self::calculate_size_in_bytes(map.capacity());
 
         let copied_map = cx.alloc_uninit_with_size::<Self>(size)?;
@@ -423,7 +423,7 @@ impl<K: Eq + Hash + Clone, V: Clone> BsIndexMap<K, V> {
     }
 }
 
-impl<K: Eq + Hash + Clone, V: Clone> Handle<BsIndexMap<K, V>> {
+impl<K: Eq + Hash + Clone, V: Clone> StackRoot<BsIndexMap<K, V>> {
     /// Return iterator through the entries of the map. Iterator is GC-safe so it is safe to live
     /// across allocations.
     pub fn iter_gc_safe(&self) -> GcSafeEntriesIter<K, V> {
@@ -453,7 +453,7 @@ pub trait BsIndexMapField<K: Eq + Hash + Clone, V: Clone> {
         }
 
         // Save old map behind handle before allocating
-        let mut old_map = old_map.to_handle();
+        let mut old_map = old_map.to_stack();
 
         // Capacity jumps from 0 to min capacity
         let new_capacity;
@@ -594,14 +594,14 @@ impl<'a, K: Clone, V: Clone> Iterator for GcUnsafeKeysIterMut<'a, K, V> {
 
 #[repr(C)]
 pub struct GcSafeEntriesIter<K, V> {
-    map: Handle<BsIndexMap<K, V>>,
+    map: StackRoot<BsIndexMap<K, V>>,
     // Index of the next entry to check
     next_entry_index: usize,
 }
 
 impl<K, V> GcSafeEntriesIter<K, V> {
     #[inline]
-    pub fn new(map: Handle<BsIndexMap<K, V>>) -> Self {
+    pub fn new(map: StackRoot<BsIndexMap<K, V>>) -> Self {
         GcSafeEntriesIter {
             map,
             next_entry_index: 0,
@@ -609,7 +609,7 @@ impl<K, V> GcSafeEntriesIter<K, V> {
     }
 
     #[inline]
-    pub fn from_parts(map: Handle<BsIndexMap<K, V>>, next_entry_index: usize) -> Self {
+    pub fn from_parts(map: StackRoot<BsIndexMap<K, V>>, next_entry_index: usize) -> Self {
         GcSafeEntriesIter {
             map,
             next_entry_index,
@@ -617,7 +617,7 @@ impl<K, V> GcSafeEntriesIter<K, V> {
     }
 
     #[inline]
-    pub fn to_parts(&self) -> (Handle<BsIndexMap<K, V>>, usize) {
+    pub fn to_parts(&self) -> (StackRoot<BsIndexMap<K, V>>, usize) {
         (self.map, self.next_entry_index)
     }
 }
@@ -627,7 +627,7 @@ impl<K: Eq + Hash + Clone, V: Clone> Iterator for GcSafeEntriesIter<K, V> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        // TODO: Handle when map data is moved to a new map e.g. when growing. Must write info for
+        // TODO: StackRoot when map data is moved to a new map e.g. when growing. Must write info for
         // switching iterator to point to new map in place of the old map.
 
         let mut current_entry_index = self.next_entry_index;
@@ -654,14 +654,14 @@ impl<K: Eq + Hash + Clone, V: Clone> HeapItem for HeapPtr<BsIndexMap<K, V>> {
     }
 
     /// Visit pointers intrinsic to all IndexMaps. Do not visit entries as they could be of any type.
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         Self::visit_pointers_impl(self, visitor, |_, _| ());
     }
 }
 
 impl<K: Eq + Hash + Clone, V: Clone> HeapPtr<BsIndexMap<K, V>> {
     #[inline]
-    pub fn visit_pointers_impl<H: HeapVisitor>(
+    pub fn visit_pointers_impl<H: GcVisitorExt>(
         &mut self,
         visitor: &mut H,
         mut entries_visitor: impl FnMut(&mut Self, &mut H),

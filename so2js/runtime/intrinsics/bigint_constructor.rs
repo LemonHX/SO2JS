@@ -11,7 +11,7 @@ use crate::{
         error::{range_error, type_error},
         eval_result::EvalResult,
         function::get_argument,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         object_value::ObjectValue,
         ordinary_object::object_create,
@@ -20,7 +20,7 @@ use crate::{
             is_integral_number, to_bigint, to_index, to_primitive, ToPrimitivePreferredType,
         },
         value::BigIntValue,
-        Context, Handle, HeapPtr, Value,
+        Context, StackRoot, HeapPtr, Value,
     },
     set_uninit,
 };
@@ -38,8 +38,8 @@ extend_object! {
 impl BigIntObject {
     pub fn new_from_value(
         cx: Context,
-        bigint_data: Handle<BigIntValue>,
-    ) -> AllocResult<Handle<BigIntObject>> {
+        bigint_data: StackRoot<BigIntValue>,
+    ) -> AllocResult<StackRoot<BigIntObject>> {
         let mut object = object_create::<BigIntObject>(
             cx,
             HeapItemKind::BigIntObject,
@@ -48,11 +48,11 @@ impl BigIntObject {
 
         set_uninit!(object.bigint_data, *bigint_data);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
-    pub fn bigint_data(&self) -> Handle<BigIntValue> {
-        self.bigint_data.to_handle()
+    pub fn bigint_data(&self) -> StackRoot<BigIntValue> {
+        self.bigint_data.to_stack()
     }
 }
 
@@ -60,7 +60,7 @@ pub struct BigIntConstructor;
 
 impl BigIntConstructor {
     //// The BigInt Constructor (https://tc39.es/ecma262/#sec-bigint-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -85,9 +85,9 @@ impl BigIntConstructor {
     /// BigInt (https://tc39.es/ecma262/#sec-bigint-constructor-number-value)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if cx.current_new_target().is_some() {
             return type_error(cx, "BigInt is not a constructor");
         }
@@ -115,9 +115,9 @@ impl BigIntConstructor {
     /// BigInt.asIntN (https://tc39.es/ecma262/#sec-bigint.asintn)
     pub fn as_int_n(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let bits_arg = get_argument(cx, arguments, 0);
         let bits = to_index(cx, bits_arg)?;
 
@@ -149,9 +149,9 @@ impl BigIntConstructor {
     /// BigInt.asUintN (https://tc39.es/ecma262/#sec-bigint.asuintn)
     pub fn as_uint_n(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let bits_arg = get_argument(cx, arguments, 0);
         let bits = to_index(cx, bits_arg)?;
 
@@ -185,7 +185,7 @@ impl HeapItem for HeapPtr<BigIntObject> {
         size_of::<BigIntObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.bigint_data);
     }

@@ -7,14 +7,14 @@ use crate::{
         error::{range_error, type_error},
         eval_result::EvalResult,
         function::get_argument,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         get,
         heap_item_descriptor::HeapItemKind,
         object_value::ObjectValue,
         ordinary_object::object_create_from_constructor,
         realm::Realm,
         type_utilities::to_index,
-        Context, Handle, HeapPtr, Value,
+        Context, StackRoot, HeapPtr, Value,
     },
     set_uninit,
 };
@@ -43,11 +43,11 @@ impl ArrayBufferObject {
     /// AllocateArrayBuffer (https://tc39.es/ecma262/#sec-allocatearraybuffer)
     pub fn new(
         cx: Context,
-        constructor: Handle<ObjectValue>,
+        constructor: StackRoot<ObjectValue>,
         byte_length: usize,
         max_byte_length: Option<usize>,
-        data: Option<Handle<ByteArray>>,
-    ) -> EvalResult<Handle<ArrayBufferObject>> {
+        data: Option<StackRoot<ByteArray>>,
+    ) -> EvalResult<StackRoot<ArrayBufferObject>> {
         if let Some(max_byte_length) = max_byte_length {
             if byte_length > max_byte_length {
                 return range_error(cx, "byte length exceeds max byte length");
@@ -80,7 +80,7 @@ impl ArrayBufferObject {
         }
 
         // Save object pointer behind handle as we are about to allocate
-        let mut object = object.to_handle();
+        let mut object = object.to_stack();
 
         object.data = if let Some(data) = data {
             // If requested size matches the underlying data block then simply reuse it
@@ -134,8 +134,8 @@ impl ArrayBufferObject {
         self.data.as_mut().unwrap().as_mut_slice()
     }
 
-    pub fn data_opt(&self) -> Option<Handle<ByteArray>> {
-        self.data.map(|data| data.to_handle())
+    pub fn data_opt(&self) -> Option<StackRoot<ByteArray>> {
+        self.data.map(|data| data.to_stack())
     }
 
     pub fn set_data(&mut self, data: HeapPtr<ByteArray>) {
@@ -162,7 +162,7 @@ pub struct ArrayBufferConstructor;
 
 impl ArrayBufferConstructor {
     /// Properties of the ArrayBuffer Constructor (https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -190,9 +190,9 @@ impl ArrayBufferConstructor {
     /// ArrayBuffer (https://tc39.es/ecma262/#sec-arraybuffer-length)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let new_target = if let Some(new_target) = cx.current_new_target() {
             new_target
         } else {
@@ -218,9 +218,9 @@ impl ArrayBufferConstructor {
     /// ArrayBuffer.isView (https://tc39.es/ecma262/#sec-arraybuffer.isview)
     pub fn is_view(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
         if !value.is_object() {
             return Ok(cx.bool(false));
@@ -236,10 +236,10 @@ impl ArrayBufferConstructor {
 /// ArrayBufferCopyAndDetach (https://tc39.es/ecma262/#sec-arraybuffercopyanddetach)
 pub fn array_buffer_copy_and_detach(
     cx: Context,
-    mut array_buffer: Handle<ArrayBufferObject>,
-    new_length: Handle<Value>,
+    mut array_buffer: StackRoot<ArrayBufferObject>,
+    new_length: StackRoot<Value>,
     to_fixed: bool,
-) -> EvalResult<Handle<ArrayBufferObject>> {
+) -> EvalResult<StackRoot<ArrayBufferObject>> {
     let new_byte_length = if new_length.is_undefined() {
         array_buffer.byte_length()
     } else {
@@ -275,10 +275,10 @@ pub fn array_buffer_copy_and_detach(
 /// CloneArrayBuffer (https://tc39.es/ecma262/#sec-clonearraybuffer)
 pub fn clone_array_buffer(
     cx: Context,
-    mut source_buffer: Handle<ArrayBufferObject>,
+    mut source_buffer: StackRoot<ArrayBufferObject>,
     source_byte_offset: usize,
     source_length: usize,
-) -> EvalResult<Handle<ArrayBufferObject>> {
+) -> EvalResult<StackRoot<ArrayBufferObject>> {
     let array_buffer_constructor = cx.get_intrinsic(Intrinsic::ArrayBufferConstructor);
     let mut target_buffer = ArrayBufferObject::new(
         cx,
@@ -300,7 +300,7 @@ pub fn clone_array_buffer(
 /// GetArrayBufferMaxByteLengthOption (https://tc39.es/ecma262/#sec-getarraybuffermaxbytelengthoption)
 fn get_array_buffer_max_byte_length_option(
     cx: Context,
-    options: Handle<Value>,
+    options: StackRoot<Value>,
 ) -> EvalResult<Option<usize>> {
     if !options.is_object() {
         return Ok(None);
@@ -330,7 +330,7 @@ impl HeapItem for HeapPtr<ArrayBufferObject> {
         size_of::<ArrayBufferObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer_opt(&mut self.data);
     }

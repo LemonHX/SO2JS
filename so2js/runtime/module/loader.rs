@@ -10,7 +10,7 @@ use crate::{
         eval_result::EvalResult,
         intrinsics::intrinsics::Intrinsic,
         promise_object::{PromiseCapability, PromiseObject},
-        Context, Handle, Realm,
+        Context, StackRoot, Realm,
     },
 };
 
@@ -24,8 +24,8 @@ struct GraphLoader {
     is_loading: bool,
     pending_modules_count: usize,
     visited: HashSet<ModuleId>,
-    promise_capability: Handle<PromiseCapability>,
-    realm: Handle<Realm>,
+    promise_capability: StackRoot<PromiseCapability>,
+    realm: StackRoot<Realm>,
 }
 
 impl GraphLoader {
@@ -97,7 +97,7 @@ impl GraphLoader {
     fn finish_loading_imported_module(
         &mut self,
         cx: Context,
-        mut referrer: Handle<SourceTextModule>,
+        mut referrer: StackRoot<SourceTextModule>,
         module_request: ModuleRequest,
         module_result: EvalResult<DynModule>,
     ) -> AllocResult<()> {
@@ -145,8 +145,8 @@ impl GraphLoader {
 /// LoadRequestedModules (https://tc39.es/ecma262/#sec-LoadRequestedModules)
 pub fn load_requested_modules(
     cx: Context,
-    module: Handle<SourceTextModule>,
-) -> AllocResult<Handle<PromiseObject>> {
+    module: StackRoot<SourceTextModule>,
+) -> AllocResult<StackRoot<PromiseObject>> {
     let promise_constructor = cx.get_intrinsic(Intrinsic::PromiseConstructor);
     let capability = must_a!(PromiseCapability::new(cx, promise_constructor.into()));
     let realm = module.program_function_ptr().realm();

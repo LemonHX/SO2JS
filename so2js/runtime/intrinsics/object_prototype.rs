@@ -6,7 +6,7 @@ use crate::{
         error::type_error,
         eval_result::EvalResult,
         function::get_argument,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         object_value::ObjectValue,
         ordinary_object::object_ordinary_init,
@@ -17,7 +17,7 @@ use crate::{
             is_array, is_callable, require_object_coercible, same_object_value_handles, to_object,
             to_property_key,
         },
-        Context, Handle, HeapPtr, Value,
+        Context, StackRoot, HeapPtr, Value,
     },
 };
 use alloc::string::ToString;
@@ -30,7 +30,7 @@ extend_object! {
 
 impl ObjectPrototype {
     // Start out uninitialized and then initialize later to break dependency cycles.
-    pub fn new_uninit(cx: Context) -> AllocResult<Handle<ObjectPrototype>> {
+    pub fn new_uninit(cx: Context) -> AllocResult<StackRoot<ObjectPrototype>> {
         // Initialized with correct values in initialize method, but set to default value
         // at first to be GC safe until initialize method is called.
         Ok(ObjectValue::new(cx, None, false)?.cast())
@@ -39,8 +39,8 @@ impl ObjectPrototype {
     /// Properties of the Object Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-object-prototype-object)
     pub fn initialize(
         cx: Context,
-        object: Handle<ObjectPrototype>,
-        realm: Handle<Realm>,
+        object: StackRoot<ObjectPrototype>,
+        realm: StackRoot<Realm>,
     ) -> AllocResult<()> {
         let mut object = object.as_object();
 
@@ -122,9 +122,9 @@ impl ObjectPrototype {
     /// Object.prototype.hasOwnProperty (https://tc39.es/ecma262/#sec-object.prototype.hasownproperty)
     pub fn has_own_property(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let property_arg = get_argument(cx, arguments, 0);
         let property_key = to_property_key(cx, property_arg)?;
         let this_object = to_object(cx, this_value)?;
@@ -136,9 +136,9 @@ impl ObjectPrototype {
     /// Object.prototype.isPrototypeOf (https://tc39.es/ecma262/#sec-object.prototype.isprototypeof)
     pub fn is_prototype_of(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
         if !value.is_object() {
             return Ok(cx.bool(false));
@@ -165,9 +165,9 @@ impl ObjectPrototype {
     /// Object.prototype.propertyIsEnumerable (https://tc39.es/ecma262/#sec-object.prototype.propertyisenumerable)
     pub fn property_is_enumerable(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let property_arg = get_argument(cx, arguments, 0);
         let property_key = to_property_key(cx, property_arg)?;
         let this_object = to_object(cx, this_value)?;
@@ -181,18 +181,18 @@ impl ObjectPrototype {
     /// Object.prototype.toLocaleString (https://tc39.es/ecma262/#sec-object.prototype.tolocalestring)
     pub fn to_locale_string(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         invoke(cx, this_value, cx.names.to_string(), &[])
     }
 
     /// Object.prototype.toString (https://tc39.es/ecma262/#sec-object.prototype.tostring)
     pub fn to_string(
         mut cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if this_value.is_undefined() {
             return Ok(cx.alloc_string("[object Undefined]")?.as_value());
         } else if this_value.is_null() {
@@ -244,18 +244,18 @@ impl ObjectPrototype {
     /// Object.prototype.valueOf (https://tc39.es/ecma262/#sec-object.prototype.valueof)
     pub fn value_of(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         Ok(to_object(cx, this_value)?.as_value())
     }
 
     /// get Object.prototype.__proto__ (https://tc39.es/ecma262/#sec-get-object.prototype.__proto__)
     pub fn get_proto(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         match object.get_prototype_of(cx)? {
             None => Ok(cx.null()),
@@ -266,9 +266,9 @@ impl ObjectPrototype {
     /// set Object.prototype.__proto__ (https://tc39.es/ecma262/#sec-set-object.prototype.__proto__)
     pub fn set_proto(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
 
         let proto = get_argument(cx, arguments, 0);
@@ -294,9 +294,9 @@ impl ObjectPrototype {
     /// Object.prototype.__defineGetter__ (https://tc39.es/ecma262/#sec-object.prototype.__defineGetter__)
     pub fn define_getter(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
 
         let getter = get_argument(cx, arguments, 1);
@@ -316,9 +316,9 @@ impl ObjectPrototype {
     /// Object.prototype.__defineSetter__ (https://tc39.es/ecma262/#sec-object.prototype.__defineSetter__)
     pub fn define_setter(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
 
         let setter = get_argument(cx, arguments, 1);
@@ -338,9 +338,9 @@ impl ObjectPrototype {
     /// Object.prototype.__lookupGetter__ (https://tc39.es/ecma262/#sec-object.prototype.__lookupGetter__)
     pub fn lookup_getter(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let key_arg = get_argument(cx, arguments, 0);
         let key = to_property_key(cx, key_arg)?;
@@ -370,9 +370,9 @@ impl ObjectPrototype {
     /// Object.prototype.__lookupSetter__ (https://tc39.es/ecma262/#sec-object.prototype.__lookupSetter__)
     pub fn lookup_setter(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let key_arg = get_argument(cx, arguments, 0);
         let key = to_property_key(cx, key_arg)?;
@@ -405,7 +405,7 @@ impl HeapItem for HeapPtr<ObjectPrototype> {
         size_of::<ObjectPrototype>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
     }
 }

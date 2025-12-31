@@ -11,7 +11,7 @@ use super::{
     },
     array_object::create_array_from_list,
     error::type_error,
-    gc::{Handle, HeapItem, HeapPtr, HeapVisitor},
+    gc::{StackRoot, HeapItem, HeapPtr, GcVisitorExt},
     get,
     heap_item_descriptor::HeapItemKind,
     intrinsics::intrinsics::Intrinsic,
@@ -42,11 +42,11 @@ impl ProxyObject {
 
     pub fn new(
         cx: Context,
-        proxy_target: Handle<ObjectValue>,
-        proxy_handler: Handle<ObjectValue>,
+        proxy_target: StackRoot<ObjectValue>,
+        proxy_handler: StackRoot<ObjectValue>,
         is_callable: bool,
         is_constructor: bool,
-    ) -> AllocResult<Handle<ProxyObject>> {
+    ) -> AllocResult<StackRoot<ProxyObject>> {
         let mut object =
             object_create::<ProxyObject>(cx, HeapItemKind::Proxy, Intrinsic::ObjectPrototype)?;
 
@@ -55,17 +55,17 @@ impl ProxyObject {
         set_uninit!(object.is_callable, is_callable);
         set_uninit!(object.is_constructor, is_constructor);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     #[inline]
-    pub fn handler(&self) -> Option<Handle<ObjectValue>> {
-        self.proxy_handler.map(|o| o.to_handle())
+    pub fn handler(&self) -> Option<StackRoot<ObjectValue>> {
+        self.proxy_handler.map(|o| o.to_stack())
     }
 
     #[inline]
-    pub fn target(&self) -> Option<Handle<ObjectValue>> {
-        self.proxy_target.map(|o| o.to_handle())
+    pub fn target(&self) -> Option<StackRoot<ObjectValue>> {
+        self.proxy_target.map(|o| o.to_stack())
     }
 
     #[inline]
@@ -88,12 +88,12 @@ impl ProxyObject {
     }
 }
 
-impl VirtualObject for Handle<ProxyObject> {
+impl VirtualObject for StackRoot<ProxyObject> {
     /// [[GetOwnProperty]] (https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-getownproperty-p)
     fn get_own_property(
         &self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
     ) -> EvalResult<Option<PropertyDescriptor>> {
         if self.is_revoked() {
             return type_error(cx, "operation attempted on revoked proxy");
@@ -177,7 +177,7 @@ impl VirtualObject for Handle<ProxyObject> {
     fn define_own_property(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
         desc: PropertyDescriptor,
     ) -> EvalResult<bool> {
         if self.is_revoked() {
@@ -264,7 +264,7 @@ impl VirtualObject for Handle<ProxyObject> {
     }
 
     /// [[HasProperty]] (https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-hasproperty-p)
-    fn has_property(&self, cx: Context, key: Handle<PropertyKey>) -> EvalResult<bool> {
+    fn has_property(&self, cx: Context, key: StackRoot<PropertyKey>) -> EvalResult<bool> {
         if self.is_revoked() {
             return type_error(cx, "operation attempted on revoked proxy");
         }
@@ -307,9 +307,9 @@ impl VirtualObject for Handle<ProxyObject> {
     fn get(
         &self,
         cx: Context,
-        key: Handle<PropertyKey>,
-        receiver: Handle<Value>,
-    ) -> EvalResult<Handle<Value>> {
+        key: StackRoot<PropertyKey>,
+        receiver: StackRoot<Value>,
+    ) -> EvalResult<StackRoot<Value>> {
         if self.is_revoked() {
             return type_error(cx, "operation attempted on revoked proxy");
         }
@@ -351,9 +351,9 @@ impl VirtualObject for Handle<ProxyObject> {
     fn set(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
-        value: Handle<Value>,
-        receiver: Handle<Value>,
+        key: StackRoot<PropertyKey>,
+        value: StackRoot<Value>,
+        receiver: StackRoot<Value>,
     ) -> EvalResult<bool> {
         if self.is_revoked() {
             return type_error(cx, "operation attempted on revoked proxy");
@@ -394,7 +394,7 @@ impl VirtualObject for Handle<ProxyObject> {
     }
 
     /// [[Delete]] (https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-delete-p)
-    fn delete(&mut self, cx: Context, key: Handle<PropertyKey>) -> EvalResult<bool> {
+    fn delete(&mut self, cx: Context, key: StackRoot<PropertyKey>) -> EvalResult<bool> {
         if self.is_revoked() {
             return type_error(cx, "operation attempted on revoked proxy");
         }
@@ -444,7 +444,7 @@ impl VirtualObject for Handle<ProxyObject> {
     }
 
     /// [[OwnPropertyKeys]] (https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-ownpropertykeys)
-    fn own_property_keys(&self, cx: Context) -> EvalResult<Vec<Handle<Value>>> {
+    fn own_property_keys(&self, cx: Context) -> EvalResult<Vec<StackRoot<Value>>> {
         if self.is_revoked() {
             return type_error(cx, "operation attempted on revoked proxy");
         }
@@ -483,7 +483,7 @@ impl VirtualObject for Handle<ProxyObject> {
                 );
             }
 
-            let next_key = must!(PropertyKey::from_value(cx, next)).to_handle(cx);
+            let next_key = must!(PropertyKey::from_value(cx, next)).to_stack();
             if !unchecked_result_keys.insert(next_key) {
                 return type_error(
                     cx,
@@ -502,7 +502,7 @@ impl VirtualObject for Handle<ProxyObject> {
         let mut target_non_configurable_keys = vec![];
 
         for key in target_keys {
-            let property_key = must!(PropertyKey::from_value(cx, key)).to_handle(cx);
+            let property_key = must!(PropertyKey::from_value(cx, key)).to_stack();
             let desc = target.get_own_property(cx, property_key)?;
 
             if let Some(PropertyDescriptor {
@@ -560,9 +560,9 @@ impl VirtualObject for Handle<ProxyObject> {
     fn call(
         &self,
         cx: Context,
-        this_argument: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_argument: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if self.is_revoked() {
             return type_error(cx, "operation attempted on revoked proxy");
         }
@@ -585,9 +585,9 @@ impl VirtualObject for Handle<ProxyObject> {
     fn construct(
         &self,
         cx: Context,
-        arguments: &[Handle<Value>],
-        new_target: Handle<ObjectValue>,
-    ) -> EvalResult<Handle<ObjectValue>> {
+        arguments: &[StackRoot<Value>],
+        new_target: StackRoot<ObjectValue>,
+    ) -> EvalResult<StackRoot<ObjectValue>> {
         if self.is_revoked() {
             return type_error(cx, "operation attempted on revoked proxy");
         }
@@ -623,7 +623,7 @@ impl VirtualObject for Handle<ProxyObject> {
 
 impl ProxyObject {
     /// [[GetPrototypeOf]] (https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-getprototypeof)
-    pub fn get_prototype_of(&self, cx: Context) -> EvalResult<Option<Handle<ObjectValue>>> {
+    pub fn get_prototype_of(&self, cx: Context) -> EvalResult<Option<StackRoot<ObjectValue>>> {
         if self.is_revoked() {
             return type_error(cx, "operation attempted on revoked proxy");
         }
@@ -671,7 +671,7 @@ impl ProxyObject {
     pub fn set_prototype_of(
         &mut self,
         cx: Context,
-        proto: Option<Handle<ObjectValue>>,
+        proto: Option<StackRoot<ObjectValue>>,
     ) -> EvalResult<bool> {
         if self.is_revoked() {
             return type_error(cx, "operation attempted on revoked proxy");
@@ -776,9 +776,9 @@ impl ProxyObject {
 /// ProxyCreate (https://tc39.es/ecma262/#sec-proxycreate)
 pub fn proxy_create(
     cx: Context,
-    target: Handle<Value>,
-    handler: Handle<Value>,
-) -> EvalResult<Handle<ProxyObject>> {
+    target: StackRoot<Value>,
+    handler: StackRoot<Value>,
+) -> EvalResult<StackRoot<ProxyObject>> {
     if !target.is_object() {
         return type_error(cx, "proxy target must be an object");
     }
@@ -807,7 +807,7 @@ impl HeapItem for HeapPtr<ProxyObject> {
         size_of::<ProxyObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer_opt(&mut self.proxy_handler);
         visitor.visit_pointer_opt(&mut self.proxy_target);

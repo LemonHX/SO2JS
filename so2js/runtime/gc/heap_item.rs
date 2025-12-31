@@ -7,7 +7,7 @@ use crate::runtime::{
     boxed_value::BoxedValue,
     bytecode::{
         constant_table::ConstantTable,
-        exception_handlers::ExceptionHandlers,
+        exception_handlers::ExceptionStackRootrs,
         function::{BytecodeFunction, Closure},
     },
     class_names::ClassNames,
@@ -79,7 +79,7 @@ use crate::runtime::{
     Realm,
 };
 
-use super::{HeapPtr, HeapVisitor};
+use super::{HeapPtr, GcVisitorExt};
 
 /// Trait implemented by all items stored on the heap. This includes both JS objects and non-object
 /// items like strings and descriptors.
@@ -89,7 +89,7 @@ pub trait HeapItem {
 
     /// Call the provided visit function on all pointer fields in this item. Pass a mutable
     /// reference to the fields themselves so they can be updated in copying collection.
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor);
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt);
 }
 
 /// An arbitrary heap item. Only common field between heap items is their descriptor, which can be
@@ -171,7 +171,7 @@ impl HeapPtr<AnyHeapItem> {
             HeapItemKind::Closure => self.cast::<Closure>().byte_size(),
             HeapItemKind::BytecodeFunction => self.cast::<BytecodeFunction>().byte_size(),
             HeapItemKind::ConstantTable => self.cast::<ConstantTable>().byte_size(),
-            HeapItemKind::ExceptionHandlers => self.cast::<ExceptionHandlers>().byte_size(),
+            HeapItemKind::ExceptionStackRootrs => self.cast::<ExceptionStackRootrs>().byte_size(),
             HeapItemKind::SourceFile => self.cast::<SourceFile>().byte_size(),
             HeapItemKind::Scope => self.cast::<Scope>().byte_size(),
             HeapItemKind::ScopeNames => self.cast::<ScopeNames>().byte_size(),
@@ -221,7 +221,7 @@ impl HeapPtr<AnyHeapItem> {
         }
     }
 
-    pub fn visit_pointers_for_kind(&mut self, visitor: &mut impl HeapVisitor, kind: HeapItemKind) {
+    pub fn visit_pointers_for_kind(&mut self, visitor: &mut impl GcVisitorExt, kind: HeapItemKind) {
         match kind {
             HeapItemKind::Descriptor => self.cast::<HeapItemDescriptor>().visit_pointers(visitor),
             HeapItemKind::OrdinaryObject => self.cast::<ObjectValue>().visit_pointers(visitor),
@@ -300,8 +300,8 @@ impl HeapPtr<AnyHeapItem> {
                 self.cast::<BytecodeFunction>().visit_pointers(visitor)
             }
             HeapItemKind::ConstantTable => self.cast::<ConstantTable>().visit_pointers(visitor),
-            HeapItemKind::ExceptionHandlers => {
-                self.cast::<ExceptionHandlers>().visit_pointers(visitor)
+            HeapItemKind::ExceptionStackRootrs => {
+                self.cast::<ExceptionStackRootrs>().visit_pointers(visitor)
             }
             HeapItemKind::SourceFile => self.cast::<SourceFile>().visit_pointers(visitor),
             HeapItemKind::Scope => self.cast::<Scope>().visit_pointers(visitor),
@@ -390,7 +390,7 @@ impl HeapItem for HeapPtr<AnyHeapItem> {
         self.byte_size_for_kind(self.descriptor().kind())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_pointers_for_kind(visitor, self.descriptor().kind());
     }
 }

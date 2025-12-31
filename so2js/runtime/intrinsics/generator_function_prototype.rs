@@ -1,6 +1,6 @@
 use crate::runtime::{
     alloc_error::AllocResult, object_value::ObjectValue, property::Property, realm::Realm, Context,
-    Handle,
+    StackRoot,
 };
 
 use super::intrinsics::Intrinsic;
@@ -9,7 +9,7 @@ pub struct GeneratorFunctionPrototype;
 
 impl GeneratorFunctionPrototype {
     /// Properties of the GeneratorFunction Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-generatorfunction-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::FunctionPrototype)),

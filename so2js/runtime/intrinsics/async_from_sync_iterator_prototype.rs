@@ -7,7 +7,7 @@ use crate::{
         error::type_error_value,
         eval_result::EvalResult,
         function::get_argument,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         intrinsics::promise_prototype::perform_promise_then,
         iterator::{
@@ -18,7 +18,7 @@ use crate::{
         ordinary_object::object_create,
         promise_object::{coerce_to_ordinary_promise, PromiseCapability},
         realm::Realm,
-        Context, Handle, HeapPtr, Value,
+        Context, StackRoot, HeapPtr, Value,
     },
     set_uninit,
 };
@@ -34,7 +34,7 @@ extend_object! {
 }
 
 impl AsyncFromSyncIterator {
-    pub fn new(cx: Context, iterator: Iterator) -> AllocResult<Handle<AsyncFromSyncIterator>> {
+    pub fn new(cx: Context, iterator: Iterator) -> AllocResult<StackRoot<AsyncFromSyncIterator>> {
         let mut object = object_create::<AsyncFromSyncIterator>(
             cx,
             HeapItemKind::AsyncFromSyncIterator,
@@ -48,15 +48,15 @@ impl AsyncFromSyncIterator {
         set_uninit!(object.iterator, *iterator.iterator);
         set_uninit!(object.next_method, *iterator.next_method);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
-    fn iterator(&self) -> Handle<ObjectValue> {
-        self.iterator.to_handle()
+    fn iterator(&self) -> StackRoot<ObjectValue> {
+        self.iterator.to_stack()
     }
 
-    fn next_method(&self, cx: Context) -> Handle<Value> {
-        self.next_method.to_handle(cx)
+    fn next_method(&self, cx: Context) -> StackRoot<Value> {
+        self.next_method.to_stack()
     }
 }
 
@@ -65,7 +65,7 @@ impl HeapItem for HeapPtr<AsyncFromSyncIterator> {
         core::mem::size_of::<AsyncFromSyncIterator>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.iterator);
         visitor.visit_value(&mut self.next_method);
@@ -76,7 +76,7 @@ pub struct AsyncFromSyncIteratorPrototype;
 
 impl AsyncFromSyncIteratorPrototype {
     /// The %AsyncFromSyncIteratorPrototype% Object (https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::AsyncIteratorPrototype)),
@@ -93,9 +93,9 @@ impl AsyncFromSyncIteratorPrototype {
     /// %AsyncFromSyncIteratorPrototype%.next (https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%.next)
     pub fn next(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let promise_constructor = cx.get_intrinsic(Intrinsic::PromiseConstructor);
         let capability = must!(PromiseCapability::new(cx, promise_constructor.into()));
 
@@ -129,9 +129,9 @@ impl AsyncFromSyncIteratorPrototype {
     /// %AsyncFromSyncIteratorPrototype%.return (https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%.return)
     pub fn return_(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let promise_constructor = cx.get_intrinsic(Intrinsic::PromiseConstructor);
         let capability = must!(PromiseCapability::new(cx, promise_constructor.into()));
 
@@ -190,9 +190,9 @@ impl AsyncFromSyncIteratorPrototype {
     /// %AsyncFromSyncIteratorPrototype%.throw (https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%.throw)
     pub fn throw(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let promise_constructor = cx.get_intrinsic(Intrinsic::PromiseConstructor);
         let capability = must!(PromiseCapability::new(cx, promise_constructor.into()));
 
@@ -256,11 +256,11 @@ impl AsyncFromSyncIteratorPrototype {
 /// AsyncFromSyncIteratorContinuation (https://tc39.es/ecma262/#sec-asyncfromsynciteratorcontinuation)
 fn async_from_sync_iterator_continuation(
     cx: Context,
-    iter_result: Handle<ObjectValue>,
-    capability: Handle<PromiseCapability>,
-    sync_iterator: Handle<ObjectValue>,
+    iter_result: StackRoot<ObjectValue>,
+    capability: StackRoot<PromiseCapability>,
+    sync_iterator: StackRoot<ObjectValue>,
     close_on_rejection: bool,
-) -> EvalResult<Handle<Value>> {
+) -> EvalResult<StackRoot<Value>> {
     let is_done_completion = iterator_complete(cx, iter_result);
     let is_done = if_abrupt_reject_promise!(cx, is_done_completion, capability);
 
@@ -325,9 +325,9 @@ fn async_from_sync_iterator_continuation(
 
 pub fn create_continuing_iter_result_object(
     cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let value = get_argument(cx, arguments, 0);
     Ok(create_iter_result_object(
         cx, value, /* is_done */ false,
@@ -336,9 +336,9 @@ pub fn create_continuing_iter_result_object(
 
 pub fn create_done_iter_result_object(
     cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let value = get_argument(cx, arguments, 0);
     Ok(create_iter_result_object(
         cx, value, /* is_done */ true,
@@ -347,9 +347,9 @@ pub fn create_done_iter_result_object(
 
 pub fn async_from_sync_iterator_continuation_on_reject(
     mut cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     // Fetch the iterator passed from the caller
     let current_function = cx.current_function();
     let sync_iterator = get_sync_iterator(cx, current_function);
@@ -359,7 +359,7 @@ pub fn async_from_sync_iterator_continuation_on_reject(
     iterator_close(cx, sync_iterator, eval_err!(error))
 }
 
-fn get_sync_iterator(cx: Context, function: Handle<ObjectValue>) -> Handle<ObjectValue> {
+fn get_sync_iterator(cx: Context, function: StackRoot<ObjectValue>) -> StackRoot<ObjectValue> {
     function
         .private_element_find(cx, cx.well_known_symbols.index().as_symbol())
         .unwrap()
@@ -369,8 +369,8 @@ fn get_sync_iterator(cx: Context, function: Handle<ObjectValue>) -> Handle<Objec
 
 fn set_sync_iterator(
     cx: Context,
-    mut function: Handle<ObjectValue>,
-    value: Handle<ObjectValue>,
+    mut function: StackRoot<ObjectValue>,
+    value: StackRoot<ObjectValue>,
 ) -> AllocResult<()> {
     function.private_element_set(cx, cx.well_known_symbols.index().as_symbol(), value.into())
 }

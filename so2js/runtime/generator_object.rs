@@ -3,13 +3,13 @@ use crate::{
     runtime::{
         alloc_error::AllocResult,
         eval_result::EvalResult,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         intrinsics::intrinsics::Intrinsic,
         iterator::create_iter_result_object,
         object_value::ObjectValue,
         ordinary_object::{get_prototype_from_constructor, object_ordinary_init},
-        Context, Handle, HeapPtr,
+        Context, StackRoot, HeapPtr,
     },
     set_uninit,
 };
@@ -104,7 +104,7 @@ pub trait TGeneratorObject {
 impl GeneratorObject {
     fn new(
         cx: Context,
-        prototype: Option<Handle<ObjectValue>>,
+        prototype: Option<StackRoot<ObjectValue>>,
         pc_to_resume_offset: usize,
         fp_index: usize,
         completion_indices: Option<(u32, u32)>,
@@ -127,7 +127,7 @@ impl GeneratorObject {
 
     pub fn new_for_generator(
         cx: Context,
-        closure: Handle<Closure>,
+        closure: StackRoot<Closure>,
         pc_to_resume_offset: usize,
         fp_index: usize,
         stack_frame: &[StackSlotValue],
@@ -199,7 +199,7 @@ impl GeneratorObject {
     }
 }
 
-impl TGeneratorObject for Handle<GeneratorObject> {
+impl TGeneratorObject for StackRoot<GeneratorObject> {
     fn pc_to_resume_offset(&self) -> usize {
         self.pc_to_resume_offset
     }
@@ -220,8 +220,8 @@ impl TGeneratorObject for Handle<GeneratorObject> {
 /// GeneratorValidate (https://tc39.es/ecma262/#sec-generatorvalidate)
 fn generator_validate(
     cx: Context,
-    generator: Handle<Value>,
-) -> EvalResult<Handle<GeneratorObject>> {
+    generator: StackRoot<Value>,
+) -> EvalResult<StackRoot<GeneratorObject>> {
     if generator.is_object() {
         if let Some(generator) = generator.as_object().as_generator() {
             if generator.state == GeneratorState::Executing {
@@ -238,9 +238,9 @@ fn generator_validate(
 /// GeneratorResume (https://tc39.es/ecma262/#sec-generatorresume)
 pub fn generator_resume(
     cx: Context,
-    generator: Handle<Value>,
-    completion_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    generator: StackRoot<Value>,
+    completion_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let generator = generator_validate(cx, generator)?;
 
     // Check if generator has already completed
@@ -260,10 +260,10 @@ pub fn generator_resume(
 
 fn generate_resume_impl(
     mut cx: Context,
-    mut generator: Handle<GeneratorObject>,
-    completion_value: Handle<Value>,
+    mut generator: StackRoot<GeneratorObject>,
+    completion_value: StackRoot<Value>,
     completion_type: GeneratorCompletionType,
-) -> EvalResult<Handle<Value>> {
+) -> EvalResult<StackRoot<Value>> {
     // Mark the generator as executing then resume the generator
     generator.state = GeneratorState::Executing;
 
@@ -289,10 +289,10 @@ fn generate_resume_impl(
 /// GeneratorResumeAbrupt (https://tc39.es/ecma262/#sec-generatorresumeabrupt)
 pub fn generator_resume_abrupt(
     cx: Context,
-    generator: Handle<Value>,
-    completion_value: Handle<Value>,
+    generator: StackRoot<Value>,
+    completion_value: StackRoot<Value>,
     completion_type: GeneratorCompletionType,
-) -> EvalResult<Handle<Value>> {
+) -> EvalResult<StackRoot<Value>> {
     let mut generator = generator_validate(cx, generator)?;
 
     // An abrupt completion on a generator that has not been started immediately completes it
@@ -319,7 +319,7 @@ impl HeapItem for HeapPtr<GeneratorObject> {
         GeneratorObject::calculate_size_in_bytes(self.stack_frame.len())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
 
         if self.state.is_suspended() {

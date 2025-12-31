@@ -1,8 +1,8 @@
 use crate::handle_scope_guard;
 
 use super::{
-    alloc_error::AllocResult, context::Context, gc::HeapVisitor, property_key::PropertyKey,
-    value::SymbolValue, Handle,
+    alloc_error::AllocResult, context::Context, gc::GcVisitorExt, property_key::PropertyKey,
+    value::SymbolValue, StackRoot,
 };
 
 // All built-in string property keys referenced in the spec
@@ -26,12 +26,12 @@ macro_rules! builtin_names {
             $(
                 #[inline]
                 #[allow(dead_code, clippy::wrong_self_convention)]
-                pub fn $rust_name(&self) -> Handle<PropertyKey> {
-                    Handle::<PropertyKey>::from_fixed_non_heap_ptr(&self.$rust_name)
+                pub fn $rust_name(&self) -> StackRoot<PropertyKey> {
+                    StackRoot::<PropertyKey>::from_fixed_non_heap_ptr(&self.$rust_name)
                 }
             )*
 
-            pub fn visit_roots(&mut self, visitor: &mut impl HeapVisitor) {
+            pub fn visit_roots(&mut self, visitor: &mut impl GcVisitorExt) {
                 $(
                     visitor.visit_property_key(&mut self.$rust_name);
                 )*
@@ -490,12 +490,12 @@ macro_rules! builtin_symbols {
 
             $(
                 #[inline]
-                pub fn $rust_name(&self) -> Handle<PropertyKey> {
-                    Handle::<PropertyKey>::from_fixed_non_heap_ptr(&self.$rust_name)
+                pub fn $rust_name(&self) -> StackRoot<PropertyKey> {
+                    StackRoot::<PropertyKey>::from_fixed_non_heap_ptr(&self.$rust_name)
                 }
             )*
 
-            pub fn visit_roots(&mut self, visitor: &mut impl HeapVisitor) {
+            pub fn visit_roots(&mut self, visitor: &mut impl GcVisitorExt) {
                 $(
                     visitor.visit_property_key(&mut self.$rust_name);
                 )*

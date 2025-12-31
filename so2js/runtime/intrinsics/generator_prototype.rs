@@ -11,7 +11,7 @@ use crate::runtime::{
     property::Property,
     realm::Realm,
     value::Value,
-    Context, Handle, PropertyDescriptor,
+    Context, StackRoot, PropertyDescriptor,
 };
 
 use super::intrinsics::Intrinsic;
@@ -20,7 +20,7 @@ pub struct GeneratorPrototype;
 
 impl GeneratorPrototype {
     /// The %GeneratorPrototype% Object (https://tc39.es/ecma262/#sec-properties-of-generator-prototype)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::IteratorPrototype)),
@@ -47,9 +47,9 @@ impl GeneratorPrototype {
     /// %GeneratorPrototype%.next (https://tc39.es/ecma262/#sec-generator.prototype.next)
     pub fn next(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
         generator_resume(cx, this_value, value)
     }
@@ -57,9 +57,9 @@ impl GeneratorPrototype {
     /// %GeneratorPrototype%.return (https://tc39.es/ecma262/#sec-generator.prototype.return)
     pub fn return_(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
         generator_resume_abrupt(cx, this_value, value, GeneratorCompletionType::Return)
     }
@@ -67,24 +67,24 @@ impl GeneratorPrototype {
     /// %GeneratorPrototype%.throw (https://tc39.es/ecma262/#sec-generator.prototype.throw)
     pub fn throw(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let error = get_argument(cx, arguments, 0);
         generator_resume_abrupt(cx, this_value, error, GeneratorCompletionType::Throw)
     }
 
     /// Every generator function has a prototype property referencing an instance of the generator
     /// prototype. Install this property on a generator function.
-    pub fn install_on_generator_function(cx: Context, closure: Handle<Closure>) -> EvalResult<()> {
+    pub fn install_on_generator_function(cx: Context, closure: StackRoot<Closure>) -> EvalResult<()> {
         let proto = object_create::<ObjectValue>(
             cx,
             HeapItemKind::OrdinaryObject,
             Intrinsic::GeneratorPrototype,
         )?
-        .to_handle();
+        .to_stack();
 
-        let proto_desc = PropertyDescriptor::data(proto.to_handle().into(), true, false, false);
+        let proto_desc = PropertyDescriptor::data(proto.to_stack().into(), true, false, false);
         define_property_or_throw(cx, closure.into(), cx.names.prototype(), proto_desc)?;
 
         Ok(())

@@ -9,7 +9,7 @@ use super::{
     property_key::PropertyKey,
     type_utilities::{is_constructor_object_value, same_object_value_handles},
     value::Value,
-    Context, Handle,
+    Context, StackRoot,
 };
 use crate::runtime::alloc_error::AllocResult;
 use alloc::vec;
@@ -20,10 +20,10 @@ pub struct BoundFunctionObject;
 impl BoundFunctionObject {
     pub fn new(
         cx: Context,
-        target_function: Handle<ObjectValue>,
-        bound_this: Handle<Value>,
-        bound_arguments: Vec<Handle<Value>>,
-    ) -> EvalResult<Handle<ObjectValue>> {
+        target_function: StackRoot<ObjectValue>,
+        bound_this: StackRoot<Value>,
+        bound_arguments: Vec<StackRoot<Value>>,
+    ) -> EvalResult<StackRoot<ObjectValue>> {
         let prototype = target_function.get_prototype_of(cx)?;
 
         let is_constructor = if let Some(closure) = target_function.as_closure() {
@@ -62,8 +62,8 @@ impl BoundFunctionObject {
 
     fn get_target_function(
         cx: Context,
-        bound_function: Handle<ObjectValue>,
-    ) -> Handle<ObjectValue> {
+        bound_function: StackRoot<ObjectValue>,
+    ) -> StackRoot<ObjectValue> {
         bound_function
             .private_element_find(cx, cx.well_known_symbols.bound_target().cast())
             .unwrap()
@@ -73,8 +73,8 @@ impl BoundFunctionObject {
 
     fn set_target_function(
         cx: Context,
-        mut bound_function: Handle<ObjectValue>,
-        target: Handle<ObjectValue>,
+        mut bound_function: StackRoot<ObjectValue>,
+        target: StackRoot<ObjectValue>,
     ) -> AllocResult<()> {
         bound_function.private_element_set(
             cx,
@@ -86,8 +86,8 @@ impl BoundFunctionObject {
     /// If this object is a bound function, return the target function. Otherwise, return None.
     pub fn get_target_if_bound_function(
         cx: Context,
-        object: Handle<ObjectValue>,
-    ) -> Option<Handle<ObjectValue>> {
+        object: StackRoot<ObjectValue>,
+    ) -> Option<StackRoot<ObjectValue>> {
         object
             .private_element_find(cx, cx.well_known_symbols.bound_target().cast())
             .map(|p| p.value().as_object())
@@ -97,7 +97,7 @@ impl BoundFunctionObject {
         object.has_private_element(cx.well_known_symbols.bound_target().cast())
     }
 
-    fn get_bound_this(cx: Context, bound_function: Handle<ObjectValue>) -> Handle<Value> {
+    fn get_bound_this(cx: Context, bound_function: StackRoot<ObjectValue>) -> StackRoot<Value> {
         bound_function
             .private_element_find(cx, cx.well_known_symbols.bound_this().cast())
             .unwrap()
@@ -106,8 +106,8 @@ impl BoundFunctionObject {
 
     fn set_bound_this(
         cx: Context,
-        mut bound_function: Handle<ObjectValue>,
-        bound_this: Handle<Value>,
+        mut bound_function: StackRoot<ObjectValue>,
+        bound_this: StackRoot<Value>,
     ) -> AllocResult<()> {
         bound_function.private_element_set(
             cx,
@@ -118,8 +118,8 @@ impl BoundFunctionObject {
 
     fn get_bound_arguments(
         cx: Context,
-        bound_function: Handle<ObjectValue>,
-    ) -> Handle<ArrayObject> {
+        bound_function: StackRoot<ObjectValue>,
+    ) -> StackRoot<ArrayObject> {
         bound_function
             .private_element_find(cx, cx.well_known_symbols.bound_arguments().cast())
             .unwrap()
@@ -129,8 +129,8 @@ impl BoundFunctionObject {
 
     fn set_bound_arguments(
         cx: Context,
-        mut bound_function: Handle<ObjectValue>,
-        arguments: Handle<ArrayObject>,
+        mut bound_function: StackRoot<ObjectValue>,
+        arguments: StackRoot<ArrayObject>,
     ) -> AllocResult<()> {
         bound_function.private_element_set(
             cx,
@@ -146,9 +146,9 @@ impl BoundFunctionObject {
     /// and [[Construct]] (https://tc39.es/ecma262/#sec-bound-function-exotic-objects-construct-argumentslist-newtarget)
     pub fn call(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let bound_function = cx.current_function();
 
         let bound_target_function = Self::get_target_function(cx, bound_function);
@@ -159,7 +159,7 @@ impl BoundFunctionObject {
         let mut all_arguments = vec![];
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
         let num_bound_arguments = length_of_array_like(cx, bound_arguments.into())?;
 
         // OPTIMIZATION: Much room for optimization of bound arguments instead of using array and

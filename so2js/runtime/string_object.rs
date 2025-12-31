@@ -9,7 +9,7 @@ use crate::{
     runtime::{
         alloc_error::AllocResult,
         eval_result::EvalResult,
-        gc::{Handle, HeapPtr},
+        gc::{StackRoot, HeapPtr},
         heap_item_descriptor::HeapItemKind,
         intrinsics::intrinsics::Intrinsic,
         object_value::{ObjectValue, VirtualObject},
@@ -29,7 +29,7 @@ use crate::{
 };
 
 use super::{
-    gc::{HeapItem, HeapVisitor},
+    gc::{HeapItem, GcVisitorExt},
     property::Property,
     rust_vtables::extract_virtual_object_vtable,
     string_value::FlatString,
@@ -48,8 +48,8 @@ impl StringObject {
 
     pub fn new_from_value(
         cx: Context,
-        string_data_handle: Handle<StringValue>,
-    ) -> AllocResult<Handle<StringObject>> {
+        string_data_handle: StackRoot<StringValue>,
+    ) -> AllocResult<StackRoot<StringObject>> {
         let mut object = object_create::<StringObject>(
             cx,
             HeapItemKind::StringObject,
@@ -61,7 +61,7 @@ impl StringObject {
 
         set_uninit!(object.string_data, string_data);
 
-        let object = object.to_handle();
+        let object = object.to_stack();
 
         Self::set_length_property(object, cx, string_length)?;
 
@@ -70,9 +70,9 @@ impl StringObject {
 
     pub fn new_from_constructor(
         cx: Context,
-        constructor: Handle<ObjectValue>,
-        string_data_handle: Handle<StringValue>,
-    ) -> EvalResult<Handle<StringObject>> {
+        constructor: StackRoot<ObjectValue>,
+        string_data_handle: StackRoot<StringValue>,
+    ) -> EvalResult<StackRoot<StringObject>> {
         let mut object = object_create_from_constructor::<StringObject>(
             cx,
             constructor,
@@ -85,7 +85,7 @@ impl StringObject {
 
         set_uninit!(object.string_data, string_data);
 
-        let object = object.to_handle();
+        let object = object.to_stack();
 
         Self::set_length_property(object, cx, string_length)?;
 
@@ -94,9 +94,9 @@ impl StringObject {
 
     pub fn new_with_proto(
         cx: Context,
-        proto: Handle<ObjectValue>,
-        string_data_handle: Handle<StringValue>,
-    ) -> AllocResult<Handle<StringObject>> {
+        proto: StackRoot<ObjectValue>,
+        string_data_handle: StackRoot<StringValue>,
+    ) -> AllocResult<StackRoot<StringObject>> {
         let mut object =
             object_create_with_proto::<StringObject>(cx, HeapItemKind::StringObject, proto)?;
 
@@ -105,7 +105,7 @@ impl StringObject {
 
         set_uninit!(object.string_data, string_data);
 
-        let object = object.to_handle();
+        let object = object.to_stack();
 
         Self::set_length_property(object, cx, string_length)?;
 
@@ -113,12 +113,12 @@ impl StringObject {
     }
 
     fn set_length_property(
-        string: Handle<StringObject>,
+        string: StackRoot<StringObject>,
         cx: Context,
         length: u32,
     ) -> AllocResult<()> {
         // String objects have an immutable length property
-        let length_value = Value::from(length).to_handle(cx);
+        let length_value = Value::from(length).to_stack();
         string.as_object().set_property(
             cx,
             cx.names.length(),
@@ -126,8 +126,8 @@ impl StringObject {
         )
     }
 
-    pub fn string_data(&self) -> Handle<StringValue> {
-        self.string_data.to_handle()
+    pub fn string_data(&self) -> StackRoot<StringValue> {
+        self.string_data.to_stack()
     }
 }
 
@@ -136,7 +136,7 @@ impl StringObject {
     fn string_get_own_property(
         &self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
     ) -> AllocResult<Option<PropertyDescriptor>> {
         if key.is_symbol() {
             return Ok(None);
@@ -160,12 +160,12 @@ impl StringObject {
 }
 
 #[wrap_ordinary_object]
-impl VirtualObject for Handle<StringObject> {
+impl VirtualObject for StackRoot<StringObject> {
     /// [[GetOwnProperty]] (https://tc39.es/ecma262/#sec-string-exotic-objects-getownproperty-p)
     fn get_own_property(
         &self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
     ) -> EvalResult<Option<PropertyDescriptor>> {
         let desc = ordinary_get_own_property(cx, self.as_object(), key);
         if desc.is_none() {
@@ -179,7 +179,7 @@ impl VirtualObject for Handle<StringObject> {
     fn define_own_property(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
         desc: PropertyDescriptor,
     ) -> EvalResult<bool> {
         let string_desc = self.string_get_own_property(cx, key)?;
@@ -197,8 +197,8 @@ impl VirtualObject for Handle<StringObject> {
     }
 
     /// [[OwnPropertyKeys]] (https://tc39.es/ecma262/#sec-string-exotic-objects-ownpropertykeys)
-    fn own_property_keys(&self, mut cx: Context) -> EvalResult<Vec<Handle<Value>>> {
-        let mut keys: Vec<Handle<Value>> = vec![];
+    fn own_property_keys(&self, mut cx: Context) -> EvalResult<Vec<StackRoot<Value>>> {
+        let mut keys: Vec<StackRoot<Value>> = vec![];
 
         let length = self.string_data.len();
         for i in 0..length {
@@ -221,7 +221,7 @@ impl HeapItem for HeapPtr<StringObject> {
         size_of::<StringObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.string_data);
     }

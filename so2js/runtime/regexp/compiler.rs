@@ -28,7 +28,7 @@ use crate::{
         alloc_error::AllocResult,
         debug_print::{DebugPrint, DebugPrintMode},
         string_value::StringValue,
-        Context, Handle,
+        Context, StackRoot,
     },
 };
 
@@ -53,7 +53,7 @@ struct CompiledRegExpBuilder {
     /// Stack of flags that are active in the current context. The topmost set of flags in the stack
     /// is the current set of flags.
     flags: Vec<RegExpFlags>,
-    source: Handle<StringValue>,
+    source: StackRoot<StringValue>,
     current_block_id: BlockId,
     num_progress_points: u32,
     num_loop_registers: u32,
@@ -101,7 +101,7 @@ impl SubExpressionInfo {
 const MAX_INLINED_REPITITIONS: u64 = 10;
 
 impl CompiledRegExpBuilder {
-    fn new(regexp: &RegExp, source: Handle<StringValue>) -> Self {
+    fn new(regexp: &RegExp, source: StackRoot<StringValue>) -> Self {
         Self {
             blocks: vec![],
             flags: vec![regexp.flags],
@@ -295,7 +295,7 @@ impl CompiledRegExpBuilder {
         &mut self,
         cx: Context,
         regexp: &RegExp,
-    ) -> AllocResult<Handle<CompiledRegExpObject>> {
+    ) -> AllocResult<StackRoot<CompiledRegExpObject>> {
         // Prime with new block
         self.new_block();
 
@@ -1554,8 +1554,8 @@ fn create_whitespace_set_builder() -> CodePointInversionListBuilder {
 pub fn compile_regexp(
     cx: Context,
     regexp: &RegExp,
-    source: Handle<StringValue>,
-) -> AllocResult<Handle<CompiledRegExpObject>> {
+    source: StackRoot<StringValue>,
+) -> AllocResult<StackRoot<CompiledRegExpObject>> {
     let mut builder = CompiledRegExpBuilder::new(regexp, source);
     let compiled_regexp = builder.compile(cx, regexp)?;
 

@@ -3,7 +3,7 @@ use super::{
     boxed_value::BoxedValue,
     collections::InlineArray,
     error::{err_assign_constant, err_cannot_set_property, err_not_defined},
-    gc::{AnyHeapItem, HeapItem, HeapVisitor},
+    gc::{AnyHeapItem, HeapItem, GcVisitorExt},
     get,
     heap_item_descriptor::HeapItemDescriptor,
     module::source_text_module::SourceTextModule,
@@ -12,7 +12,7 @@ use super::{
     scope_names::ScopeNames,
     string_value::StringValue,
     type_utilities::to_boolean,
-    Context, EvalResult, Handle, HeapPtr, PropertyKey, Realm, Value,
+    Context, EvalResult, StackRoot, HeapPtr, PropertyKey, Realm, Value,
 };
 use crate::{
     field_offset,
@@ -50,10 +50,10 @@ impl Scope {
     fn new(
         cx: Context,
         kind: ScopeKind,
-        parent: Option<Handle<Scope>>,
-        scope_names: Handle<ScopeNames>,
-        object: Option<Handle<ObjectValue>>,
-    ) -> AllocResult<Handle<Scope>> {
+        parent: Option<StackRoot<Scope>>,
+        scope_names: StackRoot<ScopeNames>,
+        object: Option<StackRoot<ObjectValue>>,
+    ) -> AllocResult<StackRoot<Scope>> {
         let num_slots = scope_names.len();
         let size = Self::calculate_size_in_bytes(num_slots);
         let mut scope = cx.alloc_uninit_with_size::<Scope>(size)?;
@@ -69,14 +69,14 @@ impl Scope {
 
         scope.slots.init_with(num_slots, Value::undefined());
 
-        Ok(scope.to_handle())
+        Ok(scope.to_stack())
     }
 
     pub fn new_global(
         cx: Context,
-        scope_names: Handle<ScopeNames>,
-        global_object: Handle<ObjectValue>,
-    ) -> AllocResult<Handle<Scope>> {
+        scope_names: StackRoot<ScopeNames>,
+        global_object: StackRoot<ObjectValue>,
+    ) -> AllocResult<StackRoot<Scope>> {
         Self::new(
             cx,
             ScopeKind::Global,
@@ -88,9 +88,9 @@ impl Scope {
 
     pub fn new_module(
         cx: Context,
-        scope_names: Handle<ScopeNames>,
-        global_object: Handle<ObjectValue>,
-    ) -> AllocResult<Handle<Scope>> {
+        scope_names: StackRoot<ScopeNames>,
+        global_object: StackRoot<ObjectValue>,
+    ) -> AllocResult<StackRoot<Scope>> {
         Self::new(
             cx,
             ScopeKind::Module,
@@ -102,26 +102,26 @@ impl Scope {
 
     pub fn new_lexical(
         cx: Context,
-        parent: Handle<Scope>,
-        scope_names: Handle<ScopeNames>,
-    ) -> AllocResult<Handle<Scope>> {
+        parent: StackRoot<Scope>,
+        scope_names: StackRoot<ScopeNames>,
+    ) -> AllocResult<StackRoot<Scope>> {
         Self::new(cx, ScopeKind::Lexical, Some(parent), scope_names, None)
     }
 
     pub fn new_function(
         cx: Context,
-        parent: Handle<Scope>,
-        scope_names: Handle<ScopeNames>,
-    ) -> AllocResult<Handle<Scope>> {
+        parent: StackRoot<Scope>,
+        scope_names: StackRoot<ScopeNames>,
+    ) -> AllocResult<StackRoot<Scope>> {
         Self::new(cx, ScopeKind::Function, Some(parent), scope_names, None)
     }
 
     pub fn new_with(
         cx: Context,
-        parent: Handle<Scope>,
-        scope_names: Handle<ScopeNames>,
-        object: Handle<ObjectValue>,
-    ) -> AllocResult<Handle<Scope>> {
+        parent: StackRoot<Scope>,
+        scope_names: StackRoot<ScopeNames>,
+        object: StackRoot<ObjectValue>,
+    ) -> AllocResult<StackRoot<Scope>> {
         Self::new(cx, ScopeKind::With, Some(parent), scope_names, Some(object))
     }
 
@@ -204,7 +204,7 @@ impl Scope {
     }
 }
 
-impl Handle<Scope> {
+impl StackRoot<Scope> {
     /// Create a new scope that is an exact duplicate of this scope.
     pub fn duplicate(&self, cx: Context) -> AllocResult<HeapPtr<Scope>> {
         let size = Scope::calculate_size_in_bytes(self.slots.len());
@@ -228,12 +228,12 @@ impl Handle<Scope> {
     pub fn lookup(
         &self,
         cx: Context,
-        name: Handle<StringValue>,
+        name: StackRoot<StringValue>,
         is_strict: bool,
-    ) -> EvalResult<Option<Handle<Value>>> {
+    ) -> EvalResult<Option<StackRoot<Value>>> {
         // Reuse handles while walking scope chain
-        let mut object_handle = Handle::<ObjectValue>::empty(cx);
-        let mut scope = Handle::<Scope>::empty(cx);
+        let mut object_handle = StackRoot::<ObjectValue>::empty(cx);
+        let mut scope = StackRoot::<Scope>::empty(cx);
         scope.replace(**self);
 
         loop {
@@ -246,9 +246,9 @@ impl Handle<Scope> {
                 // we need to load the value from the BoxedValue.
                 if scope.kind == ScopeKind::Module && scope_names.is_module_binding(index) {
                     let boxed_value = slot_value.as_pointer().cast::<BoxedValue>();
-                    return Ok(Some(boxed_value.get().to_handle(cx)));
+                    return Ok(Some(boxed_value.get().to_stack()));
                 } else {
-                    return Ok(Some(slot_value.to_handle(cx)));
+                    return Ok(Some(slot_value.to_stack()));
                 }
             }
 
@@ -283,7 +283,7 @@ impl Handle<Scope> {
                 let realm = scope.global_scope_realm();
                 let value = realm.get_lexical_name(*name.as_flat());
 
-                return Ok(value.map(|v| v.to_handle(cx)));
+                return Ok(value.map(|v| v.to_stack()));
             }
         }
     }
@@ -294,13 +294,13 @@ impl Handle<Scope> {
     pub fn lookup_store(
         &mut self,
         cx: Context,
-        name: Handle<StringValue>,
-        value: Handle<Value>,
+        name: StackRoot<StringValue>,
+        value: StackRoot<Value>,
         is_strict: bool,
     ) -> EvalResult<bool> {
         // Reuse handles while walking scope chain
-        let mut object_handle = Handle::<ObjectValue>::empty(cx);
-        let mut scope = Handle::<Scope>::empty(cx);
+        let mut object_handle = StackRoot::<ObjectValue>::empty(cx);
+        let mut scope = StackRoot::<Scope>::empty(cx);
         scope.replace(**self);
 
         loop {
@@ -376,10 +376,10 @@ impl Handle<Scope> {
     ///
     /// The name must be an interned string.
     #[inline]
-    pub fn lookup_delete(&mut self, cx: Context, name: Handle<StringValue>) -> EvalResult<bool> {
+    pub fn lookup_delete(&mut self, cx: Context, name: StackRoot<StringValue>) -> EvalResult<bool> {
         // Reuse handles while walking scope chain
-        let mut object_handle = Handle::<ObjectValue>::empty(cx);
-        let mut scope = Handle::<Scope>::empty(cx);
+        let mut object_handle = StackRoot::<ObjectValue>::empty(cx);
+        let mut scope = StackRoot::<Scope>::empty(cx);
         scope.replace(**self);
 
         loop {
@@ -422,8 +422,8 @@ impl Handle<Scope> {
     fn has_object_binding(
         &self,
         cx: Context,
-        object: Handle<ObjectValue>,
-        key: Handle<PropertyKey>,
+        object: StackRoot<ObjectValue>,
+        key: StackRoot<PropertyKey>,
     ) -> EvalResult<bool> {
         // Check if key appears in object
         if !has_property(cx, object, key)? {
@@ -451,9 +451,9 @@ impl Handle<Scope> {
     }
 
     /// Return the object for this scope, creating it if necessary.
-    pub fn ensure_scope_object(&mut self, cx: Context) -> AllocResult<Handle<ObjectValue>> {
+    pub fn ensure_scope_object(&mut self, cx: Context) -> AllocResult<StackRoot<ObjectValue>> {
         if let Some(object) = self.object {
-            return Ok(object.to_handle());
+            return Ok(object.to_stack());
         }
 
         let object = ordinary_object_create(cx)?;
@@ -467,7 +467,7 @@ impl HeapItem for HeapPtr<Scope> {
         Scope::calculate_size_in_bytes(self.slots.len())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
         visitor.visit_pointer_opt(&mut self.parent);
         visitor.visit_pointer(&mut self.scope_names);

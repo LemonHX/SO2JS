@@ -7,7 +7,7 @@ use crate::{
         collections::InlineArray,
         error::type_error,
         eval_result::EvalResult,
-        gc::HeapVisitor,
+        gc::GcVisitorExt,
         get,
         global_names::create_global_declaration_instantiation_intrinsic,
         heap_item_descriptor::HeapItemKind,
@@ -95,7 +95,7 @@ use crate::{
         ordinary_object::object_create_with_proto,
         property_descriptor::PropertyDescriptor,
         realm::Realm,
-        Context, Handle, HeapPtr, Value,
+        Context, StackRoot, HeapPtr, Value,
     },
 };
 
@@ -157,7 +157,6 @@ pub enum Intrinsic {
     IteratorConstructor,
     IteratorHelperPrototype,
     IteratorPrototype,
-    #[allow(clippy::upper_case_acronyms)]
     JSON,
     MapConstructor,
     MapIteratorPrototype,
@@ -229,7 +228,7 @@ pub struct Intrinsics {
 
 impl Intrinsics {
     /// CreateIntrinsics (https://tc39.es/ecma262/#sec-createintrinsics)
-    pub fn initialize(cx: Context, mut realm: Handle<Realm>) -> AllocResult<()> {
+    pub fn initialize(cx: Context, mut realm: StackRoot<Realm>) -> AllocResult<()> {
         // Initialize all pointers to valid pointer outside heap in case a GC is triggered before
         // they are set to real intrinsic object.
         realm
@@ -495,15 +494,16 @@ impl Intrinsics {
         self.intrinsics.as_slice()[intrinsic as usize]
     }
 
-    pub fn get(&self, intrinsic: Intrinsic) -> Handle<ObjectValue> {
-        self.get_ptr(intrinsic).to_handle()
+    pub fn get(&self, intrinsic: Intrinsic) -> StackRoot<ObjectValue> {
+        let ptr: HeapPtr<ObjectValue> = self.get_ptr(intrinsic);
+        ptr.to_stack()
     }
 
     // Intrinsic prototypes are created before their corresponding constructors, so we must add a
     // constructor property after creation.
     fn add_constructor_to_prototype(
         cx: Context,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
         prototype: Intrinsic,
         constructor: Intrinsic,
     ) -> AllocResult<()> {
@@ -522,7 +522,7 @@ impl Intrinsics {
     // Same as `add_constructor_to_prototype` but sets the constructor property to be non-writable.
     fn add_non_writable_constructor_to_prototype(
         cx: Context,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
         prototype: Intrinsic,
         constructor: Intrinsic,
     ) -> AllocResult<()> {
@@ -541,17 +541,17 @@ impl Intrinsics {
 
 pub fn throw_type_error(
     cx: Context,
-    _: Handle<Value>,
-    _: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    _: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     type_error(cx, "'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them")
 }
 
 /// %ThrowTypeError% (https://tc39.es/ecma262/#sec-%throwtypeerror%)
 fn create_throw_type_error_intrinsic(
     cx: Context,
-    realm: Handle<Realm>,
-) -> AllocResult<Handle<Value>> {
+    realm: StackRoot<Realm>,
+) -> AllocResult<StackRoot<Value>> {
     handle_scope!(cx, {
         let mut throw_type_error_func =
             BuiltinFunction::create_builtin_function_without_properties(
@@ -592,8 +592,8 @@ fn create_throw_type_error_intrinsic(
 /// AddRestrictedFunctionProperties (https://tc39.es/ecma262/#sec-addrestrictedfunctionproperties)
 fn add_restricted_function_properties(
     cx: Context,
-    func: Handle<ObjectValue>,
-    realm: Handle<Realm>,
+    func: StackRoot<ObjectValue>,
+    realm: StackRoot<Realm>,
 ) -> AllocResult<()> {
     handle_scope_guard!(cx);
 
@@ -621,7 +621,7 @@ fn add_restricted_function_properties(
 }
 
 impl Intrinsics {
-    pub fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    pub fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         for intrinsic in self.intrinsics.as_mut_slice() {
             visitor.visit_pointer(intrinsic);
         }

@@ -5,13 +5,13 @@ use crate::{
     runtime::{
         alloc_error::AllocResult,
         collections::{BsIndexMap, BsIndexMapField},
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         intrinsics::intrinsics::Intrinsic,
         object_value::ObjectValue,
         ordinary_object::object_create_from_constructor,
-        value::{ValueCollectionKey, ValueCollectionKeyHandle},
-        Context, EvalResult, Handle, HeapPtr, Value,
+        value::{ValueCollectionKey, ValueCollectionKeyStackRoot},
+        Context, EvalResult, StackRoot, HeapPtr, Value,
     },
     set_uninit,
 };
@@ -28,11 +28,11 @@ pub type ValueMap = BsIndexMap<ValueCollectionKey, Value>;
 impl MapObject {
     pub fn new_from_constructor(
         cx: Context,
-        constructor: Handle<ObjectValue>,
-    ) -> EvalResult<Handle<MapObject>> {
+        constructor: StackRoot<ObjectValue>,
+    ) -> EvalResult<StackRoot<MapObject>> {
         // Allocate and place behind handle before allocating environment
         let map_data =
-            ValueMap::new(cx, HeapItemKind::MapObjectValueMap, ValueMap::MIN_CAPACITY)?.to_handle();
+            ValueMap::new(cx, HeapItemKind::MapObjectValueMap, ValueMap::MIN_CAPACITY)?.to_stack();
 
         let mut object = object_create_from_constructor::<MapObject>(
             cx,
@@ -43,7 +43,7 @@ impl MapObject {
 
         set_uninit!(object.map_data, *map_data);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     pub fn map_data(&self) -> HeapPtr<ValueMap> {
@@ -51,7 +51,7 @@ impl MapObject {
     }
 }
 
-impl Handle<MapObject> {
+impl StackRoot<MapObject> {
     pub fn map_data_field(&self) -> MapObjectMapField {
         MapObjectMapField(*self)
     }
@@ -59,10 +59,10 @@ impl Handle<MapObject> {
     pub fn insert(
         &self,
         cx: Context,
-        key: Handle<Value>,
-        value: Handle<Value>,
+        key: StackRoot<Value>,
+        value: StackRoot<Value>,
     ) -> AllocResult<bool> {
-        let key_handle = ValueCollectionKeyHandle::new(key)?;
+        let key_handle = ValueCollectionKeyStackRoot::new(key)?;
 
         Ok(self
             .map_data_field()
@@ -71,7 +71,7 @@ impl Handle<MapObject> {
     }
 }
 
-pub struct MapObjectMapField(Handle<MapObject>);
+pub struct MapObjectMapField(StackRoot<MapObject>);
 
 impl BsIndexMapField<ValueCollectionKey, Value> for MapObjectMapField {
     fn new_map(&self, cx: Context, capacity: usize) -> AllocResult<HeapPtr<ValueMap>> {
@@ -92,7 +92,7 @@ impl HeapItem for HeapPtr<MapObject> {
         size_of::<MapObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.map_data);
     }
@@ -103,7 +103,7 @@ impl MapObjectMapField {
         ValueMap::calculate_size_in_bytes(map.capacity())
     }
 
-    pub fn visit_pointers(map: &mut HeapPtr<ValueMap>, visitor: &mut impl HeapVisitor) {
+    pub fn visit_pointers(map: &mut HeapPtr<ValueMap>, visitor: &mut impl GcVisitorExt) {
         map.visit_pointers_impl(visitor, |map, visitor| {
             for (key, value) in map.iter_mut_gc_unsafe() {
                 key.visit_pointers(visitor);

@@ -10,7 +10,7 @@ use crate::runtime::{
     property_descriptor::{from_property_descriptor, to_property_descriptor},
     realm::Realm,
     type_utilities::{is_callable, is_constructor_value, to_property_key},
-    Context, Handle, Value,
+    Context, StackRoot, Value,
 };
 
 use super::intrinsics::Intrinsic;
@@ -19,7 +19,7 @@ use super::intrinsics::Intrinsic;
 pub struct ReflectObject;
 
 impl ReflectObject {
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -91,9 +91,9 @@ impl ReflectObject {
     /// Reflect.apply (https://tc39.es/ecma262/#sec-reflect.apply)
     pub fn apply(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let target = get_argument(cx, arguments, 0);
         if !is_callable(target) {
             return type_error(cx, "value is not a function");
@@ -109,9 +109,9 @@ impl ReflectObject {
     /// Reflect.construct (https://tc39.es/ecma262/#sec-reflect.construct)
     pub fn construct(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let target = get_argument(cx, arguments, 0);
         if !is_constructor_value(target) {
             return type_error(cx, "value is not a constructor");
@@ -139,9 +139,9 @@ impl ReflectObject {
     /// Reflect.defineProperty (https://tc39.es/ecma262/#sec-reflect.defineproperty)
     pub fn define_property(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let target = get_argument(cx, arguments, 0);
         if !target.is_object() {
             return type_error(cx, "value is not an object");
@@ -162,9 +162,9 @@ impl ReflectObject {
     /// Reflect.deleteProperty (https://tc39.es/ecma262/#sec-reflect.deleteproperty)
     pub fn delete_property(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let target = get_argument(cx, arguments, 0);
         if !target.is_object() {
             return type_error(cx, "value is not an object");
@@ -181,9 +181,9 @@ impl ReflectObject {
     /// Reflect.get (https://tc39.es/ecma262/#sec-reflect.get)
     pub fn get(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let target = get_argument(cx, arguments, 0);
         if !target.is_object() {
             return type_error(cx, "value is not an object");
@@ -204,9 +204,9 @@ impl ReflectObject {
     /// Reflect.getOwnPropertyDescriptor (https://tc39.es/ecma262/#sec-reflect.getownpropertydescriptor)
     pub fn get_own_property_descriptor(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let target = get_argument(cx, arguments, 0);
         if !target.is_object() {
             return type_error(cx, "value is not an object");
@@ -228,9 +228,9 @@ impl ReflectObject {
     /// Reflect.getPrototypeOf (https://tc39.es/ecma262/#sec-reflect.getprototypeof)
     pub fn get_prototype_of(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let target = get_argument(cx, arguments, 0);
         if !target.is_object() {
             return type_error(cx, "value is not an object");
@@ -244,9 +244,9 @@ impl ReflectObject {
     /// Reflect.has (https://tc39.es/ecma262/#sec-reflect.has)
     pub fn has(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let target = get_argument(cx, arguments, 0);
         if !target.is_object() {
             return type_error(cx, "value is not an object");
@@ -263,9 +263,9 @@ impl ReflectObject {
     /// Reflect.isExtensible (https://tc39.es/ecma262/#sec-reflect.isextensible)
     pub fn is_extensible(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let target = get_argument(cx, arguments, 0);
         if !target.is_object() {
             return type_error(cx, "value is not an object");
@@ -278,9 +278,9 @@ impl ReflectObject {
     /// Reflect.ownKeys (https://tc39.es/ecma262/#sec-reflect.ownkeys)
     pub fn own_keys(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let target = get_argument(cx, arguments, 0);
         if !target.is_object() {
             return type_error(cx, "value is not an object");
@@ -294,9 +294,9 @@ impl ReflectObject {
     /// Reflect.preventExtensions (https://tc39.es/ecma262/#sec-reflect.preventextensions)
     pub fn prevent_extensions(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let target = get_argument(cx, arguments, 0);
         if !target.is_object() {
             return type_error(cx, "value is not an object");
@@ -309,9 +309,9 @@ impl ReflectObject {
     /// Reflect.set (https://tc39.es/ecma262/#sec-reflect.set)
     pub fn set(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let target = get_argument(cx, arguments, 0);
         if !target.is_object() {
             return type_error(cx, "value is not an object");
@@ -334,9 +334,9 @@ impl ReflectObject {
     /// Reflect.setPrototypeOf (https://tc39.es/ecma262/#sec-reflect.setprototypeof)
     pub fn set_prototype_of(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let target = get_argument(cx, arguments, 0);
         if !target.is_object() {
             return type_error(cx, "value is not an object");

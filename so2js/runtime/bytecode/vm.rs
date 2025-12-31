@@ -40,7 +40,7 @@ use crate::{
         eval_result::EvalError,
         for_in_iterator::ForInIterator,
         function::build_function_name,
-        gc::HeapVisitor,
+        gc::GcVisitorExt,
         generator_object::{GeneratorCompletionType, GeneratorObject, TGeneratorObject},
         get,
         heap_item_descriptor::HeapItemKind,
@@ -67,7 +67,7 @@ use crate::{
             same_object_value, to_boolean, to_number, to_numeric, to_object, to_property_key,
         },
         value::{BigIntValue, SymbolValue},
-        Context, EvalResult, Handle, HeapPtr, PropertyDescriptor, PropertyKey, Realm, Value,
+        Context, EvalResult, HeapPtr, PropertyDescriptor, PropertyKey, Realm, StackRoot, Value,
     },
 };
 
@@ -265,7 +265,10 @@ impl VM {
 
     /// Execute an entire bytecode script, first instantiating the global declarations then
     /// running the script function.
-    pub fn execute_script(&mut self, bytecode_script: BytecodeScript) -> EvalResult<Handle<Value>> {
+    pub fn execute_script(
+        &mut self,
+        bytecode_script: BytecodeScript,
+    ) -> EvalResult<StackRoot<Value>> {
         let mut realm = bytecode_script.script_function.realm();
         let global_names = bytecode_script.global_names;
 
@@ -307,9 +310,9 @@ impl VM {
     /// Execute a module. Must only be called during the evaluation phase, after loading and linking.
     pub fn execute_module(
         &mut self,
-        module: Handle<SourceTextModule>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        module: StackRoot<SourceTextModule>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let program_function = module.program_function();
         let module_scope = module.module_scope();
         let realm = program_function.realm();
@@ -323,10 +326,10 @@ impl VM {
     /// Execute a closure with the provided arguments.
     fn execute(
         &mut self,
-        closure: Handle<Closure>,
-        receiver: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        closure: StackRoot<Closure>,
+        receiver: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         #[cfg(feature = "handle_stats")]
         let num_handles_before = self.current_num_handles();
 
@@ -351,12 +354,7 @@ impl VM {
 
     #[cfg(feature = "handle_stats")]
     fn current_num_handles(&self) -> usize {
-        self.cx()
-            .heap
-            .info()
-            .handle_context()
-            .handle_stats()
-            .num_handles
+        self.cx().handle_context.handle_stats().num_handles
     }
 
     /// Resume a suspended generator, executing it until it suspends or completes.
@@ -369,9 +367,9 @@ impl VM {
     pub fn resume_generator(
         &mut self,
         generator: impl TGeneratorObject,
-        completion_value: Handle<Value>,
+        completion_value: StackRoot<Value>,
         completion_type: GeneratorCompletionType,
-    ) -> EvalResult<Handle<Value>> {
+    ) -> EvalResult<StackRoot<Value>> {
         let saved_stack_frame = generator.stack_frame();
         let stack_frame_size = saved_stack_frame.len();
 
@@ -427,7 +425,7 @@ impl VM {
         // of dispatch loop when the marked return address is encountered.
         self.dispatch_loop()?;
 
-        Ok(return_value.to_handle(self.cx()))
+        Ok(return_value.to_stack())
     }
 
     fn reset_stack(&mut self) {
@@ -554,8 +552,8 @@ impl VM {
                         debug_assert!(generator_object.is_async_generator());
 
                         let mut async_generator =
-                            generator_object.as_async_generator().unwrap().to_handle();
-                        let yield_value = yield_value.to_handle(self.cx());
+                            generator_object.as_async_generator().unwrap().to_stack();
+                        let yield_value = yield_value.to_stack();
 
                         maybe_throw_a!(async_generator_complete_step(
                             self.cx(),
@@ -623,7 +621,7 @@ impl VM {
                             (completion_value_index, completion_type_index),
                             self.stack_frame().as_slice(),
                         ))
-                        .to_handle();
+                        .to_stack();
 
                         maybe_throw_a!(
                             argument_promise.add_await_reaction(self.cx(), generator.into())
@@ -668,7 +666,7 @@ impl VM {
                     // Find the index of the FP in the stack frame
                     let fp_index = unsafe { self.fp().offset_from(self.sp()) as usize };
 
-                    let current_closure = self.closure().to_handle();
+                    let current_closure = self.closure().to_stack();
 
                     // Create the generator in the started state, copying the current stack frame
                     // and PC to resume.
@@ -755,7 +753,7 @@ impl VM {
                 ($get_instr:ident) => {{
                     let instr = $get_instr!(ThrowInstruction);
                     self.set_pc_after(instr);
-                    let error_value = self.read_register(instr.error()).to_handle(self.cx());
+                    let error_value = self.read_register(instr.error()).to_stack();
                     throw!(error_value);
                 }};
             }
@@ -1279,7 +1277,7 @@ impl VM {
             let prefix_or_opcode = unsafe { *prefix_or_opcode_pc.cast::<OpCode>() };
 
             match prefix_or_opcode {
-                // Handle wide instructions
+                // StackRoot wide instructions
                 OpCode::WidePrefix => {
                     // PC is pointing to the wide prefix. This is followed by optional padding, the
                     // opcode, then the operands. The operands must be aligned to the next possible
@@ -1291,7 +1289,7 @@ impl VM {
                     create_dispatch_table!(Wide, opcode, opcode_pc);
                 }
 
-                // Handle extra wide instructions
+                // StackRoot extra wide instructions
                 OpCode::ExtraWidePrefix => {
                     // PC is pointing to the extra wide prefix. This is followed by optional
                     // padding, the opcode, then the operands. The operands must be aligned to the
@@ -1304,7 +1302,7 @@ impl VM {
 
                     create_dispatch_table!(ExtraWide, opcode, opcode_pc);
                 }
-                // Handle all other instructions, which must be narrow and have no prefix
+                // StackRoot all other instructions, which must be narrow and have no prefix
                 _ => {
                     create_dispatch_table!(Narrow, prefix_or_opcode, prefix_or_opcode_pc);
                 }
@@ -1427,8 +1425,8 @@ impl VM {
     }
 
     #[inline]
-    fn read_register_to_handle<W: Width>(&mut self, reg: Register<W>) -> Handle<Value> {
-        self.read_register(reg).to_handle(self.cx())
+    fn read_register_to_handle<W: Width>(&mut self, reg: Register<W>) -> StackRoot<Value> {
+        self.read_register(reg).to_stack()
     }
 
     #[inline]
@@ -1572,16 +1570,16 @@ impl VM {
     /// Assumes that the current PC is the instruction to be executed after this call completes.
     pub fn call_from_rust(
         &mut self,
-        function: Handle<Value>,
-        receiver: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        function: StackRoot<Value>,
+        receiver: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         // Check whether the value is callable, potentially deferring to proxy.
         let closure_ptr = match self.check_value_is_callable(*function)? {
             CallableObject::Closure(closure) => closure,
             CallableObject::Proxy(proxy) => {
                 return handle_scope!(self.cx(), {
-                    proxy.to_handle().call(self.cx(), receiver, arguments)
+                    proxy.to_stack().call(self.cx(), receiver, arguments)
                 });
             }
             CallableObject::Error(error) => return eval_err!(error),
@@ -1596,12 +1594,12 @@ impl VM {
             // Call rust runtime function directly in its own handle scope
             let cx = self.cx();
             handle_scope!(cx, {
-                let receiver = receiver.to_handle(cx);
+                let receiver = receiver.to_stack();
                 self.call_rust_runtime(closure_ptr, function_id, receiver, arguments, None)
             })
         } else {
             // Otherwise this is a call to a JS function in the VM
-            let args_rev_iter = arguments.iter().rev().map(Handle::deref);
+            let args_rev_iter = arguments.iter().rev().map(StackRoot::deref);
 
             // Push the address of the return value
             let mut return_value = Value::undefined();
@@ -1623,7 +1621,7 @@ impl VM {
             // dispatch loop when the marked return address is encountered.
             self.dispatch_loop()?;
 
-            Ok(return_value.to_handle(self.cx()))
+            Ok(return_value.to_stack())
         }
     }
 
@@ -1633,19 +1631,17 @@ impl VM {
     /// Assumes that the current PC is the instruction to be executed after this call completes.
     pub fn construct_from_rust(
         &mut self,
-        function: Handle<Value>,
-        arguments: &[Handle<Value>],
-        new_target: Handle<ObjectValue>,
-    ) -> EvalResult<Handle<ObjectValue>> {
+        function: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+        new_target: StackRoot<ObjectValue>,
+    ) -> EvalResult<StackRoot<ObjectValue>> {
         handle_scope!(self.cx(), {
             // Check whether the value is a constructor, potentially deferring to proxy.
             let closure_handle = match self.check_value_is_constructor(*function)? {
-                CallableObject::Closure(closure) => closure.to_handle(),
+                CallableObject::Closure(closure) => closure.to_stack(),
                 // Proxy constructors call directly into the rust runtime
                 CallableObject::Proxy(proxy) => {
-                    return proxy
-                        .to_handle()
-                        .construct(self.cx(), arguments, new_target);
+                    return proxy.to_stack().construct(self.cx(), arguments, new_target);
                 }
                 CallableObject::Error(error) => return eval_err!(error),
             };
@@ -1685,7 +1681,7 @@ impl VM {
                 receiver_handle.replace(receiver);
 
                 // Otherwise this is a call to a JS function in the VM
-                let args_rev_iter = arguments.iter().rev().map(Handle::deref);
+                let args_rev_iter = arguments.iter().rev().map(StackRoot::deref);
 
                 // Push the address of the return value
                 let mut return_value = Value::undefined();
@@ -1708,7 +1704,7 @@ impl VM {
                 // of dispatch loop when the marked return address is encountered. May allocate.
                 self.dispatch_loop()?;
 
-                let return_value = return_value.to_handle(self.cx());
+                let return_value = return_value.to_stack();
 
                 // Use the function's return value if it is an object
                 if return_value.is_object() {
@@ -1739,9 +1735,9 @@ impl VM {
             CallableObject::Proxy(proxy) => {
                 return handle_scope!(self.cx(), {
                     // Can default to undefined receiver, which will be eventually coerced by callee
-                    let receiver = receiver.unwrap_or(Value::undefined()).to_handle(self.cx());
+                    let receiver = receiver.unwrap_or(Value::undefined()).to_stack();
                     let arguments = self.prepare_rust_runtime_args(args);
-                    let return_value = proxy.to_handle().call(self.cx(), receiver, &arguments)?;
+                    let return_value = proxy.to_stack().call(self.cx(), receiver, &arguments)?;
                     unsafe { *return_value_address = *return_value };
 
                     Ok(())
@@ -1760,7 +1756,7 @@ impl VM {
 
             let cx = self.cx();
             handle_scope!(cx, {
-                let receiver = receiver.to_handle(cx);
+                let receiver = receiver.to_stack();
 
                 // Prepare arguments for the runtime call
                 let arguments = self.prepare_rust_runtime_args(args);
@@ -1833,8 +1829,8 @@ impl VM {
             // Proxy constructors call into the rust runtime
             CallableObject::Proxy(proxy) => {
                 return handle_scope!(self.cx(), {
-                    let proxy = proxy.to_handle();
-                    let new_target = new_target.to_handle();
+                    let proxy = proxy.to_stack();
+                    let new_target = new_target.to_stack();
                     let arguments = self.prepare_rust_runtime_args(args);
                     let return_value = proxy.construct(self.cx(), &arguments, new_target)?;
 
@@ -1859,7 +1855,7 @@ impl VM {
                 // Prepare arguments for the runtime call
                 let arguments = self.prepare_rust_runtime_args(args);
 
-                let new_target = new_target.to_handle();
+                let new_target = new_target.to_stack();
 
                 let return_value = self.call_rust_runtime(
                     closure_ptr,
@@ -1873,9 +1869,9 @@ impl VM {
                 Ok(*(return_value.as_object())) as EvalResult<HeapPtr<ObjectValue>>
             } else {
                 // Otherwise this is a call to a JS function in the VM.
-                let closure_handle = closure_ptr.to_handle();
-                let function_handle = function_ptr.to_handle();
-                let new_target = new_target.to_handle();
+                let closure_handle = closure_ptr.to_stack();
+                let function_handle = function_ptr.to_stack();
+                let new_target = new_target.to_stack();
 
                 // Create the receiver to use. Allocates.
                 let is_base = function_ptr.is_base_constructor();
@@ -2103,7 +2099,7 @@ impl VM {
     #[inline]
     fn pop_stack_frame(&mut self) {
         unsafe {
-            // Handle under/overapplication of arguments.
+            // StackRoot under/overapplication of arguments.
             let num_formal_parameters = self.closure().function_ptr().num_parameters() as usize;
             let argc = self.argc();
             let num_arguments = argc.max(num_formal_parameters);
@@ -2196,19 +2192,19 @@ impl VM {
     fn prepare_rust_runtime_args<W: Width>(
         &mut self,
         args: GenericCallArgs<W>,
-    ) -> Vec<Handle<Value>> {
+    ) -> Vec<StackRoot<Value>> {
         let mut arguments = vec![];
 
         // Arguments should be iterated in order
         match self.get_args_slice(args) {
             ArgsSlice::Forward(slice) => {
                 for arg in slice {
-                    arguments.push(arg.to_handle(self.cx()));
+                    arguments.push(arg.to_stack());
                 }
             }
             ArgsSlice::Reverse(slice) => {
                 for arg in slice.iter().rev() {
-                    arguments.push(arg.to_handle(self.cx()));
+                    arguments.push(arg.to_stack());
                 }
             }
         }
@@ -2229,7 +2225,7 @@ impl VM {
     ) {
         let mut sp = self.sp();
 
-        // Handle under application of arguments, pushing undefined for missing arguments. This
+        // StackRoot under application of arguments, pushing undefined for missing arguments. This
         // guarantees that the number of pushed arguments equals max(argc, func.num_parameters).
         let num_parameters = num_declared_parameters;
         if argc < num_parameters {
@@ -2276,8 +2272,8 @@ impl VM {
                 // closure behind a handle across `to_object` call.
                 let cx = self.cx();
                 handle_scope!(cx, {
-                    let closure = closure.to_handle();
-                    let receiver = receiver.to_handle(cx);
+                    let closure = closure.to_stack();
+                    let receiver = receiver.to_stack();
                     let receiver_object = to_object(cx, receiver)?;
                     Ok((*closure, *receiver_object.as_value()))
                 })
@@ -2297,7 +2293,7 @@ impl VM {
     #[inline]
     fn generate_constructor_receiver(
         &mut self,
-        new_target: Handle<ObjectValue>,
+        new_target: StackRoot<ObjectValue>,
         is_base: bool,
     ) -> EvalResult<Value> {
         if is_base {
@@ -2321,9 +2317,9 @@ impl VM {
     #[inline]
     fn constructor_non_object_return_value(
         &mut self,
-        receiver: Handle<Value>,
+        receiver: StackRoot<Value>,
         is_base: bool,
-    ) -> EvalResult<Handle<ObjectValue>> {
+    ) -> EvalResult<StackRoot<ObjectValue>> {
         if is_base {
             // Base classes always return the receiver. Receiver is guaranteed to be an object
             // created earlier in this construct call.
@@ -2357,10 +2353,10 @@ impl VM {
         &mut self,
         function: HeapPtr<Closure>,
         function_id: RustRuntimeFunctionId,
-        receiver: Handle<Value>,
-        arguments: &[Handle<Value>],
-        new_target: Option<Handle<ObjectValue>>,
-    ) -> EvalResult<Handle<Value>> {
+        receiver: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+        new_target: Option<StackRoot<ObjectValue>>,
+    ) -> EvalResult<StackRoot<Value>> {
         // Push a minimal stack frame for the Rust runtime function. No arguments are pushed in.
         self.push_stack_frame(
             function,
@@ -2453,8 +2449,8 @@ impl VM {
         flags: EvalFlags,
     ) -> EvalResult<()> {
         let is_strict_caller = self.closure().function_ptr().is_strict();
-        let scope = self.scope().to_handle();
-        let arg = arg.to_handle(self.cx());
+        let scope = self.scope().to_stack();
+        let arg = arg.to_stack();
 
         // Allocates
         let result = perform_eval(self.cx(), arg, is_strict_caller, Some(scope), flags)?;
@@ -2471,7 +2467,7 @@ impl VM {
         handle_scope!(self.cx(), {
             let super_constructor = must!(self
                 .closure()
-                .to_handle()
+                .to_stack()
                 .as_object()
                 .get_prototype_of(self.cx()));
 
@@ -2485,7 +2481,7 @@ impl VM {
                 .stack_frame()
                 .args()
                 .iter()
-                .map(|arg| arg.to_handle(self.cx()))
+                .map(|arg| arg.to_stack())
                 .collect::<Vec<_>>();
 
             // New target is in the first local register
@@ -2581,7 +2577,7 @@ impl VM {
         let cx = self.cx();
         handle_scope!(cx, {
             let name = self.get_constant(name_constant_index);
-            let name = name.as_string().to_handle();
+            let name = name.as_string().to_stack();
 
             // May allocate, reuse name handle
             let name_key = PropertyKey::string(cx, name)?;
@@ -2621,7 +2617,7 @@ impl VM {
             let value = self.read_register_to_handle(instr.value());
 
             let name = self.get_constant(instr.constant_index());
-            let name = name.as_string().to_handle();
+            let name = name.as_string().to_stack();
 
             // May allocate, reuse name handle
             let name_key = PropertyKey::string(cx, name)?;
@@ -2693,9 +2689,9 @@ impl VM {
         let cx = self.cx();
         handle_scope!(cx, {
             let name = self.get_constant(name_constant_index);
-            let name = name.as_string().to_handle();
+            let name = name.as_string().to_stack();
 
-            let scope = self.scope().to_handle();
+            let scope = self.scope().to_stack();
             let is_strict = self.closure().function_ptr().is_strict();
 
             if let Some(value) = scope.lookup(cx, name, is_strict)? {
@@ -2721,12 +2717,12 @@ impl VM {
     ) -> EvalResult<()> {
         let cx = self.cx();
         handle_scope!(cx, {
-            let value = self.read_register(instr.value()).to_handle(cx);
+            let value = self.read_register(instr.value()).to_stack();
 
             let name = self.get_constant(instr.name_index());
-            let name = name.as_string().to_handle();
+            let name = name.as_string().to_stack();
 
-            let mut scope = self.scope().to_handle();
+            let mut scope = self.scope().to_stack();
             let is_strict = self.closure().function_ptr().is_strict();
 
             let found_name = scope.lookup_store(cx, name, value, is_strict)?;
@@ -3326,10 +3322,10 @@ impl VM {
         handle_scope_guard!(self.cx());
 
         let func = self.get_constant(instr.function_index());
-        let func = func.to_handle(self.cx()).cast::<BytecodeFunction>();
+        let func = func.to_stack().cast::<BytecodeFunction>();
 
         let dest = instr.dest();
-        let scope = self.scope().to_handle();
+        let scope = self.scope().to_stack();
 
         // Allocates
         let closure = Closure::new(self.cx(), func, scope)?;
@@ -3347,10 +3343,10 @@ impl VM {
         handle_scope_guard!(self.cx());
 
         let func = self.get_constant(instr.function_index());
-        let func = func.to_handle(self.cx()).cast::<BytecodeFunction>();
+        let func = func.to_stack().cast::<BytecodeFunction>();
 
         let dest = instr.dest();
-        let scope = self.scope().to_handle();
+        let scope = self.scope().to_stack();
 
         // Allocates
         let proto = self.cx().get_intrinsic(Intrinsic::AsyncFunctionPrototype);
@@ -3369,10 +3365,10 @@ impl VM {
         handle_scope_guard!(self.cx());
 
         let func = self.get_constant(instr.function_index());
-        let func = func.to_handle(self.cx()).cast::<BytecodeFunction>();
+        let func = func.to_stack().cast::<BytecodeFunction>();
 
         let dest = instr.dest();
-        let scope = self.scope().to_handle();
+        let scope = self.scope().to_stack();
 
         // Allocates
         let func_proto = self
@@ -3398,10 +3394,10 @@ impl VM {
         handle_scope_guard!(self.cx());
 
         let func = self.get_constant(instr.function_index());
-        let func = func.to_handle(self.cx()).cast::<BytecodeFunction>();
+        let func = func.to_stack().cast::<BytecodeFunction>();
 
         let dest = instr.dest();
-        let scope = self.scope().to_handle();
+        let scope = self.scope().to_stack();
 
         // Allocates
         let func_proto = self
@@ -3449,9 +3445,7 @@ impl VM {
         handle_scope_guard!(self.cx());
 
         let compiled_regexp = self.get_constant(instr.regexp_index());
-        let compiled_regexp = compiled_regexp
-            .to_handle(self.cx())
-            .cast::<CompiledRegExpObject>();
+        let compiled_regexp = compiled_regexp.to_stack().cast::<CompiledRegExpObject>();
 
         let dest = instr.dest();
 
@@ -3472,15 +3466,15 @@ impl VM {
 
         let dest = instr.dest();
 
-        let closure = self.closure().to_handle();
-        let scope = self.scope().to_handle();
+        let closure = self.closure().to_stack();
+        let scope = self.scope().to_stack();
         let num_parameters = closure.function_ptr().num_parameters() as usize;
 
         let arguments = self
             .stack_frame()
             .args()
             .iter()
-            .map(|arg| arg.to_handle(self.cx()))
+            .map(|arg| arg.to_stack())
             .collect::<Vec<_>>();
 
         // Allocates
@@ -3506,7 +3500,7 @@ impl VM {
             .stack_frame()
             .args()
             .iter()
-            .map(|arg| arg.to_handle(self.cx()))
+            .map(|arg| arg.to_stack())
             .collect::<Vec<_>>();
 
         // Allocates
@@ -3524,11 +3518,11 @@ impl VM {
 
             let class_names = self
                 .get_constant(instr.class_names_index())
-                .to_handle(self.cx())
+                .to_stack()
                 .cast::<ClassNames>();
             let constructor_function = self
                 .get_constant(instr.constructor_function_index())
-                .to_handle(self.cx())
+                .to_stack()
                 .cast::<BytecodeFunction>();
 
             let super_class = self.read_register_to_handle(instr.super_class());
@@ -3542,7 +3536,7 @@ impl VM {
                 .get_reg_rev_slice(instr.methods(), class_names.num_arguments())
                 .iter()
                 .rev()
-                .map(|value| value.to_handle(self.cx()))
+                .map(|value| value.to_stack())
                 .collect::<Vec<_>>();
 
             // Allocates
@@ -3587,10 +3581,7 @@ impl VM {
         handle_scope_guard!(self.cx());
 
         let dest = instr.dest();
-        let name = self
-            .get_constant(instr.name_index())
-            .as_string()
-            .to_handle();
+        let name = self.get_constant(instr.name_index()).as_string().to_stack();
 
         // Allocates
         let private_symbol = SymbolValue::new(self.cx(), Some(name), /* is_private */ true)?;
@@ -3721,7 +3712,7 @@ impl VM {
             let object = self.read_register_to_handle(instr.object());
 
             let key = self.get_constant(instr.name_constant_index());
-            let key = key.as_string().to_handle();
+            let key = key.as_string().to_stack();
 
             let dest = instr.dest();
             let is_strict = self.closure().function_ptr().is_strict();
@@ -3756,7 +3747,7 @@ impl VM {
             let object = self.read_register_to_handle(instr.object());
 
             let key = self.get_constant(instr.name_constant_index());
-            let key = key.as_string().to_handle();
+            let key = key.as_string().to_stack();
 
             let value = self.read_register_to_handle(instr.value());
 
@@ -3790,7 +3781,7 @@ impl VM {
             let object = self.read_register_to_handle(instr.object());
 
             let key = self.get_constant(instr.name_constant_index());
-            let key = key.as_string().to_handle();
+            let key = key.as_string().to_stack();
 
             let value = self.read_register_to_handle(instr.value());
 
@@ -3844,7 +3835,7 @@ impl VM {
             let receiver = self.read_register_to_handle(instr.receiver());
 
             let key = self.get_constant(instr.name_constant_index());
-            let key = key.as_string().to_handle();
+            let key = key.as_string().to_stack();
 
             let dest = instr.dest();
 
@@ -3926,10 +3917,10 @@ impl VM {
         instr: &DeleteBindingInstruction<W>,
     ) -> EvalResult<()> {
         handle_scope!(self.cx(), {
-            let mut scope = self.scope().to_handle();
+            let mut scope = self.scope().to_stack();
             let name = self
                 .get_constant(instr.name_constant_index())
-                .to_handle(self.cx())
+                .to_stack()
                 .as_string();
             let dest = instr.dest();
 
@@ -4064,7 +4055,7 @@ impl VM {
             let excluded_property_keys = self
                 .get_args_rev_slice(instr.argv(), instr.argc())
                 .iter()
-                .map(|v| v.to_handle(self.cx()).cast::<PropertyKey>())
+                .map(|v| v.to_stack().cast::<PropertyKey>())
                 .collect::<HashSet<_>>();
 
             // May allocate
@@ -4079,7 +4070,7 @@ impl VM {
         handle_scope!(self.cx(), {
             let dest = instr.dest();
             let object = self.read_register_to_handle(instr.object());
-            let key = self.get_constant(instr.name()).as_string().to_handle();
+            let key = self.get_constant(instr.name()).as_string().to_stack();
 
             let key = PropertyKey::string_handle(self.cx(), key)?;
 
@@ -4104,10 +4095,10 @@ impl VM {
     ) -> EvalResult<()> {
         handle_scope_guard!(self.cx());
 
-        let scope = self.scope().to_handle();
+        let scope = self.scope().to_stack();
         let scope_names = self
             .get_constant(instr.scope_names_index())
-            .to_handle(self.cx())
+            .to_stack()
             .cast::<ScopeNames>();
 
         // Allocates
@@ -4126,10 +4117,10 @@ impl VM {
     ) -> EvalResult<()> {
         handle_scope_guard!(self.cx());
 
-        let scope = self.scope().to_handle();
+        let scope = self.scope().to_stack();
         let scope_names = self
             .get_constant(instr.scope_names_index())
-            .to_handle(self.cx())
+            .to_stack()
             .cast::<ScopeNames>();
 
         // Allocates
@@ -4149,10 +4140,10 @@ impl VM {
         handle_scope!(self.cx(), {
             let object = self.read_register_to_handle(instr.object());
 
-            let scope = self.scope().to_handle();
+            let scope = self.scope().to_stack();
             let scope_names = self
                 .get_constant(instr.scope_names_index())
-                .to_handle(self.cx())
+                .to_stack()
                 .cast::<ScopeNames>();
 
             // Allocates
@@ -4178,7 +4169,7 @@ impl VM {
     fn execute_dup_scope<W: Width>(&mut self, _: &DupScopeInstruction<W>) -> EvalResult<()> {
         handle_scope_guard!(self.cx());
 
-        let scope = self.scope().to_handle();
+        let scope = self.scope().to_stack();
 
         // Allocates
         let dup_scope = scope.duplicate(self.cx())?;
@@ -4312,9 +4303,9 @@ impl VM {
         // Allocates
         let rest_array = must!(array_create(self.cx(), 0, None));
 
-        // Handles are shared between iterations
-        let mut array_key = PropertyKey::uninit().to_handle(self.cx());
-        let mut value_handle = Value::uninit().to_handle(self.cx());
+        // StackRoots are shared between iterations
+        let mut array_key = PropertyKey::uninit().to_stack();
+        let mut value_handle = Value::uninit().to_stack();
 
         // The arguments between the number of formal parameters and the actual argc supplied will
         // all be added to the rest array.
@@ -4376,7 +4367,7 @@ impl VM {
         }
 
         let name = self.get_constant(instr.name_constant_index()).as_string();
-        let name_str = name.to_handle().format()?;
+        let name_str = name.to_stack().format()?;
 
         reference_error(
             self.cx(),
@@ -4569,7 +4560,7 @@ impl VM {
     #[inline]
     fn iterator_unpack_result<W: Width>(
         &mut self,
-        iterator_result: Handle<Value>,
+        iterator_result: StackRoot<Value>,
         value_dest: Register<W>,
         is_done_dest: Register<W>,
     ) -> EvalResult<()> {
@@ -4719,7 +4710,7 @@ impl VM {
 
         // May allocate
         let value = if let Some(module) = module_scope.module_scope_module() {
-            let object = module.to_handle().get_import_meta_object(self.cx())?;
+            let object = module.to_stack().get_import_meta_object(self.cx())?;
             object.as_value()
         } else {
             Value::undefined()
@@ -4764,7 +4755,7 @@ impl VM {
         &mut self,
         stack_frame: StackFrame,
         instr_addr: *const u8,
-        error_value: Handle<Value>,
+        error_value: StackRoot<Value>,
     ) -> bool {
         let func = stack_frame.closure().function_ptr();
         if func.exception_handlers_ptr().is_none() {
@@ -4815,7 +4806,7 @@ impl VM {
 
     /// Visit all heap roots in the VM during GC root collection. Rewrites the stack in place,
     /// taking care to rewrite the current PC and return addresses.
-    pub fn visit_roots(&mut self, visitor: &mut impl HeapVisitor) {
+    pub fn visit_roots(&mut self, visitor: &mut impl GcVisitorExt) {
         if !self.is_executing() {
             return;
         }
@@ -4855,7 +4846,7 @@ impl VM {
     ///
     /// The pointer to rewrite may be either the current PC or the return adress
     fn rewrite_bytecode_function_and_address(
-        visitor: &mut impl HeapVisitor,
+        visitor: &mut impl GcVisitorExt,
         stack_frame: StackFrame,
         instruction_address: *const u8,
         set_instruction_address: impl FnOnce(*const u8),
@@ -4884,5 +4875,5 @@ enum ArgsSlice<'a> {
 enum CallableObject {
     Closure(HeapPtr<Closure>),
     Proxy(HeapPtr<ProxyObject>),
-    Error(Handle<Value>),
+    Error(StackRoot<Value>),
 }

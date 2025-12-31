@@ -1,7 +1,7 @@
 use crate::runtime::{
     alloc_error::AllocResult, error::type_error, eval_result::EvalResult, function::get_argument,
     intrinsics::weak_ref_constructor::can_be_held_weakly, object_value::ObjectValue,
-    property::Property, realm::Realm, value::ValueCollectionKey, Context, Handle, Value,
+    property::Property, realm::Realm, value::ValueCollectionKey, Context, StackRoot, Value,
 };
 
 use super::{intrinsics::Intrinsic, weak_set_object::WeakSetObject};
@@ -10,7 +10,7 @@ pub struct WeakSetPrototype;
 
 impl WeakSetPrototype {
     /// Properties of the WeakSet Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-weakset-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -36,9 +36,9 @@ impl WeakSetPrototype {
     /// WeakSet.prototype.add (https://tc39.es/ecma262/#sec-weakset.prototype.add)
     pub fn add(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let weak_set_object = if let Some(weak_set_object) = this_weak_set_value(this_value) {
             weak_set_object
         } else {
@@ -58,9 +58,9 @@ impl WeakSetPrototype {
     /// WeakSet.prototype.delete (https://tc39.es/ecma262/#sec-weakset.prototype.delete)
     pub fn delete(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let weak_set_object = if let Some(weak_set_object) = this_weak_set_value(this_value) {
             weak_set_object
         } else {
@@ -81,9 +81,9 @@ impl WeakSetPrototype {
     /// WeakSet.prototype.has (https://tc39.es/ecma262/#sec-weakset.prototype.has)
     pub fn has(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let weak_set_object = if let Some(weak_set_object) = this_weak_set_value(this_value) {
             weak_set_object
         } else {
@@ -102,7 +102,7 @@ impl WeakSetPrototype {
     }
 }
 
-fn this_weak_set_value(value: Handle<Value>) -> Option<Handle<WeakSetObject>> {
+fn this_weak_set_value(value: StackRoot<Value>) -> Option<StackRoot<WeakSetObject>> {
     if !value.is_object() {
         return None;
     }

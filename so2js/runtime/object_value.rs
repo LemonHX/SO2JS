@@ -15,9 +15,10 @@ use super::{
     builtin_function::BuiltinFunction,
     bytecode::function::Closure,
     collections::{BsIndexMap, BsIndexMapField},
+    context::ContextCell,
     error::type_error,
     eval_result::EvalResult,
-    gc::{Handle, HeapInfo, HeapItem, HeapPtr, HeapVisitor},
+    gc::{GcVisitorExt, StackRoot, HeapItem, HeapPtr},
     generator_object::GeneratorObject,
     heap_item_descriptor::HeapItemKind,
     intrinsics::{
@@ -106,16 +107,16 @@ macro_rules! extend_object_without_conversions {
             }
         }
 
-        impl $(<$($generics),*>)? $crate::runtime::Handle<$name $(<$($generics),*>)?> {
+        impl $(<$($generics),*>)? $crate::runtime::StackRoot<$name $(<$($generics),*>)?> {
             #[allow(dead_code)]
             #[inline]
-            pub fn as_object(&self) -> $crate::runtime::Handle<$crate::runtime::object_value::ObjectValue> {
+            pub fn as_object(&self) -> $crate::runtime::StackRoot<$crate::runtime::object_value::ObjectValue> {
                 self.cast()
             }
 
             #[allow(dead_code)]
             #[inline]
-            pub fn as_value(&self) -> $crate::runtime::Handle<$crate::runtime::Value> {
+            pub fn as_value(&self) -> $crate::runtime::StackRoot<$crate::runtime::Value> {
                 self.cast()
             }
 
@@ -123,7 +124,7 @@ macro_rules! extend_object_without_conversions {
             /// used when we know we want the default ordinary methods to be called.
             #[allow(dead_code)]
             #[inline]
-            pub fn ordinary_object(&self) -> $crate::runtime::Handle<$crate::runtime::ordinary_object::OrdinaryObject> {
+            pub fn ordinary_object(&self) -> $crate::runtime::StackRoot<$crate::runtime::ordinary_object::OrdinaryObject> {
                 self.cast()
             }
         }
@@ -149,15 +150,15 @@ macro_rules! extend_object {
             }
         }
 
-        impl $(<$($generics),*>)? From<$crate::runtime::Handle<$name $(<$($generics),*>)?>> for $crate::runtime::Handle<$crate::runtime::object_value::ObjectValue> {
-            fn from(value: $crate::runtime::Handle<$name $(<$($generics),*>)?>) -> Self {
+        impl $(<$($generics),*>)? From<$crate::runtime::StackRoot<$name $(<$($generics),*>)?>> for $crate::runtime::StackRoot<$crate::runtime::object_value::ObjectValue> {
+            fn from(value: $crate::runtime::StackRoot<$name $(<$($generics),*>)?>) -> Self {
                 value.cast::<$crate::runtime::object_value::ObjectValue>()
             }
         }
 
         impl $(<$($generics),*>)? $crate::runtime::HeapPtr<$name $(<$($generics),*>)?> {
             #[inline]
-            pub fn visit_object_pointers(&self, visitor: &mut impl $crate::runtime::gc::HeapVisitor) {
+            pub fn visit_object_pointers(&self, visitor: &mut impl $crate::runtime::gc::GcVisitorExt) {
                 use $crate::runtime::gc::HeapItem;
                 self.as_object().visit_pointers(visitor);
             }
@@ -173,9 +174,9 @@ extend_object_without_conversions! {
 impl ObjectValue {
     pub fn new(
         cx: Context,
-        prototype: Option<Handle<ObjectValue>>,
+        prototype: Option<StackRoot<ObjectValue>>,
         is_extensible: bool,
-    ) -> AllocResult<Handle<ObjectValue>> {
+    ) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = cx.alloc_uninit::<ObjectValue>()?;
 
         set_uninit!(
@@ -188,7 +189,7 @@ impl ObjectValue {
         set_uninit!(object.is_extensible_field, is_extensible);
         object.set_uninit_hash_code();
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     // Array properties methods
@@ -200,7 +201,7 @@ impl ObjectValue {
     pub fn private_element_find(
         &self,
         cx: Context,
-        private_name: Handle<SymbolValue>,
+        private_name: StackRoot<SymbolValue>,
     ) -> Option<Property> {
         let property_key = PropertyKey::symbol(private_name);
         // Safe since get_mut does not allocate on managed heap, and property reference is
@@ -210,14 +211,14 @@ impl ObjectValue {
             .map(|property| Property::from_heap(cx, property))
     }
 
-    pub fn has_private_element(&self, private_name: Handle<SymbolValue>) -> bool {
+    pub fn has_private_element(&self, private_name: StackRoot<SymbolValue>) -> bool {
         let property_key = PropertyKey::symbol(private_name);
         // Safe since contains_key does not allocate on managed heap
         self.named_properties.contains_key(&property_key)
     }
 
     // Property accessors and mutators
-    pub fn get_property(&self, cx: Context, key: Handle<PropertyKey>) -> Option<Property> {
+    pub fn get_property(&self, cx: Context, key: StackRoot<PropertyKey>) -> Option<Property> {
         if key.is_array_index() {
             let array_index = key.as_array_index();
             return self.array_properties.get_property(cx, array_index);
@@ -294,7 +295,9 @@ impl ObjectValue {
     /// instead explicitly pass in the Context.
     #[inline]
     fn cx(&self) -> Context {
-        HeapInfo::from_raw_heap_ptr(self as *const _).cx()
+        let gc_header = unsafe { so2js_gc::GcHeader::from_object_ptr(self as *const _) };
+        let context_ptr = gc_header.context_ptr() as *mut ContextCell;
+        unsafe { Context::from_context_cell_ptr(context_ptr) }
     }
 }
 
@@ -334,12 +337,12 @@ impl HeapPtr<ObjectValue> {
     }
 }
 
-impl Handle<ObjectValue> {
+impl StackRoot<ObjectValue> {
     /// Cast as a virtual object, allowing virtual methods to be called. Manually constructs a
     /// trait object using the vtable stored in the object descriptor.
     #[inline]
     fn as_trait_object(&self) -> ObjectTraitObject {
-        let data = self as *const Handle<ObjectValue>;
+        let data = self as *const StackRoot<ObjectValue>;
         let vtable = self.descriptor().vtable();
 
         ObjectTraitObject { data, vtable }
@@ -365,7 +368,7 @@ impl Handle<ObjectValue> {
     pub fn set_property(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
         property: Property,
     ) -> AllocResult<()> {
         if key.is_array_index() {
@@ -383,7 +386,7 @@ impl Handle<ObjectValue> {
         Ok(())
     }
 
-    pub fn remove_property(&mut self, key: Handle<PropertyKey>) {
+    pub fn remove_property(&mut self, key: StackRoot<PropertyKey>) {
         if key.is_array_index() {
             let array_index = key.as_array_index();
             self.array_properties.remove_property(array_index);
@@ -398,8 +401,8 @@ impl Handle<ObjectValue> {
     pub fn private_element_set(
         &mut self,
         cx: Context,
-        private_name: Handle<SymbolValue>,
-        value: Handle<Value>,
+        private_name: StackRoot<SymbolValue>,
+        value: StackRoot<Value>,
     ) -> AllocResult<()> {
         let property_key = PropertyKey::symbol(private_name);
         let property = Property::private_field(value);
@@ -416,7 +419,7 @@ impl Handle<ObjectValue> {
     pub fn private_property_add(
         &mut self,
         cx: Context,
-        private_name: Handle<SymbolValue>,
+        private_name: StackRoot<SymbolValue>,
         private_property: Property,
     ) -> EvalResult<()> {
         if self.has_private_element(private_name) {
@@ -444,8 +447,8 @@ impl Handle<ObjectValue> {
     pub fn intrinsic_data_prop(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
-        value: Handle<Value>,
+        key: StackRoot<PropertyKey>,
+        value: StackRoot<Value>,
     ) -> AllocResult<()> {
         handle_scope_guard!(cx);
 
@@ -477,9 +480,9 @@ impl Handle<ObjectValue> {
     pub fn intrinsic_getter(
         &mut self,
         cx: Context,
-        name: Handle<PropertyKey>,
+        name: StackRoot<PropertyKey>,
         func: RustRuntimeFunction,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
     ) -> AllocResult<()> {
         handle_scope_guard!(cx);
 
@@ -495,10 +498,10 @@ impl Handle<ObjectValue> {
     pub fn intrinsic_getter_and_setter(
         &mut self,
         cx: Context,
-        name: Handle<PropertyKey>,
+        name: StackRoot<PropertyKey>,
         getter: RustRuntimeFunction,
         setter: RustRuntimeFunction,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
     ) -> AllocResult<()> {
         handle_scope_guard!(cx);
 
@@ -515,10 +518,10 @@ impl Handle<ObjectValue> {
     pub fn intrinsic_func(
         &mut self,
         cx: Context,
-        name: Handle<PropertyKey>,
+        name: StackRoot<PropertyKey>,
         func: RustRuntimeFunction,
         length: u32,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
     ) -> AllocResult<()> {
         handle_scope_guard!(cx);
 
@@ -529,8 +532,8 @@ impl Handle<ObjectValue> {
     pub fn intrinsic_frozen_property(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
-        value: Handle<Value>,
+        key: StackRoot<PropertyKey>,
+        value: StackRoot<Value>,
     ) -> AllocResult<()> {
         handle_scope_guard!(cx);
 
@@ -539,10 +542,10 @@ impl Handle<ObjectValue> {
 }
 
 // Non-virtual object internal methods from spec
-impl Handle<ObjectValue> {
+impl StackRoot<ObjectValue> {
     /// The [[GetPrototypeOf]] internal method for all objects. Dispatches to type-specific
     /// implementations as necessary.
-    pub fn get_prototype_of(&self, cx: Context) -> EvalResult<Option<Handle<ObjectValue>>> {
+    pub fn get_prototype_of(&self, cx: Context) -> EvalResult<Option<StackRoot<ObjectValue>>> {
         if let Some(proxy_object) = self.as_proxy() {
             proxy_object.get_prototype_of(cx)
         } else {
@@ -555,7 +558,7 @@ impl Handle<ObjectValue> {
     pub fn set_prototype_of(
         &mut self,
         cx: Context,
-        new_prototype: Option<Handle<ObjectValue>>,
+        new_prototype: Option<StackRoot<ObjectValue>>,
     ) -> EvalResult<bool> {
         if let Some(mut proxy_object) = self.as_proxy() {
             proxy_object.set_prototype_of(cx, new_prototype)
@@ -601,12 +604,12 @@ fn is_typed_array_fixed_length(typed_array: DynTypedArray) -> bool {
 }
 
 // Wrap all virtual methods for easy access
-impl Handle<ObjectValue> {
+impl StackRoot<ObjectValue> {
     #[inline]
     pub fn get_own_property(
         &self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
     ) -> EvalResult<Option<PropertyDescriptor>> {
         self.virtual_object().get_own_property(cx, key)
     }
@@ -615,14 +618,14 @@ impl Handle<ObjectValue> {
     pub fn define_own_property(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
         desc: PropertyDescriptor,
     ) -> EvalResult<bool> {
         self.virtual_object_mut().define_own_property(cx, key, desc)
     }
 
     #[inline]
-    pub fn has_property(&self, cx: Context, key: Handle<PropertyKey>) -> EvalResult<bool> {
+    pub fn has_property(&self, cx: Context, key: StackRoot<PropertyKey>) -> EvalResult<bool> {
         self.virtual_object().has_property(cx, key)
     }
 
@@ -630,9 +633,9 @@ impl Handle<ObjectValue> {
     pub fn get(
         &self,
         cx: Context,
-        key: Handle<PropertyKey>,
-        receiver: Handle<Value>,
-    ) -> EvalResult<Handle<Value>> {
+        key: StackRoot<PropertyKey>,
+        receiver: StackRoot<Value>,
+    ) -> EvalResult<StackRoot<Value>> {
         self.virtual_object().get(cx, key, receiver)
     }
 
@@ -640,20 +643,20 @@ impl Handle<ObjectValue> {
     pub fn set(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
-        value: Handle<Value>,
-        receiver: Handle<Value>,
+        key: StackRoot<PropertyKey>,
+        value: StackRoot<Value>,
+        receiver: StackRoot<Value>,
     ) -> EvalResult<bool> {
         self.virtual_object_mut().set(cx, key, value, receiver)
     }
 
     #[inline]
-    pub fn delete(&mut self, cx: Context, key: Handle<PropertyKey>) -> EvalResult<bool> {
+    pub fn delete(&mut self, cx: Context, key: StackRoot<PropertyKey>) -> EvalResult<bool> {
         self.virtual_object_mut().delete(cx, key)
     }
 
     #[inline]
-    pub fn own_property_keys(&self, cx: Context) -> EvalResult<Vec<Handle<Value>>> {
+    pub fn own_property_keys(&self, cx: Context) -> EvalResult<Vec<StackRoot<Value>>> {
         self.virtual_object().own_property_keys(cx)
     }
 
@@ -681,52 +684,52 @@ pub trait VirtualObject {
     fn get_own_property(
         &self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
     ) -> EvalResult<Option<PropertyDescriptor>>;
 
     fn define_own_property(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
         desc: PropertyDescriptor,
     ) -> EvalResult<bool>;
 
-    fn has_property(&self, cx: Context, key: Handle<PropertyKey>) -> EvalResult<bool>;
+    fn has_property(&self, cx: Context, key: StackRoot<PropertyKey>) -> EvalResult<bool>;
 
     fn get(
         &self,
         cx: Context,
-        key: Handle<PropertyKey>,
-        receiver: Handle<Value>,
-    ) -> EvalResult<Handle<Value>>;
+        key: StackRoot<PropertyKey>,
+        receiver: StackRoot<Value>,
+    ) -> EvalResult<StackRoot<Value>>;
 
     fn set(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
-        value: Handle<Value>,
-        receiver: Handle<Value>,
+        key: StackRoot<PropertyKey>,
+        value: StackRoot<Value>,
+        receiver: StackRoot<Value>,
     ) -> EvalResult<bool>;
 
-    fn delete(&mut self, cx: Context, key: Handle<PropertyKey>) -> EvalResult<bool>;
+    fn delete(&mut self, cx: Context, key: StackRoot<PropertyKey>) -> EvalResult<bool>;
 
-    fn own_property_keys(&self, cx: Context) -> EvalResult<Vec<Handle<Value>>>;
+    fn own_property_keys(&self, cx: Context) -> EvalResult<Vec<StackRoot<Value>>>;
 
     fn call(
         &self,
         _: Context,
-        _this_argument: Handle<Value>,
-        _arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _this_argument: StackRoot<Value>,
+        _arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         panic!("[[Call]] not implemented for this object")
     }
 
     fn construct(
         &self,
         _: Context,
-        _arguments: &[Handle<Value>],
-        _new_target: Handle<ObjectValue>,
-    ) -> EvalResult<Handle<ObjectValue>> {
+        _arguments: &[StackRoot<Value>],
+        _new_target: StackRoot<ObjectValue>,
+    ) -> EvalResult<StackRoot<ObjectValue>> {
         panic!("[[Construct]] not implemented for this object")
     }
 
@@ -741,7 +744,7 @@ pub trait VirtualObject {
 
 pub type NamedPropertiesMap = BsIndexMap<PropertyKey, HeapProperty>;
 
-pub struct NamedPropertiesMapField(Handle<ObjectValue>);
+pub struct NamedPropertiesMapField(StackRoot<ObjectValue>);
 
 impl BsIndexMapField<PropertyKey, HeapProperty> for NamedPropertiesMapField {
     fn new_map(&self, cx: Context, capacity: usize) -> AllocResult<HeapPtr<NamedPropertiesMap>> {
@@ -761,7 +764,7 @@ impl BsIndexMapField<PropertyKey, HeapProperty> for NamedPropertiesMapField {
 // to properly type our custom trait object creation.
 #[repr(C)]
 struct ObjectTraitObject {
-    data: *const Handle<ObjectValue>,
+    data: *const StackRoot<ObjectValue>,
     vtable: *const (),
 }
 
@@ -770,7 +773,7 @@ impl HeapItem for HeapPtr<ObjectValue> {
         size_of::<ObjectValue>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
         visitor.visit_pointer_opt(&mut self.prototype);
         visitor.visit_pointer(&mut self.named_properties);
@@ -783,7 +786,7 @@ impl NamedPropertiesMapField {
         NamedPropertiesMap::calculate_size_in_bytes(map.capacity())
     }
 
-    pub fn visit_pointers(map: &mut HeapPtr<NamedPropertiesMap>, visitor: &mut impl HeapVisitor) {
+    pub fn visit_pointers(map: &mut HeapPtr<NamedPropertiesMap>, visitor: &mut impl GcVisitorExt) {
         map.visit_pointers_impl(visitor, |map, visitor| {
             for (property_key, property) in map.iter_mut_gc_unsafe() {
                 visitor.visit_property_key(property_key);
@@ -817,9 +820,9 @@ macro_rules! impl_subtype_casts {
             }
         }
 
-        impl Handle<ObjectValue> {
+        impl StackRoot<ObjectValue> {
             #[inline]
-            pub fn $as_func(&self) -> Option<Handle<$subtype>> {
+            pub fn $as_func(&self) -> Option<StackRoot<$subtype>> {
                 if self.$is_func() {
                     Some(self.cast())
                 } else {

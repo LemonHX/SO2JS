@@ -14,13 +14,13 @@ use super::{
     object_value::ObjectValue,
     ordinary_object::ordinary_object_create,
     type_utilities::to_boolean,
-    Context, EvalResult, Handle, Value,
+    Context, EvalResult, StackRoot, Value,
 };
 
 /// Iterator Records (https://tc39.es/ecma262/#sec-iterator-records)
 pub struct Iterator {
-    pub iterator: Handle<ObjectValue>,
-    pub next_method: Handle<Value>,
+    pub iterator: StackRoot<ObjectValue>,
+    pub next_method: StackRoot<Value>,
     pub is_done: bool,
 }
 
@@ -33,9 +33,9 @@ pub enum IteratorHint {
 /// GetIterator (https://tc39.es/ecma262/#sec-getiterator)
 pub fn get_iterator(
     cx: Context,
-    object: Handle<Value>,
+    object: StackRoot<Value>,
     hint: IteratorHint,
-    method: Option<Handle<ObjectValue>>,
+    method: Option<StackRoot<ObjectValue>>,
 ) -> EvalResult<Iterator> {
     let method = if let Some(method) = method {
         method
@@ -86,7 +86,7 @@ pub fn get_iterator(
 }
 
 /// GetIteratorDirect (https://tc39.es/ecma262/#sec-getiteratordirect)
-pub fn get_iterator_direct(cx: Context, object: Handle<ObjectValue>) -> EvalResult<Iterator> {
+pub fn get_iterator_direct(cx: Context, object: StackRoot<ObjectValue>) -> EvalResult<Iterator> {
     let next_method = get(cx, object, cx.names.next())?;
     Ok(Iterator {
         iterator: object,
@@ -98,7 +98,7 @@ pub fn get_iterator_direct(cx: Context, object: Handle<ObjectValue>) -> EvalResu
 /// GetIteratorFlattenable (https://tc39.es/ecma262/#sec-getiteratorflattenable)
 pub fn get_iterator_flattenable(
     cx: Context,
-    value: Handle<Value>,
+    value: StackRoot<Value>,
     reject_primitives: bool,
 ) -> EvalResult<Iterator> {
     if !value.is_object() {
@@ -122,10 +122,10 @@ pub fn get_iterator_flattenable(
 /// IteratorNext (https://tc39.es/ecma262/#sec-iteratornext)
 pub fn iterator_next(
     cx: Context,
-    iterator: Handle<ObjectValue>,
-    next_method: Handle<Value>,
-    value: Option<Handle<Value>>,
-) -> EvalResult<Handle<ObjectValue>> {
+    iterator: StackRoot<ObjectValue>,
+    next_method: StackRoot<Value>,
+    value: Option<StackRoot<Value>>,
+) -> EvalResult<StackRoot<ObjectValue>> {
     let result = if let Some(value) = value {
         call(cx, next_method, iterator.as_value(), &[value])?
     } else {
@@ -140,18 +140,18 @@ pub fn iterator_next(
 }
 
 /// IteratorComplete (https://tc39.es/ecma262/#sec-iteratorcomplete)
-pub fn iterator_complete(cx: Context, iter_result: Handle<ObjectValue>) -> EvalResult<bool> {
+pub fn iterator_complete(cx: Context, iter_result: StackRoot<ObjectValue>) -> EvalResult<bool> {
     let is_done = get(cx, iter_result, cx.names.done())?;
     Ok(to_boolean(*is_done))
 }
 
 /// IteratorValue (https://tc39.es/ecma262/#sec-iteratorvalue)
-pub fn iterator_value(cx: Context, iter_result: Handle<ObjectValue>) -> EvalResult<Handle<Value>> {
+pub fn iterator_value(cx: Context, iter_result: StackRoot<ObjectValue>) -> EvalResult<StackRoot<Value>> {
     get(cx, iter_result, cx.names.value())
 }
 
 /// IteratorStep (https://tc39.es/ecma262/#sec-iteratorstep)
-pub fn iterator_step(cx: Context, iterator: &Iterator) -> EvalResult<Option<Handle<ObjectValue>>> {
+pub fn iterator_step(cx: Context, iterator: &Iterator) -> EvalResult<Option<StackRoot<ObjectValue>>> {
     let iter_result = iterator_next(cx, iterator.iterator, iterator.next_method, None)?;
     let is_done = iterator_complete(cx, iter_result)?;
 
@@ -165,9 +165,9 @@ pub fn iterator_step(cx: Context, iterator: &Iterator) -> EvalResult<Option<Hand
 /// IteratorClose (https://tc39.es/ecma262/#sec-iteratorclose)
 pub fn iterator_close(
     cx: Context,
-    iterator: Handle<ObjectValue>,
-    completion: EvalResult<Handle<Value>>,
-) -> EvalResult<Handle<Value>> {
+    iterator: StackRoot<ObjectValue>,
+    completion: EvalResult<StackRoot<Value>>,
+) -> EvalResult<StackRoot<Value>> {
     let inner_result = get_method(cx, iterator.into(), cx.names.return_());
     let inner_result = match inner_result {
         Ok(None) => return completion,
@@ -195,7 +195,7 @@ pub fn iterator_close(
 pub fn iterator_step_value(
     cx: Context,
     iterator: &mut Iterator,
-) -> EvalResult<Option<Handle<Value>>> {
+) -> EvalResult<Option<StackRoot<Value>>> {
     let iter_result_completion = iterator_next(cx, iterator.iterator, iterator.next_method, None);
     let iter_result = match iter_result_completion {
         Ok(iter_result) => iter_result,
@@ -232,9 +232,9 @@ pub fn iterator_step_value(
 /// CreateIteratorResultObject (https://tc39.es/ecma262/#sec-createiterresultobject)
 pub fn create_iter_result_object(
     cx: Context,
-    value: Handle<Value>,
+    value: StackRoot<Value>,
     is_done: bool,
-) -> AllocResult<Handle<Value>> {
+) -> AllocResult<StackRoot<Value>> {
     let object = ordinary_object_create(cx)?;
 
     must_a!(create_data_property_or_throw(
@@ -258,12 +258,12 @@ pub fn create_iter_result_object(
 // Iterate over an object, executing a callback function against every value returned by the
 // iterator. Return a completion from the callback function to stop and close the iterator.
 pub fn iter_iterator_values<
-    F: FnMut(Context, Handle<Value>) -> Option<EvalResult<Handle<Value>>>,
+    F: FnMut(Context, StackRoot<Value>) -> Option<EvalResult<StackRoot<Value>>>,
 >(
     cx: Context,
-    object: Handle<Value>,
+    object: StackRoot<Value>,
     f: &mut F,
-) -> EvalResult<Handle<Value>> {
+) -> EvalResult<StackRoot<Value>> {
     let iterator = get_iterator(cx, object, IteratorHint::Sync, None)?;
 
     loop {
@@ -284,13 +284,13 @@ pub fn iter_iterator_values<
 }
 
 pub fn iter_iterator_method_values<
-    F: FnMut(Context, Handle<Value>) -> Option<EvalResult<Handle<Value>>>,
+    F: FnMut(Context, StackRoot<Value>) -> Option<EvalResult<StackRoot<Value>>>,
 >(
     cx: Context,
-    object: Handle<Value>,
-    method: Handle<ObjectValue>,
+    object: StackRoot<Value>,
+    method: StackRoot<ObjectValue>,
     f: &mut F,
-) -> EvalResult<Handle<Value>> {
+) -> EvalResult<StackRoot<Value>> {
     let iterator = get_iterator(cx, object, IteratorHint::Sync, Some(method))?;
 
     loop {

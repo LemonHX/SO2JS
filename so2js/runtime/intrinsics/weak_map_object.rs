@@ -6,12 +6,12 @@ use crate::{
         alloc_error::AllocResult,
         collections::{BsHashMap, BsHashMapField},
         eval_result::EvalResult,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         object_value::ObjectValue,
         ordinary_object::object_create_from_constructor,
-        value::{ValueCollectionKey, ValueCollectionKeyHandle},
-        Context, Handle, HeapPtr, Value,
+        value::{ValueCollectionKey, ValueCollectionKeyStackRoot},
+        Context, StackRoot, HeapPtr, Value,
     },
     set_uninit,
 };
@@ -34,10 +34,10 @@ type WeakValueMap = BsHashMap<ValueCollectionKey, Value>;
 impl WeakMapObject {
     pub fn new_from_constructor(
         cx: Context,
-        constructor: Handle<ObjectValue>,
-    ) -> EvalResult<Handle<WeakMapObject>> {
+        constructor: StackRoot<ObjectValue>,
+    ) -> EvalResult<StackRoot<WeakMapObject>> {
         let weak_map_data =
-            WeakValueMap::new_initial(cx, HeapItemKind::WeakMapObjectWeakValueMap)?.to_handle();
+            WeakValueMap::new_initial(cx, HeapItemKind::WeakMapObjectWeakValueMap)?.to_stack();
 
         let mut object = object_create_from_constructor::<WeakMapObject>(
             cx,
@@ -48,7 +48,7 @@ impl WeakMapObject {
 
         set_uninit!(object.weak_map_data, *weak_map_data);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     pub fn weak_map_data(&self) -> HeapPtr<WeakValueMap> {
@@ -64,7 +64,7 @@ impl WeakMapObject {
     }
 }
 
-impl Handle<WeakMapObject> {
+impl StackRoot<WeakMapObject> {
     pub fn weak_map_data_field(&self) -> WeakMapObjectMapField {
         WeakMapObjectMapField(*self)
     }
@@ -72,10 +72,10 @@ impl Handle<WeakMapObject> {
     pub fn insert(
         &self,
         cx: Context,
-        key: Handle<Value>,
-        value: Handle<Value>,
+        key: StackRoot<Value>,
+        value: StackRoot<Value>,
     ) -> AllocResult<bool> {
-        let key_handle = ValueCollectionKeyHandle::new(key)?;
+        let key_handle = ValueCollectionKeyStackRoot::new(key)?;
 
         Ok(self
             .weak_map_data_field()
@@ -85,7 +85,7 @@ impl Handle<WeakMapObject> {
 }
 
 #[derive(Clone)]
-pub struct WeakMapObjectMapField(Handle<WeakMapObject>);
+pub struct WeakMapObjectMapField(StackRoot<WeakMapObject>);
 
 impl BsHashMapField<ValueCollectionKey, Value> for WeakMapObjectMapField {
     fn new_map(&self, cx: Context, capacity: usize) -> AllocResult<HeapPtr<WeakValueMap>> {
@@ -106,7 +106,7 @@ impl HeapItem for HeapPtr<WeakMapObject> {
         size_of::<WeakMapObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.weak_map_data);
 
@@ -119,7 +119,7 @@ impl WeakMapObjectMapField {
         WeakValueMap::calculate_size_in_bytes(map.capacity())
     }
 
-    pub fn visit_pointers(map: &mut HeapPtr<WeakValueMap>, visitor: &mut impl HeapVisitor) {
+    pub fn visit_pointers(map: &mut HeapPtr<WeakValueMap>, visitor: &mut impl GcVisitorExt) {
         map.visit_pointers(visitor);
 
         for (key, value) in map.iter_mut_gc_unsafe() {

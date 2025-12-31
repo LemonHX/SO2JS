@@ -20,7 +20,7 @@ use crate::{
         realm::Realm,
         string_value::{FlatString, StringValue},
         type_utilities::{is_callable, is_callable_object, to_integer_or_infinity},
-        Context, Handle, HeapPtr, Value,
+        Context, StackRoot, HeapPtr, Value,
     },
 };
 use alloc::string::ToString;
@@ -31,21 +31,21 @@ pub struct FunctionPrototype {}
 
 impl FunctionPrototype {
     /// Start out uninitialized and then initialize later to break dependency cycles.
-    pub fn new_uninit(cx: Context) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new_uninit(cx: Context) -> AllocResult<StackRoot<ObjectValue>> {
         // Initialized with correct values in initialize method, but set to default value
         // at first to be GC safe until initialize method is called.
         let mut object =
             object_create_with_optional_proto::<Closure>(cx, HeapItemKind::Closure, None)?;
         object.init_extra_fields(HeapPtr::uninit(), HeapPtr::uninit());
 
-        Ok(object.to_handle().into())
+        Ok(object.to_stack().into())
     }
 
     /// Properties of the Function Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object)
     pub fn initialize(
         cx: Context,
-        function_prototype: Handle<ObjectValue>,
-        realm: Handle<Realm>,
+        function_prototype: StackRoot<ObjectValue>,
+        realm: StackRoot<Realm>,
     ) -> AllocResult<()> {
         let object_proto_ptr = realm.get_intrinsic_ptr(Intrinsic::ObjectPrototype);
 
@@ -100,9 +100,9 @@ impl FunctionPrototype {
     /// Function.prototype.apply (https://tc39.es/ecma262/#sec-function.prototype.apply)
     pub fn apply(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !is_callable(this_value) {
             return type_error(cx, "value is not a function");
         }
@@ -121,9 +121,9 @@ impl FunctionPrototype {
     /// Function.prototype.bind (https://tc39.es/ecma262/#sec-function.prototype.bind)
     pub fn bind(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !is_callable(this_value) {
             return type_error(cx, "value is not a function");
         }
@@ -177,9 +177,9 @@ impl FunctionPrototype {
     /// Function.prototype.call (https://tc39.es/ecma262/#sec-function.prototype.call)
     pub fn call_intrinsic(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !is_callable(this_value) {
             return type_error(cx, "value is not a function");
         }
@@ -195,9 +195,9 @@ impl FunctionPrototype {
     /// Function.prototype.toString (https://tc39.es/ecma262/#sec-function.prototype.tostring)
     pub fn to_string(
         mut cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Function.prototype.toString expected a function");
         }
@@ -233,7 +233,7 @@ impl FunctionPrototype {
 
             let func_string = FlatString::from_wtf8(cx, &source_slice)?
                 .as_string()
-                .to_handle();
+                .to_stack();
 
             return Ok(func_string.as_value());
         }
@@ -248,9 +248,9 @@ impl FunctionPrototype {
     /// Function.prototype [ @@hasInstance ] (https://tc39.es/ecma262/#sec-function.prototype-%symbol.hasinstance%)
     pub fn has_instance(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let argument = get_argument(cx, arguments, 0);
         let has_instance = ordinary_has_instance(cx, this_value, argument)?;
         Ok(cx.bool(has_instance))

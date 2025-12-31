@@ -8,14 +8,14 @@ use crate::{
         boxed_value::BoxedValue,
         error::syntax_error,
         module::{module::ModuleEnum, source_text_module::ModuleState},
-        Context, EvalResult, Handle,
+        Context, EvalResult, StackRoot,
     },
 };
 use alloc::vec;
 use alloc::vec::Vec;
 
 struct GraphLinker {
-    stack: Vec<Handle<SourceTextModule>>,
+    stack: Vec<StackRoot<SourceTextModule>>,
 }
 
 impl GraphLinker {
@@ -24,7 +24,7 @@ impl GraphLinker {
     }
 
     /// Link (https://tc39.es/ecma262/#sec-moduledeclarationlinking)
-    fn link(&mut self, cx: Context, module: Handle<SourceTextModule>) -> EvalResult<()> {
+    fn link(&mut self, cx: Context, module: StackRoot<SourceTextModule>) -> EvalResult<()> {
         // Assert state precondition
         debug_assert!(matches!(
             module.state(),
@@ -138,7 +138,7 @@ impl GraphLinker {
 }
 
 /// InitializeEnvironment (https://tc39.es/ecma262/#sec-source-text-module-record-initialize-environment)
-fn initialize_environment(cx: Context, module: Handle<SourceTextModule>) -> EvalResult<()> {
+fn initialize_environment(cx: Context, module: StackRoot<SourceTextModule>) -> EvalResult<()> {
     // Check that all re-exported names are resolvable
     for entry in module.entries_as_slice() {
         if let ModuleEntry::NamedReExport(entry) = entry {
@@ -177,7 +177,7 @@ fn initialize_environment(cx: Context, module: Handle<SourceTextModule>) -> Eval
                     } => {
                         // May allocate
                         let namespace_object =
-                            resolved_module.get_namespace_object(cx)?.to_handle();
+                            resolved_module.get_namespace_object(cx)?.to_stack();
 
                         // The BoxedValue for namespace re-exports has not yet been created (unlike
                         // all other exports, which are actual bindings whose BoxedValue is created
@@ -210,7 +210,7 @@ fn initialize_environment(cx: Context, module: Handle<SourceTextModule>) -> Eval
     Ok(())
 }
 
-pub fn link(cx: Context, module: Handle<SourceTextModule>) -> EvalResult<()> {
+pub fn link(cx: Context, module: StackRoot<SourceTextModule>) -> EvalResult<()> {
     handle_scope!(cx, {
         let mut linker = GraphLinker::new();
         linker.link(cx, module)

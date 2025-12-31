@@ -10,7 +10,7 @@ use crate::{
 
 use super::{
     async_generator_object::async_generator_resume,
-    gc::HeapVisitor,
+    gc::GcVisitorExt,
     generator_object::GeneratorCompletionType,
     object_value::ObjectValue,
     promise_object::{PromiseCapability, PromiseObject, PromiseReactionKind},
@@ -82,7 +82,7 @@ impl TaskQueue {
         )));
     }
 
-    pub fn visit_roots(&mut self, visitor: &mut impl HeapVisitor) {
+    pub fn visit_roots(&mut self, visitor: &mut impl GcVisitorExt) {
         for task in &mut self.tasks {
             match task {
                 Task::Callback1(Callback1Task { func, arg }) => {
@@ -153,8 +153,8 @@ impl Callback1Task {
     }
 
     fn execute(&self, mut cx: Context) -> EvalResult<()> {
-        let func = self.func.to_handle(cx);
-        let arg = self.arg.to_handle(cx);
+        let func = self.func.to_stack();
+        let arg = self.arg.to_stack();
 
         // Realm is only used to create errors before setting up the stack frame (e.g. non-callable
         // a stack overflow). Create these errors in the default realm for this context.
@@ -189,8 +189,8 @@ impl AwaitResumeTask {
     }
 
     fn execute(&self, mut cx: Context) -> EvalResult<()> {
-        let generator = self.generator.to_handle();
-        let completion_value = self.result.to_handle(cx);
+        let generator = self.generator.to_stack();
+        let completion_value = self.result.to_stack();
         let completion_type = match self.kind {
             PromiseReactionKind::Fulfill => GeneratorCompletionType::Normal,
             PromiseReactionKind::Reject => GeneratorCompletionType::Throw,
@@ -253,12 +253,12 @@ impl PromiseThenReactionTask {
         let realm = self.realm.unwrap_or_else(|| cx.initial_realm_ptr());
 
         cx.with_initial_realm_stack_frame(realm, |cx| {
-            let result = self.result.to_handle(cx);
-            let capability = self.capability.map(|c| c.to_handle());
+            let result = self.result.to_stack();
+            let capability = self.capability.map(|c| c.to_stack());
 
             // Call the handler if it exists on the result value
             let handler_result = if let Some(handler) = self.handler {
-                let handler = handler.to_handle();
+                let handler = handler.to_stack();
                 call_object(cx, handler, cx.undefined(), &[result])
             } else {
                 // If no handler was provided treat the handler result as a default normal or throw
@@ -318,9 +318,9 @@ impl PromiseThenSettleTask {
 
     fn execute(&self, mut cx: Context) -> EvalResult<()> {
         cx.with_initial_realm_stack_frame(self.realm, |cx| {
-            let then_function = self.then_function.to_handle();
-            let resolution = self.resolution.to_handle().into();
-            let promise = self.promise.to_handle();
+            let then_function = self.then_function.to_stack();
+            let resolution = self.resolution.to_stack().into();
+            let promise = self.promise.to_stack();
 
             execute_then(cx, then_function, resolution, promise)?;
 

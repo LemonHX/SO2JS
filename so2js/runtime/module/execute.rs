@@ -21,7 +21,7 @@ use crate::{
         object_value::ObjectValue,
         promise_object::{PromiseCapability, PromiseObject},
         string_value::FlatString,
-        to_string, Context, EvalResult, Handle, PropertyKey, Value,
+        to_string, Context, EvalResult, StackRoot, PropertyKey, Value,
     },
 };
 use alloc::string::ToString;
@@ -40,8 +40,8 @@ use super::{
 /// Returns a promise that resolves once the module has completed execution.
 pub fn execute_module(
     mut cx: Context,
-    module: Handle<SourceTextModule>,
-) -> AllocResult<Handle<PromiseObject>> {
+    module: StackRoot<SourceTextModule>,
+) -> AllocResult<StackRoot<PromiseObject>> {
     let promise_constructor = cx.get_intrinsic(Intrinsic::PromiseConstructor);
     let capability = must_a!(PromiseCapability::new(cx, promise_constructor.into()));
 
@@ -74,7 +74,7 @@ pub fn execute_module(
     }
 }
 
-fn get_module(cx: Context, function: Handle<ObjectValue>) -> Handle<SourceTextModule> {
+fn get_module(cx: Context, function: StackRoot<ObjectValue>) -> StackRoot<SourceTextModule> {
     function
         .private_element_find(cx, cx.well_known_symbols.module().cast())
         .unwrap()
@@ -85,13 +85,13 @@ fn get_module(cx: Context, function: Handle<ObjectValue>) -> Handle<SourceTextMo
 
 fn set_module(
     cx: Context,
-    mut function: Handle<ObjectValue>,
-    value: Handle<SourceTextModule>,
+    mut function: StackRoot<ObjectValue>,
+    value: StackRoot<SourceTextModule>,
 ) -> AllocResult<()> {
     function.private_element_set(cx, cx.well_known_symbols.module().cast(), value.into())
 }
 
-fn get_dyn_module(cx: Context, function: Handle<ObjectValue>) -> DynModule {
+fn get_dyn_module(cx: Context, function: StackRoot<ObjectValue>) -> DynModule {
     let item = function
         .private_element_find(cx, cx.well_known_symbols.module().cast())
         .unwrap()
@@ -104,15 +104,15 @@ fn get_dyn_module(cx: Context, function: Handle<ObjectValue>) -> DynModule {
     );
 
     if item.descriptor().kind() == HeapItemKind::SourceTextModule {
-        item.cast::<SourceTextModule>().to_handle().as_dyn_module()
+        item.cast::<SourceTextModule>().to_stack().as_dyn_module()
     } else {
-        item.cast::<SyntheticModule>().to_handle().as_dyn_module()
+        item.cast::<SyntheticModule>().to_stack().as_dyn_module()
     }
 }
 
 fn set_dyn_module(
     cx: Context,
-    mut function: Handle<ObjectValue>,
+    mut function: StackRoot<ObjectValue>,
     value: DynModule,
 ) -> AllocResult<()> {
     function.private_element_set(
@@ -122,7 +122,7 @@ fn set_dyn_module(
     )
 }
 
-fn get_capability(cx: Context, function: Handle<ObjectValue>) -> Handle<PromiseCapability> {
+fn get_capability(cx: Context, function: StackRoot<ObjectValue>) -> StackRoot<PromiseCapability> {
     function
         .private_element_find(cx, cx.well_known_symbols.capability().cast())
         .unwrap()
@@ -133,17 +133,17 @@ fn get_capability(cx: Context, function: Handle<ObjectValue>) -> Handle<PromiseC
 
 fn set_capability(
     cx: Context,
-    mut function: Handle<ObjectValue>,
-    value: Handle<PromiseCapability>,
+    mut function: StackRoot<ObjectValue>,
+    value: StackRoot<PromiseCapability>,
 ) -> AllocResult<()> {
     function.private_element_set(cx, cx.well_known_symbols.capability().cast(), value.into())
 }
 
 pub fn load_requested_modules_static_resolve(
     mut cx: Context,
-    _: Handle<Value>,
-    _: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    _: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     // Fetch the module and capbility passed from `execute_module`
     let current_function = cx.current_function();
     let module = get_module(cx, current_function);
@@ -176,9 +176,9 @@ pub fn load_requested_modules_static_resolve(
 
 pub fn load_requested_modules_reject(
     mut cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     // Fetch the capbility passed from `execute_module`
     let current_function = cx.current_function();
     let capability = get_capability(cx, current_function);
@@ -194,7 +194,7 @@ pub fn load_requested_modules_reject(
     Ok(cx.undefined())
 }
 
-fn callback(cx: Context, func: RustRuntimeFunction) -> AllocResult<Handle<ObjectValue>> {
+fn callback(cx: Context, func: RustRuntimeFunction) -> AllocResult<StackRoot<ObjectValue>> {
     let realm = cx.current_realm();
     Ok(BuiltinFunction::create_builtin_function_without_properties(
         cx,
@@ -209,14 +209,14 @@ fn callback(cx: Context, func: RustRuntimeFunction) -> AllocResult<Handle<Object
 
 pub fn module_evaluate(
     cx: Context,
-    module: Handle<SourceTextModule>,
-) -> AllocResult<Handle<PromiseObject>> {
+    module: StackRoot<SourceTextModule>,
+) -> AllocResult<StackRoot<PromiseObject>> {
     let mut evaluator = GraphEvaluator::new();
     evaluator.evaluate(cx, module)
 }
 
 struct GraphEvaluator {
-    stack: Vec<Handle<SourceTextModule>>,
+    stack: Vec<StackRoot<SourceTextModule>>,
 }
 
 impl GraphEvaluator {
@@ -228,8 +228,8 @@ impl GraphEvaluator {
     fn evaluate(
         &mut self,
         cx: Context,
-        mut module: Handle<SourceTextModule>,
-    ) -> AllocResult<Handle<PromiseObject>> {
+        mut module: StackRoot<SourceTextModule>,
+    ) -> AllocResult<StackRoot<PromiseObject>> {
         if matches!(
             module.state(),
             ModuleState::Evaluated | ModuleState::EvaluatingAsync
@@ -306,7 +306,7 @@ impl GraphEvaluator {
 
                 // Propagate rejected value as error
                 return if let Some(rejected_value) = promise.rejected_value() {
-                    eval_err!(rejected_value.to_handle(cx))
+                    eval_err!(rejected_value.to_stack())
                 } else {
                     Ok(index)
                 };
@@ -413,7 +413,7 @@ impl GraphEvaluator {
 }
 
 /// ExecuteAsyncModule (https://tc39.es/ecma262/#sec-execute-async-module)
-fn execute_async_module(mut cx: Context, module: Handle<SourceTextModule>) -> AllocResult<()> {
+fn execute_async_module(mut cx: Context, module: StackRoot<SourceTextModule>) -> AllocResult<()> {
     debug_assert!(matches!(
         module.state(),
         ModuleState::Evaluating | ModuleState::EvaluatingAsync
@@ -444,9 +444,9 @@ fn execute_async_module(mut cx: Context, module: Handle<SourceTextModule>) -> Al
 /// AsyncModuleExecutionFulfilled (https://tc39.es/ecma262/#sec-async-module-execution-fulfilled)
 pub fn async_module_execution_fulfilled(
     mut cx: Context,
-    _: Handle<Value>,
-    _: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    _: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     // Fetch the module passed from `execute_async_module`
     let current_function = cx.current_function();
     let mut module = get_module(cx, current_function);
@@ -520,8 +520,8 @@ pub fn async_module_execution_fulfilled(
 
 /// GatherAvailableAncestors (https://tc39.es/ecma262/#sec-gather-available-ancestors)
 fn gather_available_ancestors(
-    module: Handle<SourceTextModule>,
-    gathered: &mut HashMap<ModuleId, Handle<SourceTextModule>>,
+    module: StackRoot<SourceTextModule>,
+    gathered: &mut HashMap<ModuleId, StackRoot<SourceTextModule>>,
 ) {
     if let Some(async_parent_modules) = module.async_parent_modules_ptr() {
         for parent_module in async_parent_modules.as_slice() {
@@ -537,7 +537,7 @@ fn gather_available_ancestors(
                 debug_assert!(parent_module.is_async_evaluation());
                 debug_assert!(parent_module.pending_async_dependencies() > 0);
 
-                let mut parent_module = parent_module.to_handle();
+                let mut parent_module = parent_module.to_stack();
                 parent_module.dec_pending_async_dependencies();
 
                 if parent_module.pending_async_dependencies() == 0 {
@@ -557,8 +557,8 @@ fn gather_available_ancestors(
 /// AsyncModuleExecutionRejected (https://tc39.es/ecma262/#sec-async-module-execution-rejected)
 fn async_module_execution_rejected(
     cx: Context,
-    mut module: Handle<SourceTextModule>,
-    error: Handle<Value>,
+    mut module: StackRoot<SourceTextModule>,
+    error: StackRoot<Value>,
 ) -> AllocResult<()> {
     if module.state() == ModuleState::Evaluated {
         debug_assert!(module.evaluation_error_ptr().is_some());
@@ -577,7 +577,7 @@ fn async_module_execution_rejected(
     // Reject execution of all async parent modules as well
     if let Some(async_parent_modules) = module.async_parent_modules() {
         // Reuse handle between iterations
-        let mut parent_module_handle: Handle<SourceTextModule> = Handle::empty(cx);
+        let mut parent_module_handle: StackRoot<SourceTextModule> = StackRoot::empty(cx);
 
         for i in 0..async_parent_modules.len() {
             parent_module_handle.replace(async_parent_modules.as_slice()[i]);
@@ -601,9 +601,9 @@ fn async_module_execution_rejected(
 
 pub fn async_module_execution_rejected_runtime(
     mut cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     // Fetch the module passed from `execute_async_module`
     let current_function = cx.current_function();
     let module = get_module(cx, current_function);
@@ -617,10 +617,10 @@ pub fn async_module_execution_rejected_runtime(
 /// Start a dynamic import within a module, passing the argument provided to `import()`.
 pub fn dynamic_import(
     cx: Context,
-    source_file_path: Handle<FlatString>,
-    specifier: Handle<Value>,
-    options: Handle<Value>,
-) -> EvalResult<Handle<ObjectValue>> {
+    source_file_path: StackRoot<FlatString>,
+    specifier: StackRoot<Value>,
+    options: StackRoot<Value>,
+) -> EvalResult<StackRoot<ObjectValue>> {
     let promise_constructor = cx.get_intrinsic(Intrinsic::PromiseConstructor);
     let capability = must!(PromiseCapability::new(cx, promise_constructor.into()));
 
@@ -679,8 +679,8 @@ pub fn dynamic_import(
             for entry in entries {
                 // Entry is gaurenteed to be an array with two elements
                 let entry = entry.as_object();
-                let key = must!(get(cx, entry, PropertyKey::from_u8(0).to_handle(cx)));
-                let value = must!(get(cx, entry, PropertyKey::from_u8(1).to_handle(cx)));
+                let key = must!(get(cx, entry, PropertyKey::from_u8(0).to_stack()));
+                let value = must!(get(cx, entry, PropertyKey::from_u8(1).to_stack()));
 
                 if !value.is_string() {
                     let error = type_error_value(cx, "Import attribute values must be strings")?;
@@ -696,11 +696,11 @@ pub fn dynamic_import(
                 // Intern the key and value strings
                 let key_string = must!(to_string(cx, key));
                 let key_flat_string = key_string.flatten()?;
-                let key_interned_string = InternedStrings::get(cx, *key_flat_string)?.to_handle();
+                let key_interned_string = InternedStrings::get(cx, *key_flat_string)?.to_stack();
 
                 let value_flat_string = value.as_string().flatten()?;
                 let value_interned_string =
-                    InternedStrings::get(cx, *value_flat_string)?.to_handle();
+                    InternedStrings::get(cx, *value_flat_string)?.to_stack();
 
                 attribute_pairs.push((key_interned_string, value_interned_string));
             }
@@ -717,7 +717,7 @@ pub fn dynamic_import(
     };
 
     let specifier = specifier.flatten()?;
-    let specifier = InternedStrings::get(cx, *specifier)?.to_handle();
+    let specifier = InternedStrings::get(cx, *specifier)?.to_stack();
 
     let module_request = ModuleRequest {
         specifier,
@@ -738,7 +738,7 @@ pub fn dynamic_import(
 /// ContinueDynamicImport (https://tc39.es/ecma262/#sec-ContinueDynamicImport)
 fn continue_dynamic_import(
     cx: Context,
-    capability: Handle<PromiseCapability>,
+    capability: StackRoot<PromiseCapability>,
     load_completion: EvalResult<DynModule>,
 ) -> AllocResult<()> {
     let module = match completion_value!(load_completion) {
@@ -770,9 +770,9 @@ fn continue_dynamic_import(
 
 pub fn load_requested_modules_dynamic_resolve(
     mut cx: Context,
-    _: Handle<Value>,
-    _: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    _: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     // Fetch the module and capability passed from the caller
     let current_function = cx.current_function();
     let module = get_dyn_module(cx, current_function);
@@ -826,15 +826,15 @@ pub fn load_requested_modules_dynamic_resolve(
 
 pub fn module_evaluate_dynamic_resolve(
     mut cx: Context,
-    _: Handle<Value>,
-    _: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    _: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     // Fetch the module and capbility passed from the caller
     let current_function = cx.current_function();
     let mut module = get_dyn_module(cx, current_function);
     let capability = get_capability(cx, current_function);
 
-    let namespace_object = module.get_namespace_object(cx)?.to_handle();
+    let namespace_object = module.get_namespace_object(cx)?.to_stack();
 
     must!(call_object(
         cx,

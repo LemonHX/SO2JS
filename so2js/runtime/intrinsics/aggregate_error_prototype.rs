@@ -1,5 +1,5 @@
 use crate::runtime::{
-    alloc_error::AllocResult, object_value::ObjectValue, realm::Realm, Context, Handle,
+    alloc_error::AllocResult, object_value::ObjectValue, realm::Realm, Context, StackRoot,
 };
 
 use super::intrinsics::Intrinsic;
@@ -8,7 +8,7 @@ pub struct AggregateErrorPrototype;
 
 impl AggregateErrorPrototype {
     /// Properties of the AggregateError Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-aggregate-error-prototype-objects)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ErrorPrototype)),
@@ -28,6 +28,6 @@ impl AggregateErrorPrototype {
             cx.names.aggregate_error().as_string().into(),
         )?;
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 }

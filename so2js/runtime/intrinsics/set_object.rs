@@ -5,13 +5,13 @@ use crate::{
     runtime::{
         alloc_error::AllocResult,
         collections::{BsIndexSet, BsIndexSetField},
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         intrinsics::intrinsics::Intrinsic,
         object_value::ObjectValue,
         ordinary_object::{object_create, object_create_from_constructor},
-        value::{ValueCollectionKey, ValueCollectionKeyHandle},
-        Context, EvalResult, Handle, HeapPtr, Value,
+        value::{ValueCollectionKey, ValueCollectionKeyStackRoot},
+        Context, EvalResult, StackRoot, HeapPtr, Value,
     },
     set_uninit,
 };
@@ -28,10 +28,10 @@ pub type ValueSet = BsIndexSet<ValueCollectionKey>;
 impl SetObject {
     pub fn new_from_constructor(
         cx: Context,
-        constructor: Handle<ObjectValue>,
-    ) -> EvalResult<Handle<SetObject>> {
+        constructor: StackRoot<ObjectValue>,
+    ) -> EvalResult<StackRoot<SetObject>> {
         // Allocate and place behind handle before allocating object
-        let set_data = SetObjectSetField::new(cx, ValueSet::MIN_CAPACITY)?.to_handle();
+        let set_data = SetObjectSetField::new(cx, ValueSet::MIN_CAPACITY)?.to_stack();
 
         let mut object = object_create_from_constructor::<SetObject>(
             cx,
@@ -42,17 +42,17 @@ impl SetObject {
 
         set_uninit!(object.set_data, *set_data);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     /// Create a new SetObject with the provided set data.
-    pub fn new_from_set(cx: Context, set_data: Handle<ValueSet>) -> AllocResult<Handle<SetObject>> {
+    pub fn new_from_set(cx: Context, set_data: StackRoot<ValueSet>) -> AllocResult<StackRoot<SetObject>> {
         let mut object =
             object_create::<SetObject>(cx, HeapItemKind::SetObject, Intrinsic::SetPrototype)?;
 
         set_uninit!(object.set_data, *set_data);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     #[inline]
@@ -61,18 +61,18 @@ impl SetObject {
     }
 
     #[inline]
-    pub fn set_data(&self) -> Handle<ValueSet> {
-        self.set_data_ptr().to_handle()
+    pub fn set_data(&self) -> StackRoot<ValueSet> {
+        self.set_data_ptr().to_stack()
     }
 }
 
-impl Handle<SetObject> {
+impl StackRoot<SetObject> {
     fn set_data_field(&self) -> SetObjectSetField {
         SetObjectSetField(*self)
     }
 
-    pub fn insert(&self, cx: Context, item: Handle<Value>) -> AllocResult<bool> {
-        let item_handle = ValueCollectionKeyHandle::new(item)?;
+    pub fn insert(&self, cx: Context, item: StackRoot<Value>) -> AllocResult<bool> {
+        let item_handle = ValueCollectionKeyStackRoot::new(item)?;
 
         Ok(self
             .set_data_field()
@@ -82,7 +82,7 @@ impl Handle<SetObject> {
 }
 
 #[derive(Clone)]
-pub struct SetObjectSetField(Handle<SetObject>);
+pub struct SetObjectSetField(StackRoot<SetObject>);
 
 impl BsIndexSetField<ValueCollectionKey> for SetObjectSetField {
     fn new(cx: Context, capacity: usize) -> AllocResult<HeapPtr<ValueSet>> {
@@ -103,7 +103,7 @@ impl HeapItem for HeapPtr<SetObject> {
         size_of::<SetObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.set_data);
     }
@@ -114,7 +114,7 @@ impl SetObjectSetField {
         ValueSet::calculate_size_in_bytes(set.capacity())
     }
 
-    pub fn visit_pointers(set: &mut HeapPtr<ValueSet>, visitor: &mut impl HeapVisitor) {
+    pub fn visit_pointers(set: &mut HeapPtr<ValueSet>, visitor: &mut impl GcVisitorExt) {
         set.visit_pointers_impl(visitor, |set, visitor| {
             for element in set.iter_mut_gc_unsafe() {
                 element.visit_pointers(visitor);

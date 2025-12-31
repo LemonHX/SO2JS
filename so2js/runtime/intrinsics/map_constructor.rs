@@ -15,7 +15,7 @@ use crate::{
         realm::Realm,
         type_utilities::is_callable,
         value::Value,
-        Context, Handle,
+        Context, StackRoot,
     },
 };
 
@@ -25,7 +25,7 @@ pub struct MapConstructor;
 
 impl MapConstructor {
     /// The Map Constructor (https://tc39.es/ecma262/#sec-map-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -53,9 +53,9 @@ impl MapConstructor {
     /// Map (https://tc39.es/ecma262/#sec-map-iterable)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let new_target = if let Some(new_target) = cx.current_new_target() {
             new_target
         } else {
@@ -83,9 +83,9 @@ impl MapConstructor {
     /// Map.groupBy (https://tc39.es/ecma262/#sec-map.groupby)
     pub fn group_by(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let items = get_argument(cx, arguments, 0);
         let callback = get_argument(cx, arguments, 1);
 
@@ -95,7 +95,7 @@ impl MapConstructor {
         let map = must!(construct(cx, map_constructor, &[], None));
 
         for group in groups {
-            let items: Handle<Value> = create_array_from_list(cx, &group.items)?.into();
+            let items: StackRoot<Value> = create_array_from_list(cx, &group.items)?.into();
 
             map.cast::<MapObject>().insert(cx, group.key, items)?;
         }
@@ -107,10 +107,10 @@ impl MapConstructor {
 /// AddEntriesFromIterable (https://tc39.es/ecma262/#sec-add-entries-from-iterable)
 pub fn add_entries_from_iterable(
     cx: Context,
-    target: Handle<Value>,
-    iterable: Handle<Value>,
-    mut adder: impl FnMut(Context, Handle<Value>, Handle<Value>) -> EvalResult<()>,
-) -> EvalResult<Handle<Value>> {
+    target: StackRoot<Value>,
+    iterable: StackRoot<Value>,
+    mut adder: impl FnMut(Context, StackRoot<Value>, StackRoot<Value>) -> EvalResult<()>,
+) -> EvalResult<StackRoot<Value>> {
     let key_index = PropertyKey::array_index_handle(cx, 0)?;
     let value_index = PropertyKey::array_index_handle(cx, 1)?;
 

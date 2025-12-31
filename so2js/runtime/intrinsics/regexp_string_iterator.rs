@@ -7,7 +7,7 @@ use crate::{
         alloc_error::AllocResult,
         error::type_error,
         eval_result::EvalResult,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         get,
         heap_item_descriptor::HeapItemKind,
         intrinsics::regexp_prototype::{advance_u64_string_index, regexp_exec},
@@ -19,7 +19,7 @@ use crate::{
         string_value::StringValue,
         to_string,
         type_utilities::to_length,
-        Context, Handle, HeapPtr, PropertyKey, Value,
+        Context, StackRoot, HeapPtr, PropertyKey, Value,
     },
     set_uninit,
 };
@@ -40,11 +40,11 @@ extend_object! {
 impl RegExpStringIterator {
     pub fn new(
         cx: Context,
-        regexp_object: Handle<ObjectValue>,
-        target_string: Handle<StringValue>,
+        regexp_object: StackRoot<ObjectValue>,
+        target_string: StackRoot<StringValue>,
         is_global: bool,
         is_unicode: bool,
-    ) -> AllocResult<Handle<RegExpStringIterator>> {
+    ) -> AllocResult<StackRoot<RegExpStringIterator>> {
         let mut object = object_create::<RegExpStringIterator>(
             cx,
             HeapItemKind::RegExpStringIterator,
@@ -57,17 +57,17 @@ impl RegExpStringIterator {
         set_uninit!(object.is_unicode, is_unicode);
         set_uninit!(object.is_done, false);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     #[inline]
-    fn regexp_object(&self) -> Handle<ObjectValue> {
-        self.regexp_object.to_handle()
+    fn regexp_object(&self) -> StackRoot<ObjectValue> {
+        self.regexp_object.to_stack()
     }
 
     #[inline]
-    fn target_string(&self) -> Handle<StringValue> {
-        self.target_string.to_handle()
+    fn target_string(&self) -> StackRoot<StringValue> {
+        self.target_string.to_stack()
     }
 
     cast_from_value_fn!(RegExpStringIterator, "RegExp String Iterator");
@@ -77,7 +77,7 @@ impl RegExpStringIterator {
 pub struct RegExpStringIteratorPrototype;
 
 impl RegExpStringIteratorPrototype {
-    pub fn new(mut cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(mut cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let proto = realm.get_intrinsic(Intrinsic::IteratorPrototype);
         let mut object = ObjectValue::new(cx, Some(proto), true)?;
 
@@ -98,9 +98,9 @@ impl RegExpStringIteratorPrototype {
     /// %RegExpStringIteratorPrototype%.next (https://tc39.es/ecma262/#sec-%regexpstringiteratorprototype%.next)
     pub fn next(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let mut regexp_iterator = RegExpStringIterator::cast_from_value(cx, this_value)?;
 
         let regexp_object = regexp_iterator.regexp_object();
@@ -139,7 +139,7 @@ impl RegExpStringIteratorPrototype {
 
             let next_index =
                 advance_u64_string_index(target_string, last_index, regexp_iterator.is_unicode)?;
-            let next_index_value = Value::from(next_index).to_handle(cx);
+            let next_index_value = Value::from(next_index).to_stack();
             set(
                 cx,
                 regexp_object,
@@ -158,7 +158,7 @@ impl HeapItem for HeapPtr<RegExpStringIterator> {
         size_of::<RegExpStringIterator>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.regexp_object);
         visitor.visit_pointer(&mut self.target_string);

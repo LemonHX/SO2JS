@@ -2,7 +2,7 @@ use core::hash::Hash;
 
 use crate::runtime::{
     alloc_error::AllocResult,
-    gc::{HeapItem, HeapVisitor},
+    gc::{HeapItem, GcVisitorExt},
     heap_item_descriptor::HeapItemKind,
     Context, HeapPtr,
 };
@@ -61,7 +61,7 @@ impl<T: Eq + Hash + Clone> BsHashSet<T> {
     }
 
     /// Visit pointers intrinsic to all HashSets. Do not visit entries as they could be of any type.
-    pub fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    pub fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.0.visit_pointers(visitor)
     }
 }
@@ -106,7 +106,7 @@ impl<T: Eq + Hash + Clone> HeapItem for HeapPtr<BsHashSet<T>> {
         BsHashSet::<T>::calculate_size_in_bytes(self.capacity())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         BsHashSet::<T>::visit_pointers(self, visitor)
     }
 }

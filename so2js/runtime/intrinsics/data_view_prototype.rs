@@ -8,7 +8,7 @@ use crate::runtime::{
     property::Property,
     realm::Realm,
     type_utilities::{to_bigint, to_boolean, to_index, to_number},
-    Context, EvalResult, Handle, Value,
+    Context, EvalResult, StackRoot, Value,
 };
 
 use super::{
@@ -28,7 +28,7 @@ pub struct DataViewPrototype;
 
 impl DataViewPrototype {
     /// Properties of the DataView Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-dataview-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -88,9 +88,9 @@ impl DataViewPrototype {
     /// get DataView.prototype.buffer (https://tc39.es/ecma262/#sec-get-dataview.prototype.buffer)
     pub fn get_buffer(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let data_view = require_is_data_view(cx, this_value)?;
         Ok(data_view.viewed_array_buffer().as_value())
     }
@@ -98,9 +98,9 @@ impl DataViewPrototype {
     /// get DataView.prototype.byteLength (https://tc39.es/ecma262/#sec-get-dataview.prototype.bytelength)
     pub fn get_byte_length(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let data_view = require_is_data_view(cx, this_value)?;
         let data_view_record = make_data_view_with_buffer_witness_record(data_view);
 
@@ -110,15 +110,15 @@ impl DataViewPrototype {
 
         let byte_length = get_view_byte_length(&data_view_record);
 
-        Ok(Value::from(byte_length).to_handle(cx))
+        Ok(Value::from(byte_length).to_stack())
     }
 
     /// get DataView.prototype.byteOffset (https://tc39.es/ecma262/#sec-get-dataview.prototype.byteoffset)
     pub fn get_byte_offset(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let data_view = require_is_data_view(cx, this_value)?;
         let data_view_record = make_data_view_with_buffer_witness_record(data_view);
 
@@ -126,15 +126,15 @@ impl DataViewPrototype {
             return type_error(cx, "DataView is out of bounds");
         }
 
-        Ok(Value::from(data_view.byte_offset()).to_handle(cx))
+        Ok(Value::from(data_view.byte_offset()).to_stack())
     }
 
     /// DataView.prototype.getBigInt64 (https://tc39.es/ecma262/#sec-dataview.prototype.getbigint64)
     pub fn get_big_int64(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         get_view_value(
             cx,
             this_value,
@@ -147,9 +147,9 @@ impl DataViewPrototype {
     /// DataView.prototype.getBigUint64 (https://tc39.es/ecma262/#sec-dataview.prototype.getbiguint64)
     pub fn get_big_uint64(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         get_view_value(
             cx,
             this_value,
@@ -162,9 +162,9 @@ impl DataViewPrototype {
     /// DataView.prototype.getFloat16 (https://tc39.es/ecma262/#sec-dataview.prototype.getfloat16)
     pub fn get_float16(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         get_view_value(
             cx,
             this_value,
@@ -177,9 +177,9 @@ impl DataViewPrototype {
     /// DataView.prototype.getFloat32 (https://tc39.es/ecma262/#sec-dataview.prototype.getfloat32)
     pub fn get_float32(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         get_view_value(
             cx,
             this_value,
@@ -192,9 +192,9 @@ impl DataViewPrototype {
     /// DataView.prototype.getFloat64 (https://tc39.es/ecma262/#sec-dataview.prototype.getfloat64)
     pub fn get_float64(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         get_view_value(
             cx,
             this_value,
@@ -207,9 +207,9 @@ impl DataViewPrototype {
     /// DataView.prototype.getInt8 (https://tc39.es/ecma262/#sec-dataview.prototype.getint8)
     pub fn get_int8(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         get_view_value(cx, this_value, arguments, from_int8_element, |element| {
             element
         })
@@ -218,9 +218,9 @@ impl DataViewPrototype {
     /// DataView.prototype.getInt16 (https://tc39.es/ecma262/#sec-dataview.prototype.getint16)
     pub fn get_int16(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         get_view_value(
             cx,
             this_value,
@@ -233,9 +233,9 @@ impl DataViewPrototype {
     /// DataView.prototype.getInt32 (https://tc39.es/ecma262/#sec-dataview.prototype.getint32)
     pub fn get_int32(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         get_view_value(
             cx,
             this_value,
@@ -248,9 +248,9 @@ impl DataViewPrototype {
     /// DataView.prototype.getUint8 (https://tc39.es/ecma262/#sec-dataview.prototype.getuint8)
     pub fn get_uint8(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         get_view_value(cx, this_value, arguments, from_uint8_element, |element| {
             element
         })
@@ -259,9 +259,9 @@ impl DataViewPrototype {
     /// DataView.prototype.getUint16 (https://tc39.es/ecma262/#sec-dataview.prototype.getuint16)
     pub fn get_uint16(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         get_view_value(
             cx,
             this_value,
@@ -274,9 +274,9 @@ impl DataViewPrototype {
     /// DataView.prototype.getUint32 (https://tc39.es/ecma262/#sec-dataview.prototype.getuint32)
     pub fn get_uint32(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         get_view_value(
             cx,
             this_value,
@@ -289,9 +289,9 @@ impl DataViewPrototype {
     /// DataView.prototype.setBigInt64 (https://tc39.es/ecma262/#sec-dataview.prototype.setbigint64)
     pub fn set_big_int64(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         set_view_value(
             cx,
             this_value,
@@ -305,9 +305,9 @@ impl DataViewPrototype {
     /// DataView.prototype.setBigUint64 (https://tc39.es/ecma262/#sec-dataview.prototype.setbiguint64)
     pub fn set_big_uint64(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         set_view_value(
             cx,
             this_value,
@@ -321,9 +321,9 @@ impl DataViewPrototype {
     /// DataView.prototype.setFloat16 (https://tc39.es/ecma262/#sec-dataview.prototype.setfloat16)
     pub fn set_float16(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         set_view_value(
             cx,
             this_value,
@@ -337,9 +337,9 @@ impl DataViewPrototype {
     /// DataView.prototype.setFloat32 (https://tc39.es/ecma262/#sec-dataview.prototype.setfloat32)
     pub fn set_float32(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         set_view_value(
             cx,
             this_value,
@@ -353,9 +353,9 @@ impl DataViewPrototype {
     /// DataView.prototype.setFloat64 (https://tc39.es/ecma262/#sec-dataview.prototype.setfloat64)
     pub fn set_float64(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         set_view_value(
             cx,
             this_value,
@@ -369,9 +369,9 @@ impl DataViewPrototype {
     /// DataView.prototype.setInt8 (https://tc39.es/ecma262/#sec-dataview.prototype.setint8)
     pub fn set_int8(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         set_view_value(
             cx,
             this_value,
@@ -385,9 +385,9 @@ impl DataViewPrototype {
     /// DataView.prototype.setInt16 (https://tc39.es/ecma262/#sec-dataview.prototype.setint16)
     pub fn set_int16(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         set_view_value(
             cx,
             this_value,
@@ -401,9 +401,9 @@ impl DataViewPrototype {
     /// DataView.prototype.setInt32 (https://tc39.es/ecma262/#sec-dataview.prototype.setint32)
     pub fn set_int32(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         set_view_value(
             cx,
             this_value,
@@ -417,9 +417,9 @@ impl DataViewPrototype {
     /// DataView.prototype.setUint8 (https://tc39.es/ecma262/#sec-dataview.prototype.setuint8)
     pub fn set_uint8(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         set_view_value(
             cx,
             this_value,
@@ -433,9 +433,9 @@ impl DataViewPrototype {
     /// DataView.prototype.setUint16 (https://tc39.es/ecma262/#sec-dataview.prototype.setuint16)
     pub fn set_uint16(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         set_view_value(
             cx,
             this_value,
@@ -449,9 +449,9 @@ impl DataViewPrototype {
     /// DataView.prototype.setUint32 (https://tc39.es/ecma262/#sec-dataview.prototype.setuint32)
     pub fn set_uint32(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         set_view_value(
             cx,
             this_value,
@@ -464,7 +464,7 @@ impl DataViewPrototype {
 }
 
 #[inline]
-fn require_is_data_view(cx: Context, value: Handle<Value>) -> EvalResult<Handle<DataViewObject>> {
+fn require_is_data_view(cx: Context, value: StackRoot<Value>) -> EvalResult<StackRoot<DataViewObject>> {
     if !value.is_object() {
         return type_error(cx, "expected data view");
     }
@@ -481,11 +481,11 @@ fn require_is_data_view(cx: Context, value: Handle<Value>) -> EvalResult<Handle<
 #[inline]
 fn get_view_value<T>(
     cx: Context,
-    this_value: Handle<Value>,
-    arguments: &[Handle<Value>],
-    from_element_fn: fn(Context, T) -> AllocResult<Handle<Value>>,
+    this_value: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+    from_element_fn: fn(Context, T) -> AllocResult<StackRoot<Value>>,
     swap_element_bytes_fn: fn(T) -> T,
-) -> EvalResult<Handle<Value>> {
+) -> EvalResult<StackRoot<Value>> {
     let data_view = require_is_data_view(cx, this_value)?;
 
     let get_index_arg = get_argument(cx, arguments, 0);
@@ -533,12 +533,12 @@ fn get_view_value<T>(
 #[inline]
 fn set_view_value<T>(
     cx: Context,
-    this_value: Handle<Value>,
-    arguments: &[Handle<Value>],
+    this_value: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
     content_type: ContentType,
-    to_element_fn: fn(Context, Handle<Value>) -> EvalResult<T>,
+    to_element_fn: fn(Context, StackRoot<Value>) -> EvalResult<T>,
     swap_element_bytes_fn: fn(T) -> T,
-) -> EvalResult<Handle<Value>> {
+) -> EvalResult<StackRoot<Value>> {
     let data_view = require_is_data_view(cx, this_value)?;
 
     let get_index_arg = get_argument(cx, arguments, 0);
@@ -595,13 +595,13 @@ fn set_view_value<T>(
 }
 
 pub struct DataViewWithBufferWitnessRecord {
-    pub data_view: Handle<DataViewObject>,
+    pub data_view: StackRoot<DataViewObject>,
     pub cached_buffer_byte_length: Option<usize>,
 }
 
 /// MakeDataViewWithBufferWitnessRecord (https://tc39.es/ecma262/#sec-makedataviewwithbufferwitnessrecord)
 fn make_data_view_with_buffer_witness_record(
-    data_view: Handle<DataViewObject>,
+    data_view: StackRoot<DataViewObject>,
 ) -> DataViewWithBufferWitnessRecord {
     let array_buffer = data_view.viewed_array_buffer_ptr();
 

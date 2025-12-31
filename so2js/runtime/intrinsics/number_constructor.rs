@@ -9,7 +9,7 @@ use crate::{
         builtin_function::BuiltinFunction,
         eval_result::EvalResult,
         function::get_argument,
-        gc::{Handle, HeapItem, HeapVisitor},
+        gc::{StackRoot, HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         numeric_constants::{
             MAX_SAFE_INTEGER_F64, MIN_POSITIVE_SUBNORMAL_F64, MIN_SAFE_INTEGER_F64,
@@ -37,7 +37,7 @@ extend_object! {
 }
 
 impl NumberObject {
-    pub fn new(cx: Context, number_data: f64) -> AllocResult<Handle<NumberObject>> {
+    pub fn new(cx: Context, number_data: f64) -> AllocResult<StackRoot<NumberObject>> {
         let mut object = object_create::<NumberObject>(
             cx,
             HeapItemKind::NumberObject,
@@ -46,14 +46,14 @@ impl NumberObject {
 
         set_uninit!(object.number_data, number_data);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     pub fn new_from_constructor(
         cx: Context,
-        constructor: Handle<ObjectValue>,
+        constructor: StackRoot<ObjectValue>,
         number_data: f64,
-    ) -> EvalResult<Handle<NumberObject>> {
+    ) -> EvalResult<StackRoot<NumberObject>> {
         let mut object = object_create_from_constructor::<NumberObject>(
             cx,
             constructor,
@@ -63,20 +63,20 @@ impl NumberObject {
 
         set_uninit!(object.number_data, number_data);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     pub fn new_with_proto(
         cx: Context,
-        proto: Handle<ObjectValue>,
+        proto: StackRoot<ObjectValue>,
         number_data: f64,
-    ) -> AllocResult<Handle<NumberObject>> {
+    ) -> AllocResult<StackRoot<NumberObject>> {
         let mut object =
             object_create_with_proto::<NumberObject>(cx, HeapItemKind::NumberObject, proto)?;
 
         set_uninit!(object.number_data, number_data);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     pub fn number_data(&self) -> f64 {
@@ -92,7 +92,7 @@ pub struct NumberConstructor;
 
 impl NumberConstructor {
     /// Properties of the Number Constructor (https://tc39.es/ecma262/#sec-properties-of-the-number-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -155,9 +155,9 @@ impl NumberConstructor {
     /// Number (https://tc39.es/ecma262/#sec-number-constructor-number-value)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let number_value = if arguments.is_empty() {
             0.0
         } else {
@@ -172,7 +172,7 @@ impl NumberConstructor {
         };
 
         match cx.current_new_target() {
-            None => Ok(Value::from(number_value).to_handle(cx)),
+            None => Ok(Value::from(number_value).to_stack()),
             Some(new_target) => {
                 Ok(NumberObject::new_from_constructor(cx, new_target, number_value)?.as_value())
             }
@@ -182,9 +182,9 @@ impl NumberConstructor {
     /// Number.isFinite (https://tc39.es/ecma262/#sec-number.isfinite)
     pub fn is_finite(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
         if !value.is_number() {
             return Ok(cx.bool(false));
@@ -196,9 +196,9 @@ impl NumberConstructor {
     /// Number.isInteger (https://tc39.es/ecma262/#sec-number.isinteger)
     pub fn is_integer(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
         Ok(cx.bool(is_integral_number(*value)))
     }
@@ -206,9 +206,9 @@ impl NumberConstructor {
     /// Number.isNaN (https://tc39.es/ecma262/#sec-number.isnan)
     pub fn is_nan(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
         if !value.is_number() {
             return Ok(cx.bool(false));
@@ -220,9 +220,9 @@ impl NumberConstructor {
     /// Number.isSafeInteger (https://tc39.es/ecma262/#sec-number.issafeinteger)
     pub fn is_safe_integer(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
         if !is_integral_number(*value) {
             return Ok(cx.bool(false));
@@ -237,7 +237,7 @@ impl HeapItem for HeapPtr<NumberObject> {
         size_of::<NumberObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
     }
 }

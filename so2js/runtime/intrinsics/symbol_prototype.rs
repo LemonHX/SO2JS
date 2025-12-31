@@ -1,7 +1,7 @@
 use crate::runtime::{
     alloc_error::AllocResult, builtin_function::BuiltinFunction, error::type_error,
     eval_result::EvalResult, object_value::ObjectValue, property::Property, realm::Realm,
-    string_value::StringValue, value::SymbolValue, Context, Handle, Value,
+    string_value::StringValue, value::SymbolValue, Context, StackRoot, Value,
 };
 
 use super::intrinsics::Intrinsic;
@@ -10,7 +10,7 @@ pub struct SymbolPrototype;
 
 impl SymbolPrototype {
     /// Properties of the Symbol Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-symbol-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -46,9 +46,9 @@ impl SymbolPrototype {
     /// get Symbol.prototype.description (https://tc39.es/ecma262/#sec-symbol.prototype.description)
     pub fn get_description(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let symbol_value = this_symbol_value(cx, this_value)?;
         match symbol_value.as_symbol().description() {
             None => Ok(cx.undefined()),
@@ -59,9 +59,9 @@ impl SymbolPrototype {
     /// Symbol.prototype.toString (https://tc39.es/ecma262/#sec-symbol.prototype.tostring)
     pub fn to_string(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let symbol_value = this_symbol_value(cx, this_value)?;
         Ok(symbol_descriptive_string(cx, symbol_value.as_symbol())?.as_value())
     }
@@ -69,14 +69,14 @@ impl SymbolPrototype {
     /// Symbol.prototype.valueOf (https://tc39.es/ecma262/#sec-symbol.prototype.valueof)
     pub fn value_of(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         this_symbol_value(cx, this_value)
     }
 }
 
-fn this_symbol_value(cx: Context, value: Handle<Value>) -> EvalResult<Handle<Value>> {
+fn this_symbol_value(cx: Context, value: StackRoot<Value>) -> EvalResult<StackRoot<Value>> {
     if value.is_symbol() {
         return Ok(value);
     }
@@ -94,8 +94,8 @@ fn this_symbol_value(cx: Context, value: Handle<Value>) -> EvalResult<Handle<Val
 /// SymbolDescriptiveString (https://tc39.es/ecma262/#sec-symboldescriptivestring)
 pub fn symbol_descriptive_string(
     mut cx: Context,
-    symbol: Handle<SymbolValue>,
-) -> AllocResult<Handle<StringValue>> {
+    symbol: StackRoot<SymbolValue>,
+) -> AllocResult<StackRoot<StringValue>> {
     match symbol.description() {
         None => Ok(cx.alloc_string("Symbol()")?.as_string()),
         Some(description) => {

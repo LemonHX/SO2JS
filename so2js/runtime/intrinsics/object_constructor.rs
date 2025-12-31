@@ -22,7 +22,7 @@ use crate::{
         property_key::PropertyKey,
         realm::Realm,
         type_utilities::{require_object_coercible, same_value, to_object, to_property_key},
-        Context, Handle, Value,
+        Context, StackRoot, Value,
     },
 };
 use alloc::vec;
@@ -34,7 +34,7 @@ pub struct ObjectConstructor;
 
 impl ObjectConstructor {
     /// Properties of the Object Constructor (https://tc39.es/ecma262/#sec-properties-of-the-object-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -134,9 +134,9 @@ impl ObjectConstructor {
     /// Object (https://tc39.es/ecma262/#sec-object-value)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if let Some(new_target) = cx.current_new_target() {
             if !cx.current_function().ptr_eq(&new_target) {
                 let new_object = object_create_from_constructor::<ObjectValue>(
@@ -145,13 +145,13 @@ impl ObjectConstructor {
                     HeapItemKind::OrdinaryObject,
                     Intrinsic::ObjectPrototype,
                 )?;
-                return Ok(new_object.to_handle().as_value());
+                return Ok(new_object.to_stack().as_value());
             }
         }
 
         let value = get_argument(cx, arguments, 0);
         if value.is_nullish() {
-            let new_value: Handle<Value> = ordinary_object_create(cx)?.into();
+            let new_value: StackRoot<Value> = ordinary_object_create(cx)?.into();
             return Ok(new_value);
         }
 
@@ -161,9 +161,9 @@ impl ObjectConstructor {
     /// Object.assign (https://tc39.es/ecma262/#sec-object.assign)
     pub fn assign(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let to_arg = get_argument(cx, arguments, 0);
         let to = to_object(cx, to_arg)?;
 
@@ -172,7 +172,7 @@ impl ObjectConstructor {
         }
 
         // Shared between iterations
-        let mut property_key = PropertyKey::uninit().to_handle(cx);
+        let mut property_key = PropertyKey::uninit().to_stack();
 
         for argument in &arguments[1..] {
             if !argument.is_nullish() {
@@ -198,9 +198,9 @@ impl ObjectConstructor {
     /// Object.create (https://tc39.es/ecma262/#sec-object.create)
     pub fn create(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let proto = get_argument(cx, arguments, 0);
         let proto = if proto.is_object() {
             Some(proto.as_object())
@@ -215,7 +215,7 @@ impl ObjectConstructor {
             HeapItemKind::OrdinaryObject,
             proto,
         )?
-        .to_handle();
+        .to_stack();
 
         let properties = get_argument(cx, arguments, 1);
         if properties.is_undefined() {
@@ -228,9 +228,9 @@ impl ObjectConstructor {
     /// Object.defineProperties (https://tc39.es/ecma262/#sec-object.defineproperties)
     pub fn define_properties(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = get_argument(cx, arguments, 0);
         if !object.is_object() {
             return type_error(cx, "value is not an object");
@@ -243,9 +243,9 @@ impl ObjectConstructor {
     /// ObjectDefineProperties (https://tc39.es/ecma262/#sec-objectdefineproperties)
     pub fn object_define_properties(
         cx: Context,
-        object: Handle<ObjectValue>,
-        properties: Handle<Value>,
-    ) -> EvalResult<Handle<Value>> {
+        object: StackRoot<ObjectValue>,
+        properties: StackRoot<Value>,
+    ) -> EvalResult<StackRoot<Value>> {
         let properties = to_object(cx, properties)?;
 
         let keys = properties.own_property_keys(cx)?;
@@ -253,7 +253,7 @@ impl ObjectConstructor {
         let mut descriptors = vec![];
 
         for key_value in keys {
-            let key = must!(PropertyKey::from_value(cx, key_value)).to_handle(cx);
+            let key = must!(PropertyKey::from_value(cx, key_value)).to_stack();
             let prop_desc = properties.get_own_property(cx, key)?;
             if let Some(prop_desc) = prop_desc {
                 if let Some(true) = prop_desc.is_enumerable {
@@ -275,9 +275,9 @@ impl ObjectConstructor {
     /// Object.defineProperty (https://tc39.es/ecma262/#sec-object.defineproperty)
     pub fn define_property(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = get_argument(cx, arguments, 0);
         if !object.is_object() {
             return type_error(cx, "can only define property on an object");
@@ -297,9 +297,9 @@ impl ObjectConstructor {
     /// Object.entries (https://tc39.es/ecma262/#sec-object.defineproperty)
     pub fn entries(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object_arg = get_argument(cx, arguments, 0);
         let object = to_object(cx, object_arg)?;
         let name_list = enumerable_own_property_names(cx, object, KeyOrValue::KeyAndValue)?;
@@ -309,9 +309,9 @@ impl ObjectConstructor {
     /// Object.freeze (https://tc39.es/ecma262/#sec-object.freeze)
     pub fn freeze(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = get_argument(cx, arguments, 0);
         if !object.is_object() {
             return Ok(object);
@@ -327,9 +327,9 @@ impl ObjectConstructor {
     /// Object.fromEntries (https://tc39.es/ecma262/#sec-object.fromentries)
     pub fn from_entries(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let iterable_arg = get_argument(cx, arguments, 0);
         let iterable = require_object_coercible(cx, iterable_arg)?;
 
@@ -350,9 +350,9 @@ impl ObjectConstructor {
     /// Object.getOwnPropertyDescriptor (https://tc39.es/ecma262/#sec-object.getownpropertydescriptor)
     pub fn get_own_property_descriptor(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object_arg = get_argument(cx, arguments, 0);
         let object = to_object(cx, object_arg)?;
 
@@ -368,9 +368,9 @@ impl ObjectConstructor {
     /// Object.getOwnPropertyDescriptors (https://tc39.es/ecma262/#sec-object.getownpropertydescriptors)
     pub fn get_own_property_descriptors(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object_arg = get_argument(cx, arguments, 0);
         let object = to_object(cx, object_arg)?;
 
@@ -379,7 +379,7 @@ impl ObjectConstructor {
         let descriptors = ordinary_object_create(cx)?;
 
         // Shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for key_value in keys {
             key.replace(must!(PropertyKey::from_value(cx, key_value)));
@@ -401,9 +401,9 @@ impl ObjectConstructor {
     /// Object.getOwnPropertyNames (https://tc39.es/ecma262/#sec-object.getownpropertynames)
     pub fn get_own_property_names(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object_arg = get_argument(cx, arguments, 0);
         let symbol_keys = Self::get_own_property_keys(cx, object_arg, true)?;
         Ok(create_array_from_list(cx, &symbol_keys)?.as_value())
@@ -412,9 +412,9 @@ impl ObjectConstructor {
     /// Object.getOwnPropertySymbols (https://tc39.es/ecma262/#sec-object.getownpropertysymbols)
     pub fn get_own_property_symbols(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object_arg = get_argument(cx, arguments, 0);
         let symbol_keys = Self::get_own_property_keys(cx, object_arg, false)?;
         Ok(create_array_from_list(cx, &symbol_keys)?.as_value())
@@ -423,13 +423,13 @@ impl ObjectConstructor {
     /// GetOwnPropertyKeys (https://tc39.es/ecma262/#sec-getownpropertykeys)
     pub fn get_own_property_keys(
         cx: Context,
-        object: Handle<Value>,
+        object: StackRoot<Value>,
         string_keys: bool,
-    ) -> EvalResult<Vec<Handle<Value>>> {
+    ) -> EvalResult<Vec<StackRoot<Value>>> {
         let object = to_object(cx, object)?;
         let keys = object.own_property_keys(cx)?;
 
-        let keys_of_type: Vec<Handle<Value>> = keys
+        let keys_of_type: Vec<StackRoot<Value>> = keys
             .into_iter()
             .filter(|key| {
                 if string_keys {
@@ -446,9 +446,9 @@ impl ObjectConstructor {
     /// Object.getPrototypeOf (https://tc39.es/ecma262/#sec-object.getprototypeof)
     pub fn get_prototype_of(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object_arg = get_argument(cx, arguments, 0);
         let object = to_object(cx, object_arg)?;
         let prototype = object.get_prototype_of(cx)?;
@@ -462,9 +462,9 @@ impl ObjectConstructor {
     /// Object.groupBy (https://tc39.es/ecma262/#sec-object.groupby)
     pub fn group_by(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let items = get_argument(cx, arguments, 0);
         let callback = get_argument(cx, arguments, 1);
 
@@ -475,7 +475,7 @@ impl ObjectConstructor {
             HeapItemKind::OrdinaryObject,
             None,
         )?
-        .to_handle();
+        .to_stack();
 
         for group in groups {
             let property_key = group.key.cast::<PropertyKey>();
@@ -494,9 +494,9 @@ impl ObjectConstructor {
     /// Object.hasOwn (https://tc39.es/ecma262/#sec-object.hasown)
     pub fn has_own(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object_arg = get_argument(cx, arguments, 0);
         let object = to_object(cx, object_arg)?;
 
@@ -510,9 +510,9 @@ impl ObjectConstructor {
     /// Object.is (https://tc39.es/ecma262/#sec-object.is)
     pub fn is(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let is_same = same_value(
             get_argument(cx, arguments, 0),
             get_argument(cx, arguments, 1),
@@ -523,9 +523,9 @@ impl ObjectConstructor {
     /// Object.isExtensible (https://tc39.es/ecma262/#sec-object.isextensible)
     pub fn is_extensible(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
         if !value.is_object() {
             return Ok(cx.bool(false));
@@ -538,9 +538,9 @@ impl ObjectConstructor {
     /// Object.isFrozen (https://tc39.es/ecma262/#sec-object.isfrozen)
     pub fn is_frozen(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
         if !value.is_object() {
             return Ok(cx.bool(true));
@@ -553,9 +553,9 @@ impl ObjectConstructor {
     /// Object.isSealed (https://tc39.es/ecma262/#sec-object.issealed)
     pub fn is_sealed(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
         if !value.is_object() {
             return Ok(cx.bool(true));
@@ -568,9 +568,9 @@ impl ObjectConstructor {
     /// Object.keys (https://tc39.es/ecma262/#sec-object.keys)
     pub fn keys(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object_arg = get_argument(cx, arguments, 0);
         let object = to_object(cx, object_arg)?;
         let name_list = enumerable_own_property_names(cx, object, KeyOrValue::Key)?;
@@ -580,9 +580,9 @@ impl ObjectConstructor {
     /// Object.preventExtensions (https://tc39.es/ecma262/#sec-object.preventextensions)
     pub fn prevent_extensions(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
         if !value.is_object() {
             return Ok(value);
@@ -598,9 +598,9 @@ impl ObjectConstructor {
     /// Object.seal (https://tc39.es/ecma262/#sec-object.seal)
     pub fn seal(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = get_argument(cx, arguments, 0);
         if !object.is_object() {
             return Ok(object);
@@ -616,9 +616,9 @@ impl ObjectConstructor {
     /// Object.setPrototypeOf (https://tc39.es/ecma262/#sec-object.setprototypeof)
     pub fn set_prototype_of(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object_arg = get_argument(cx, arguments, 0);
         let object = require_object_coercible(cx, object_arg)?;
 
@@ -646,9 +646,9 @@ impl ObjectConstructor {
     /// Object.values (https://tc39.es/ecma262/#sec-object.values)
     pub fn values(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object_arg = get_argument(cx, arguments, 0);
         let object = to_object(cx, object_arg)?;
         let name_list = enumerable_own_property_names(cx, object, KeyOrValue::Value)?;

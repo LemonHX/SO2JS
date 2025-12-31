@@ -6,7 +6,7 @@ use crate::{
     runtime::{
         gc::HeapItem, heap_item_descriptor::HeapItemKind, intrinsics::intrinsics::Intrinsic,
         object_value::ObjectValue, ordinary_object::object_create_from_constructor,
-        type_utilities::to_integer_or_infinity_f64, Context, EvalResult, Handle, HeapPtr,
+        type_utilities::to_integer_or_infinity_f64, Context, EvalResult, StackRoot, HeapPtr,
     },
     set_uninit,
 };
@@ -23,7 +23,7 @@ extend_object! {
 impl DateObject {
     pub fn new_from_constructor(
         cx: Context,
-        constructor: Handle<ObjectValue>,
+        constructor: StackRoot<ObjectValue>,
         date_value: f64,
     ) -> EvalResult<HeapPtr<DateObject>> {
         let mut object = object_create_from_constructor::<DateObject>(
@@ -180,13 +180,13 @@ pub fn week_day(time: f64) -> f64 {
 
 /// LocalTime (https://tc39.es/ecma262/#sec-localtime)
 pub fn local_time(time: f64) -> f64 {
-    // TODO: Handle time zones
+    // TODO: StackRoot time zones
     time
 }
 
 /// UTC (https://tc39.es/ecma262/#sec-utc-t)
 pub fn utc(time: f64) -> f64 {
-    // TODO: Handle time zones
+    // TODO: StackRoot time zones
     time
 }
 
@@ -338,7 +338,7 @@ pub fn make_day(year: f64, month: f64, date: f64) -> f64 {
     // Separate out the month in the calculated year. Compute modulus according to spec.
     let calculated_month = modulo(month, 12.0);
 
-    // TODO: Handle lossy casts
+    // TODO: StackRoot lossy casts
     let calculated_year = calculated_year as i64;
     let calculated_month = calculated_month as i64 + 1;
 
@@ -383,7 +383,7 @@ impl HeapItem for HeapPtr<DateObject> {
         size_of::<DateObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl crate::runtime::gc::HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl crate::runtime::gc::GcVisitorExt) {
         self.visit_object_pointers(visitor);
     }
 }

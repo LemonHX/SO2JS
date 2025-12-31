@@ -7,7 +7,7 @@ use crate::{
         error::type_error,
         eval_result::EvalResult,
         function::get_argument,
-        gc::Handle,
+        gc::StackRoot,
         intrinsics::intrinsics::Intrinsic,
         object_value::ObjectValue,
         ordinary_object::ordinary_object_create,
@@ -21,7 +21,7 @@ pub struct ProxyConstructor;
 
 impl ProxyConstructor {
     /// Properties of the Proxy Constructor (https://tc39.es/ecma262/#sec-properties-of-the-proxy-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -39,9 +39,9 @@ impl ProxyConstructor {
     /// Proxy (https://tc39.es/ecma262/#sec-proxy-target-handler)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if cx.current_new_target().is_none() {
             return type_error(cx, "Proxy is a constructor");
         }
@@ -55,9 +55,9 @@ impl ProxyConstructor {
     /// Proxy.revocable (https://tc39.es/ecma262/#sec-proxy.revocable)
     pub fn revocable(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let target = get_argument(cx, arguments, 0);
         let handler = get_argument(cx, arguments, 1);
         let proxy = proxy_create(cx, target, handler)?;
@@ -92,7 +92,7 @@ impl ProxyConstructor {
     }
 }
 
-pub fn revoke(mut cx: Context, _: Handle<Value>, _: &[Handle<Value>]) -> EvalResult<Handle<Value>> {
+pub fn revoke(mut cx: Context, _: StackRoot<Value>, _: &[StackRoot<Value>]) -> EvalResult<StackRoot<Value>> {
     // Find the proxy object attached to this closure via a private property
     let mut revoke_function = cx.current_function();
     let proxy_object_property =

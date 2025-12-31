@@ -2,7 +2,7 @@ use crate::{
     runtime::{
         async_generator_object, bound_function_object::BoundFunctionObject, context::ContextCell,
         gc_object::GcObject, global_names, module, promise_object::PromiseCapability,
-        test_262_object::Test262Object, Context, EvalResult, Handle, Value,
+        test_262_object::Test262Object, Context, EvalResult, StackRoot, Value,
     },
     static_assert,
 };
@@ -106,9 +106,9 @@ static_assert!(NUM_BUILTIN_RUST_RUNTIME_FUNCTIONS <= (1 << (RustRuntimeFunctionI
 
 pub type RustRuntimeFunction = fn(
     cx: Context,
-    this_value: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>>;
+    this_value: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>>;
 
 impl RustRuntimeFunctionRegistry {
     #[inline]
@@ -698,9 +698,9 @@ rust_runtime_functions!(
 #[no_mangle]
 pub fn return_this(
     _: Context,
-    this_value: Handle<Value>,
-    _: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    this_value: StackRoot<Value>,
+    _: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     Ok(this_value)
 }
 
@@ -708,8 +708,8 @@ pub fn return_this(
 #[no_mangle]
 pub fn return_undefined(
     cx: Context,
-    _: Handle<Value>,
-    _: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    _: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     Ok(cx.undefined())
 }

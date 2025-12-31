@@ -1,4 +1,5 @@
 use crate::runtime::{
+    context::ContextCell,
     object_value::ObjectValue,
     string_value::StringValue,
     value::{BigIntValue, SymbolValue},
@@ -11,41 +12,42 @@ use core::{
     pin::Pin,
     ptr::NonNull,
 };
+use so2js_gc::GcHeader;
 
-use super::{Heap, HeapInfo, HeapPtr, HeapVisitor, IsHeapItem};
+use super::{GcVisitorExt, Heap, HeapPtr, IsHeapItem};
 
-/// Handles store a pointer-sized unit of data. This may be either a value or a heap pointer.
-pub type HandleContents = usize;
+/// StackRoots store a pointer-sized unit of data. This may be either a value or a heap pointer.
+pub type StackRootContents = usize;
 
-pub trait ToHandleContents {
+pub trait ToStackRootContents {
     type Impl;
 
-    fn to_handle_contents(value: Self::Impl) -> HandleContents;
+    fn to_handle_contents(value: Self::Impl) -> StackRootContents;
 }
 
-/// Handles hold a value or heap pointer behind a pointer. Handles are safe to store on the stack
+/// StackRoots hold a value or heap pointer behind a pointer. StackRoots are safe to store on the stack
 /// during a GC, since the handle's pointer does not change but the address of the heap item
 /// behind the pointer may be updated.
-pub struct Handle<T> {
-    ptr: NonNull<HandleContents>,
+pub struct StackRoot<T> {
+    ptr: NonNull<StackRootContents>,
     phantom_data: PhantomData<T>,
 }
 
-impl core::fmt::Debug for Handle<Value> {
+impl core::fmt::Debug for StackRoot<Value> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         if self.is_dangling() {
-            write!(f, "Handle(dangling)")
+            write!(f, "StackRoot(dangling)")
         } else {
             let value = self.deref();
-            write!(f, "Handle({:?})", value)
+            write!(f, "StackRoot({:?})", value)
         }
     }
 }
 
-impl<T: ToHandleContents> Handle<T> {
+impl<T: ToStackRootContents> StackRoot<T> {
     #[inline]
-    pub fn new(handle_context: &mut HandleContext, contents: HandleContents) -> Handle<T> {
-        // Handle scope block is full, so push a new handle scope block onto stack
+    pub fn new(handle_context: &mut StackRootContext, contents: StackRootContents) -> StackRoot<T> {
+        // StackRoot scope block is full, so push a new handle scope block onto stack
         if handle_context.next_ptr == handle_context.end_ptr {
             handle_context.push_block();
         }
@@ -63,21 +65,21 @@ impl<T: ToHandleContents> Handle<T> {
             handle_context.max_handles = handle_context.max_handles.max(handle_context.num_handles);
         }
 
-        Handle {
+        StackRoot {
             ptr: unsafe { NonNull::new_unchecked(handle.cast()) },
             phantom_data: PhantomData,
         }
     }
 
     #[inline]
-    pub fn empty(cx: Context) -> Handle<T> {
-        let handle_context = cx.heap.info().handle_context();
-        Handle::new(handle_context, Value::to_handle_contents(Value::empty()))
+    pub fn empty(mut cx: Context) -> StackRoot<T> {
+        let handle_context = &mut cx.handle_context;
+        StackRoot::new(handle_context, Value::to_handle_contents(Value::empty()))
     }
 
     #[inline]
-    pub const fn dangling() -> Handle<T> {
-        Handle {
+    pub const fn dangling() -> StackRoot<T> {
+        StackRoot {
             ptr: NonNull::dangling(),
             phantom_data: PhantomData,
         }
@@ -95,33 +97,33 @@ impl<T: ToHandleContents> Handle<T> {
         unsafe { self.ptr.as_ptr().write(T::to_handle_contents(new_contents)) }
     }
 
-    pub fn replace_into<U: ToHandleContents>(self, new_contents: U::Impl) -> Handle<U> {
+    pub fn replace_into<U: ToStackRootContents>(self, new_contents: U::Impl) -> StackRoot<U> {
         let mut handle = self.cast::<U>();
         handle.replace(new_contents);
         handle
     }
 }
 
-impl<T> Handle<T> {
+impl<T> StackRoot<T> {
     #[inline]
-    pub fn cast<U>(&self) -> Handle<U> {
-        Handle {
+    pub fn cast<U>(&self) -> StackRoot<U> {
+        StackRoot {
             ptr: self.ptr,
             phantom_data: PhantomData,
         }
     }
 }
 
-impl<T> Clone for Handle<T> {
+impl<T> Clone for StackRoot<T> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T> Copy for Handle<T> {}
+impl<T> Copy for StackRoot<T> {}
 
-impl<T: ToHandleContents> Deref for Handle<T> {
+impl<T: ToStackRootContents> Deref for StackRoot<T> {
     type Target = T::Impl;
 
     #[inline]
@@ -130,7 +132,7 @@ impl<T: ToHandleContents> Deref for Handle<T> {
     }
 }
 
-impl<T: ToHandleContents> DerefMut for Handle<T> {
+impl<T: ToStackRootContents> DerefMut for StackRoot<T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.ptr.cast::<Self::Target>().as_mut() }
@@ -139,14 +141,14 @@ impl<T: ToHandleContents> DerefMut for Handle<T> {
 
 /// Saved handle state that allows restoring to the state right before a handle scope was entered.
 /// Must only be created on the stack.
-#[must_use = "HandleScopes must be explicitly exited with a call to exit"]
-pub struct HandleScope {
-    heap_ptr: *mut Heap,
-    next_ptr: *mut HandleContents,
-    end_ptr: *mut HandleContents,
+#[must_use = "StackRootScopes must be explicitly exited with a call to exit"]
+pub struct StackRootScope {
+    context_ptr: *mut ContextCell,
+    next_ptr: *mut StackRootContents,
+    end_ptr: *mut StackRootContents,
 }
 
-impl HandleScope {
+impl StackRootScope {
     #[inline]
     pub fn new<F: FnOnce(Context) -> R, R: Escapable>(cx: Context, f: F) -> R {
         let handle_scope = Self::enter(cx);
@@ -155,14 +157,16 @@ impl HandleScope {
     }
 
     #[inline]
-    pub fn enter(mut cx: Context) -> HandleScope {
-        let heap = &mut cx.heap;
-        let handle_context = heap.info().handle_context();
+    pub fn enter(mut cx: Context) -> StackRootScope {
+        let context_ptr = cx.as_ptr();
+        let handle_context = &mut cx.handle_context;
+        let next_ptr = handle_context.next_ptr;
+        let end_ptr = handle_context.end_ptr;
 
-        HandleScope {
-            heap_ptr: heap as *mut Heap,
-            next_ptr: handle_context.next_ptr,
-            end_ptr: handle_context.end_ptr,
+        StackRootScope {
+            context_ptr,
+            next_ptr,
+            end_ptr,
         }
     }
 
@@ -181,8 +185,8 @@ impl HandleScope {
 
     #[inline]
     fn exit_non_consuming(&self) {
-        let heap = unsafe { &mut *self.heap_ptr };
-        let handle_context = heap.info().handle_context();
+        let context_cell = unsafe { &mut *self.context_ptr };
+        let handle_context = &mut context_cell.handle_context;
 
         // The saved handle scope was in a previous block. Pop blocks until the current block
         // matches that of the saved handle scope.
@@ -226,20 +230,20 @@ impl HandleScope {
 }
 
 /// A guard which enters a handle scope and exits it when dropped. Does not escape any values.
-pub struct HandleScopeGuard {
-    handle_scope: HandleScope,
+pub struct StackRootScopeGuard {
+    handle_scope: StackRootScope,
 }
 
-impl HandleScopeGuard {
+impl StackRootScopeGuard {
     #[inline]
-    pub fn new(cx: Context) -> HandleScopeGuard {
-        HandleScopeGuard {
-            handle_scope: HandleScope::enter(cx),
+    pub fn new(cx: Context) -> StackRootScopeGuard {
+        StackRootScopeGuard {
+            handle_scope: StackRootScope::enter(cx),
         }
     }
 }
 
-impl Drop for HandleScopeGuard {
+impl Drop for StackRootScopeGuard {
     #[inline]
     fn drop(&mut self) {
         self.handle_scope.exit_non_consuming();
@@ -250,7 +254,7 @@ impl Drop for HandleScopeGuard {
 #[macro_export]
 macro_rules! handle_scope_guard {
     ($cx:expr) => {
-        let _guard = $crate::runtime::gc::HandleScopeGuard::new($cx);
+        let _guard = $crate::runtime::gc::StackRootScopeGuard::new($cx);
     };
 }
 
@@ -259,7 +263,7 @@ macro_rules! handle_scope_guard {
 #[macro_export]
 macro_rules! handle_scope {
     ($cx:expr, $body:stmt) => {
-        $crate::runtime::gc::HandleScope::new($cx, |_| {
+        $crate::runtime::gc::StackRootScope::new($cx, |_| {
             let result = { $body };
             result
         })
@@ -269,19 +273,19 @@ macro_rules! handle_scope {
 /// Number of handles contained in a single handle block. Default to 4KB handle blocks.
 const HANDLE_BLOCK_SIZE: usize = 512;
 
-pub struct HandleBlock {
-    ptrs: [HandleContents; HANDLE_BLOCK_SIZE],
+pub struct StackRootBlock {
+    ptrs: [StackRootContents; HANDLE_BLOCK_SIZE],
     // Pointer to the start of the handles array
-    start_ptr: *mut HandleContents,
+    start_ptr: *mut StackRootContents,
     // Pointer to the end of the handles array. Used to uniquely identify this block.
-    end_ptr: *mut HandleContents,
-    prev_block: Option<Pin<Box<HandleBlock>>>,
+    end_ptr: *mut StackRootContents,
+    prev_block: Option<Pin<Box<StackRootBlock>>>,
 }
 
-impl HandleBlock {
-    fn new(prev_block: Option<Pin<Box<HandleBlock>>>) -> Pin<Box<HandleBlock>> {
+impl StackRootBlock {
+    fn new(prev_block: Option<Pin<Box<StackRootBlock>>>) -> Pin<Box<StackRootBlock>> {
         // Block must first be allocated on heap before start and end ptrs can be calculated.
-        let mut block = Pin::new(Box::new(HandleBlock {
+        let mut block = Pin::new(Box::new(StackRootBlock {
             ptrs: [0; HANDLE_BLOCK_SIZE],
             start_ptr: core::ptr::null_mut(),
             end_ptr: core::ptr::null_mut(),
@@ -296,19 +300,19 @@ impl HandleBlock {
     }
 }
 
-pub struct HandleContext {
+pub struct StackRootContext {
     /// Pointer to within a handle block, pointing to address of the next handle to allocate
-    next_ptr: *mut HandleContents,
+    next_ptr: *mut StackRootContents,
 
     /// Pointer one beyond the end of the current handle scope block, marking the limit for this
     /// handle scope. Used to uniquely identify the current handle block.
-    end_ptr: *mut HandleContents,
+    end_ptr: *mut StackRootContents,
 
     /// Current block for the handle scope stack. Contains chain of other blocks in use.
-    current_block: Pin<Box<HandleBlock>>,
+    current_block: Pin<Box<StackRootBlock>>,
 
     /// Chain of free blocks
-    free_blocks: Option<Pin<Box<HandleBlock>>>,
+    free_blocks: Option<Pin<Box<StackRootBlock>>>,
 
     /// Total number of handles currently allocated
     #[cfg(feature = "handle_stats")]
@@ -321,16 +325,32 @@ pub struct HandleContext {
 
 #[cfg(feature = "handle_stats")]
 #[derive(Debug)]
-pub struct HandleStats {
+pub struct StackRootStats {
     pub num_handles: usize,
     pub max_handles: usize,
 }
 
-impl HandleContext {
-    pub fn init(&mut self) {
-        let first_block = HandleBlock::new(None);
+impl StackRootContext {
+    /// Create a new StackRootContext with its first block allocated
+    pub fn new() -> StackRootContext {
+        let first_block = StackRootBlock::new(None);
 
-        let handle_context = HandleContext {
+        StackRootContext {
+            next_ptr: first_block.start_ptr,
+            end_ptr: first_block.end_ptr,
+            current_block: first_block,
+            free_blocks: None,
+            #[cfg(feature = "handle_stats")]
+            num_handles: 0,
+            #[cfg(feature = "handle_stats")]
+            max_handles: 0,
+        }
+    }
+
+    pub fn init(&mut self) {
+        let first_block = StackRootBlock::new(None);
+
+        let handle_context = StackRootContext {
             next_ptr: first_block.start_ptr,
             end_ptr: first_block.end_ptr,
             current_block: first_block,
@@ -349,7 +369,7 @@ impl HandleContext {
         match &mut self.free_blocks {
             None => {
                 // Allocate a new block and push it as the current block
-                let new_block = HandleBlock::new(None);
+                let new_block = StackRootBlock::new(None);
                 let old_current_block = core::mem::replace(&mut self.current_block, new_block);
                 self.current_block.prev_block = Some(old_current_block);
             }
@@ -369,7 +389,7 @@ impl HandleContext {
         self.end_ptr = self.current_block.end_ptr;
     }
 
-    fn pop_block(&mut self) -> *mut HandleContents {
+    fn pop_block(&mut self) -> *mut StackRootContents {
         // Current block is replaced by its previous block
         let old_prev_block = self.current_block.prev_block.take();
 
@@ -422,7 +442,7 @@ impl HandleContext {
         total
     }
 
-    pub fn visit_roots(&mut self, visitor: &mut impl HeapVisitor) {
+    pub fn visit_roots(&mut self, visitor: &mut impl GcVisitorExt) {
         // Only visit values that have been used (aka before the next pointer) in the current block
         let mut current_block = &self.current_block;
         Self::visit_roots_between_pointers(current_block.start_ptr, self.next_ptr, visitor);
@@ -439,9 +459,9 @@ impl HandleContext {
     }
 
     fn visit_roots_between_pointers(
-        start_ptr: *const HandleContents,
-        end_ptr: *const HandleContents,
-        visitor: &mut impl HeapVisitor,
+        start_ptr: *const StackRootContents,
+        end_ptr: *const StackRootContents,
+        visitor: &mut impl GcVisitorExt,
     ) {
         unsafe {
             let mut current_ptr = start_ptr;
@@ -455,64 +475,78 @@ impl HandleContext {
     }
 
     #[cfg(feature = "handle_stats")]
-    pub fn handle_stats(&self) -> HandleStats {
-        HandleStats {
+    pub fn handle_stats(&self) -> StackRootStats {
+        StackRootStats {
             num_handles: self.num_handles,
             max_handles: self.max_handles,
         }
     }
 }
 
-impl Handle<Value> {
+impl StackRoot<Value> {
     #[inline]
-    pub fn from_fixed_non_heap_ptr(value_ref: &Value) -> Handle<Value> {
+    pub fn from_fixed_non_heap_ptr(value_ref: &Value) -> StackRoot<Value> {
         let ptr = unsafe { NonNull::new_unchecked(value_ref as *const Value as *mut Value) };
-        Handle {
+        StackRoot {
             ptr: ptr.cast(),
             phantom_data: PhantomData,
         }
     }
 
     #[inline]
-    pub fn as_object(&self) -> Handle<ObjectValue> {
+    pub fn as_object(&self) -> StackRoot<ObjectValue> {
         self.cast()
     }
 
     #[inline]
-    pub fn as_string(&self) -> Handle<StringValue> {
+    pub fn as_string(&self) -> StackRoot<StringValue> {
         self.cast()
     }
 
     #[inline]
-    pub fn as_symbol(&self) -> Handle<SymbolValue> {
+    pub fn as_symbol(&self) -> StackRoot<SymbolValue> {
         self.cast()
     }
 
     #[inline]
-    pub fn as_bigint(&self) -> Handle<BigIntValue> {
+    pub fn as_bigint(&self) -> StackRoot<BigIntValue> {
         self.cast()
     }
 }
 
 impl Value {
     #[inline]
-    pub fn to_handle(self, cx: Context) -> Handle<Value> {
-        let handle_context = cx.heap.info().handle_context();
-        Handle::new(handle_context, Value::to_handle_contents(self))
+    pub fn to_stack(self) -> StackRoot<Value> {
+        let handle_context = todo!();
+        StackRoot::new(handle_context, Value::to_handle_contents(self))
     }
 }
 
 impl<T: IsHeapItem> HeapPtr<T> {
     #[inline]
-    pub fn to_handle(self) -> Handle<T> {
-        let handle_context = HeapInfo::from_heap_ptr(self).handle_context();
-        Handle::new(handle_context, T::to_handle_contents(self))
+    pub fn to_stack(self) -> StackRoot<T> {
+        // Get Context from the GcHeader stored with each object
+        let self_ptr = self.as_ptr();
+        let gc_header = unsafe { GcHeader::from_object_ptr(self_ptr) };
+        let context_ptr = gc_header.context_ptr() as *mut ContextCell;
+
+        // Debug: check if context_ptr looks valid
+        debug_assert!(
+            !context_ptr.is_null(),
+            "context_ptr is null! self.as_ptr() = {:p}, gc_header = {:p}",
+            self_ptr,
+            gc_header as *const _
+        );
+
+        let context_cell = unsafe { &mut *context_ptr };
+        let handle_context = &mut context_cell.handle_context;
+        StackRoot::new(handle_context, T::to_handle_contents(self))
     }
 }
 
-impl<T: IsHeapItem> From<Handle<T>> for Handle<Value> {
+impl<T: IsHeapItem> From<StackRoot<T>> for StackRoot<Value> {
     #[inline]
-    fn from(value: Handle<T>) -> Self {
+    fn from(value: StackRoot<T>) -> Self {
         value.cast()
     }
 }
@@ -556,17 +590,17 @@ impl<T> Escapable for HeapPtr<T> {
     }
 }
 
-impl Escapable for Handle<Value> {
+impl Escapable for StackRoot<Value> {
     #[inline]
     fn escape(&self, cx: Context) -> Self {
-        (**self).to_handle(cx)
+        (**self).to_stack()
     }
 }
 
-impl<T: IsHeapItem> Escapable for Handle<T> {
+impl<T: IsHeapItem> Escapable for StackRoot<T> {
     #[inline]
     fn escape(&self, _: Context) -> Self {
-        (**self).to_handle()
+        (**self).to_stack()
     }
 }
 

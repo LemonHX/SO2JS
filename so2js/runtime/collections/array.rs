@@ -2,7 +2,7 @@ use crate::{
     field_offset,
     runtime::{
         alloc_error::AllocResult,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
         Context, HeapPtr, Value,
     },
@@ -93,7 +93,7 @@ impl<T> HeapItem for HeapPtr<BsArray<T>> {
     }
 
     /// Visit pointers intrinsic to all BsArrays. Do not visit elements as they could be of any type.
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
     }
 }
@@ -107,7 +107,7 @@ pub fn value_array_byte_size(value_array: HeapPtr<ValueArray>) -> usize {
 
 pub fn value_array_visit_pointers(
     value_array: &mut HeapPtr<ValueArray>,
-    visitor: &mut impl HeapVisitor,
+    visitor: &mut impl GcVisitorExt,
 ) {
     value_array.visit_pointers(visitor);
 
@@ -127,7 +127,7 @@ pub fn byte_array_byte_size(byte_array: HeapPtr<ByteArray>) -> usize {
 
 pub fn byte_array_visit_pointers(
     byte_array: &mut HeapPtr<ByteArray>,
-    visitor: &mut impl HeapVisitor,
+    visitor: &mut impl GcVisitorExt,
 ) {
     byte_array.visit_pointers(visitor);
 }
@@ -141,6 +141,6 @@ pub fn u32_array_byte_size(array: HeapPtr<U32Array>) -> usize {
     U32Array::calculate_size_in_bytes(array.len())
 }
 
-pub fn u32_array_visit_pointers(array: &mut HeapPtr<U32Array>, visitor: &mut impl HeapVisitor) {
+pub fn u32_array_visit_pointers(array: &mut HeapPtr<U32Array>, visitor: &mut impl GcVisitorExt) {
     array.visit_pointers(visitor);
 }

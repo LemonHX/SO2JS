@@ -5,7 +5,7 @@ use crate::{
         alloc_error::AllocResult,
         builtin_function::BuiltinFunction,
         error::{type_error, type_error_value},
-        gc::{HeapItem, HeapVisitor},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::HeapItemKind,
         intrinsics::intrinsics::Intrinsic,
         object_value::ObjectValue,
@@ -25,7 +25,7 @@ use super::{
     get,
     heap_item_descriptor::HeapItemDescriptor,
     type_utilities::{same_object_value, same_value},
-    EvalResult, Handle,
+    EvalResult, StackRoot,
 };
 
 // Properties of Promise Instances (https://tc39.es/ecma262/#sec-properties-of-promise-instances)
@@ -59,12 +59,12 @@ enum PromiseState {
 pub struct PromiseReaction {
     descriptor: HeapPtr<HeapItemDescriptor>,
     /// The functions to be called when the promise is settled.
-    handler: ReactionHandler,
+    handler: ReactionStackRootr,
     /// The next reaction in the chain of reactions.
     next: Option<HeapPtr<PromiseReaction>>,
 }
 
-enum ReactionHandler {
+enum ReactionStackRootr {
     AwaitResume {
         /// An async function suspended at an await expression. Is a regular generator object for
         /// async functions and an async generator object for async generators.
@@ -104,8 +104,8 @@ impl PromiseObject {
 
     pub fn new_from_constructor(
         cx: Context,
-        constructor: Handle<ObjectValue>,
-    ) -> EvalResult<Handle<PromiseObject>> {
+        constructor: StackRoot<ObjectValue>,
+    ) -> EvalResult<StackRoot<PromiseObject>> {
         let mut object = object_create_from_constructor::<PromiseObject>(
             cx,
             constructor,
@@ -121,7 +121,7 @@ impl PromiseObject {
             }
         );
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     pub fn is_pending(&self) -> bool {
@@ -194,13 +194,13 @@ impl PromiseObject {
         // Add a task to the queue for each matching reaction in the order they were added
         for reaction in matching_reactions.into_iter().rev() {
             match reaction.handler {
-                ReactionHandler::AwaitResume {
+                ReactionStackRootr::AwaitResume {
                     suspended_generator,
                 } => {
                     cx.task_queue()
                         .enqueue_await_resume_task(kind, suspended_generator, value);
                 }
-                ReactionHandler::Then {
+                ReactionStackRootr::Then {
                     fulfill_handler,
                     reject_handler,
                     capability,
@@ -219,8 +219,8 @@ impl PromiseObject {
 /// Promise Resolve Functions (https://tc39.es/ecma262/#sec-promise-resolve-functions)
 pub fn resolve(
     mut cx: Context,
-    mut promise: Handle<PromiseObject>,
-    resolution: Handle<Value>,
+    mut promise: StackRoot<PromiseObject>,
+    resolution: StackRoot<Value>,
 ) -> AllocResult<()> {
     // Resolving an already settled promise has no effect. Immediately mark promise as
     // "already resolved" to prevent further settlement, since fulfill or reject may not be called
@@ -285,7 +285,7 @@ pub fn resolve(
     Ok(())
 }
 
-impl Handle<PromiseObject> {
+impl StackRoot<PromiseObject> {
     fn set_reactions(&mut self, value: Option<HeapPtr<PromiseReaction>>) {
         match self.state {
             PromiseState::Pending {
@@ -298,12 +298,12 @@ impl Handle<PromiseObject> {
     pub fn add_await_reaction(
         &mut self,
         mut cx: Context,
-        suspended_generator: Handle<ObjectValue>,
+        suspended_generator: StackRoot<ObjectValue>,
     ) -> AllocResult<()> {
         match &mut self.state {
             // Prepend reaction onto the current linked list of reactions.
             PromiseState::Pending { reactions, .. } => {
-                let prev_reactions = reactions.map(|r| r.to_handle());
+                let prev_reactions = reactions.map(|r| r.to_stack());
                 let new_reactions = Some(PromiseReaction::new_await_resume(
                     cx,
                     suspended_generator,
@@ -334,14 +334,14 @@ impl Handle<PromiseObject> {
     pub fn add_then_reaction(
         &mut self,
         cx: Context,
-        fulfill_handler: Option<Handle<ObjectValue>>,
-        reject_handler: Option<Handle<ObjectValue>>,
-        capability: Option<Handle<PromiseCapability>>,
+        fulfill_handler: Option<StackRoot<ObjectValue>>,
+        reject_handler: Option<StackRoot<ObjectValue>>,
+        capability: Option<StackRoot<PromiseCapability>>,
     ) -> AllocResult<()> {
         match &mut self.state {
             // Prepend reaction onto the current linked list of reactions.
             PromiseState::Pending { reactions, .. } => {
-                let prev_reactions = reactions.map(|r| r.to_handle());
+                let prev_reactions = reactions.map(|r| r.to_stack());
                 let new_reactions = Some(PromiseReaction::new_then(
                     cx,
                     fulfill_handler,
@@ -381,7 +381,7 @@ pub fn is_promise(value: Value) -> bool {
     value.is_object() && value.as_object().is_promise()
 }
 
-pub fn as_promise(value: Handle<Value>) -> Option<Handle<PromiseObject>> {
+pub fn as_promise(value: StackRoot<Value>) -> Option<StackRoot<PromiseObject>> {
     if is_promise(*value) {
         Some(value.cast())
     } else {
@@ -396,8 +396,8 @@ pub fn as_promise(value: Handle<Value>) -> Option<Handle<PromiseObject>> {
 /// constructor.
 pub fn coerce_to_ordinary_promise(
     cx: Context,
-    value: Handle<Value>,
-) -> EvalResult<Handle<PromiseObject>> {
+    value: StackRoot<Value>,
+) -> EvalResult<StackRoot<PromiseObject>> {
     if let Some(value) = as_promise(value) {
         let value_constructor = get(cx, value.into(), cx.names.constructor())?;
         let promise_constructor = cx.get_intrinsic_ptr(Intrinsic::PromiseConstructor);
@@ -408,7 +408,7 @@ pub fn coerce_to_ordinary_promise(
         }
     }
 
-    let promise = PromiseObject::new_pending(cx)?.to_handle();
+    let promise = PromiseObject::new_pending(cx)?.to_stack();
     resolve(cx, promise, value)?;
 
     Ok(promise)
@@ -419,9 +419,9 @@ pub fn coerce_to_ordinary_promise(
 /// PromiseResolve (https://tc39.es/ecma262/#sec-promise-resolve)
 pub fn promise_resolve(
     cx: Context,
-    constructor: Handle<Value>,
-    result: Handle<Value>,
-) -> EvalResult<Handle<ObjectValue>> {
+    constructor: StackRoot<Value>,
+    result: StackRoot<Value>,
+) -> EvalResult<StackRoot<ObjectValue>> {
     // If result is already a promise, return it if it was constructed with the same constructor.
     if is_promise(*result) {
         let result = result.as_object();
@@ -448,7 +448,7 @@ fn enqueue_promise_then_reaction_task(
     // Get the realm of the handler function, defaulting to the current realm if getting the
     // realm fails (i.e. the handler function is a revoked proxy).
     let realm = match handler {
-        Some(handler) => match get_function_realm_no_error(cx, handler.to_handle()) {
+        Some(handler) => match get_function_realm_no_error(cx, handler.to_stack()) {
             Some(realm) => Some(realm),
             None => Some(cx.current_realm_ptr()),
         },
@@ -462,8 +462,8 @@ fn enqueue_promise_then_reaction_task(
 impl PromiseReaction {
     fn new_await_resume(
         cx: Context,
-        suspended_generator: Handle<ObjectValue>,
-        next: Option<Handle<PromiseReaction>>,
+        suspended_generator: StackRoot<ObjectValue>,
+        next: Option<StackRoot<PromiseReaction>>,
     ) -> AllocResult<HeapPtr<PromiseReaction>> {
         let mut reaction = cx.alloc_uninit::<PromiseReaction>()?;
 
@@ -473,7 +473,7 @@ impl PromiseReaction {
         );
         set_uninit!(
             reaction.handler,
-            ReactionHandler::AwaitResume {
+            ReactionStackRootr::AwaitResume {
                 suspended_generator: *suspended_generator
             }
         );
@@ -484,10 +484,10 @@ impl PromiseReaction {
 
     fn new_then(
         cx: Context,
-        fulfill_handler: Option<Handle<ObjectValue>>,
-        reject_handler: Option<Handle<ObjectValue>>,
-        capability: Option<Handle<PromiseCapability>>,
-        next: Option<Handle<PromiseReaction>>,
+        fulfill_handler: Option<StackRoot<ObjectValue>>,
+        reject_handler: Option<StackRoot<ObjectValue>>,
+        capability: Option<StackRoot<PromiseCapability>>,
+        next: Option<StackRoot<PromiseReaction>>,
     ) -> AllocResult<HeapPtr<PromiseReaction>> {
         let mut reaction = cx.alloc_uninit::<PromiseReaction>()?;
 
@@ -497,7 +497,7 @@ impl PromiseReaction {
         );
         set_uninit!(
             reaction.handler,
-            ReactionHandler::Then {
+            ReactionStackRootr::Then {
                 fulfill_handler: fulfill_handler.map(|h| *h),
                 reject_handler: reject_handler.map(|h| *h),
                 capability: capability.map(|c| *c),
@@ -523,7 +523,7 @@ pub struct PromiseCapability {
 
 impl PromiseCapability {
     /// NewPromiseCapability (https://tc39.es/ecma262/#sec-newpromisecapability)
-    pub fn new(cx: Context, constructor: Handle<Value>) -> EvalResult<Handle<PromiseCapability>> {
+    pub fn new(cx: Context, constructor: StackRoot<Value>) -> EvalResult<StackRoot<PromiseCapability>> {
         if !is_constructor_value(constructor) {
             return type_error(cx, "expected constructor");
         }
@@ -540,7 +540,7 @@ impl PromiseCapability {
         set_uninit!(capability.resolve, Value::undefined());
         set_uninit!(capability.reject, Value::undefined());
 
-        let mut capability = capability.to_handle();
+        let mut capability = capability.to_stack();
 
         // Create the executor function and attach the capability object to it
         let mut executor = BuiltinFunction::create(
@@ -562,9 +562,9 @@ impl PromiseCapability {
         // reject fields of the capability.
         let promise = construct(cx, constructor, &[executor.into()], None)?;
 
-        if !is_callable(capability.resolve.to_handle(cx)) {
+        if !is_callable(capability.resolve.to_stack()) {
             return type_error(cx, "resolve must be callable");
-        } else if !is_callable(capability.reject.to_handle(cx)) {
+        } else if !is_callable(capability.reject.to_stack()) {
             return type_error(cx, "reject must be callable");
         }
 
@@ -574,27 +574,28 @@ impl PromiseCapability {
         Ok(capability)
     }
 
-    pub fn promise(&self) -> Handle<ObjectValue> {
-        self.promise.unwrap().to_handle()
+    pub fn promise(&self) -> StackRoot<ObjectValue> {
+        self.promise.unwrap().to_stack()
     }
 
-    pub fn resolve(&self) -> Handle<ObjectValue> {
-        self.resolve.as_object().to_handle()
+    pub fn resolve(&self) -> StackRoot<ObjectValue> {
+        self.resolve.as_object().to_stack()
     }
 
-    pub fn reject(&self) -> Handle<ObjectValue> {
-        self.reject.as_object().to_handle()
+    pub fn reject(&self) -> StackRoot<ObjectValue> {
+        self.reject.as_object().to_stack()
     }
 
     pub fn executor(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         // Get the capability object that was attached to the executor function
         let current_function = cx.current_function();
+        let name = cx.well_known_symbols.capability().cast();
         let mut capability = current_function
-            .private_element_find(cx, cx.well_known_symbols.capability().cast())
+            .private_element_find(cx, name)
             .unwrap()
             .value()
             .cast::<PromiseCapability>();
@@ -622,7 +623,7 @@ impl HeapItem for HeapPtr<PromiseObject> {
         size_of::<PromiseObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
 
         match &mut self.state {
@@ -641,15 +642,15 @@ impl HeapItem for HeapPtr<PromiseReaction> {
         size_of::<PromiseReaction>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
         match &mut self.handler {
-            ReactionHandler::AwaitResume {
+            ReactionStackRootr::AwaitResume {
                 suspended_generator,
             } => {
                 visitor.visit_pointer(suspended_generator);
             }
-            ReactionHandler::Then {
+            ReactionStackRootr::Then {
                 fulfill_handler,
                 reject_handler,
                 capability,
@@ -668,7 +669,7 @@ impl HeapItem for HeapPtr<PromiseCapability> {
         size_of::<PromiseCapability>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
         visitor.visit_pointer_opt(&mut self.promise);
         visitor.visit_value(&mut self.resolve);

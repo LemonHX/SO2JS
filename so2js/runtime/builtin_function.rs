@@ -7,7 +7,7 @@ use super::{
     object_value::ObjectValue,
     property_key::PropertyKey,
     realm::Realm,
-    Context, Handle,
+    Context, StackRoot,
 };
 
 /// Built-in Function Object (https://tc39.es/ecma262/#sec-built-in-function-objects)
@@ -19,10 +19,10 @@ impl BuiltinFunction {
         cx: Context,
         builtin_func: RustRuntimeFunction,
         length: u32,
-        name: Handle<PropertyKey>,
-        realm: Handle<Realm>,
+        name: StackRoot<PropertyKey>,
+        realm: StackRoot<Realm>,
         prefix: Option<&str>,
-    ) -> AllocResult<Handle<ObjectValue>> {
+    ) -> AllocResult<StackRoot<ObjectValue>> {
         Ok(Self::create_builtin_function(
             cx,
             builtin_func,
@@ -41,12 +41,12 @@ impl BuiltinFunction {
         cx: Context,
         builtin_func: RustRuntimeFunction,
         length: u32,
-        name: Handle<PropertyKey>,
-        realm: Handle<Realm>,
-        prototype: Option<Handle<ObjectValue>>,
+        name: StackRoot<PropertyKey>,
+        realm: StackRoot<Realm>,
+        prototype: Option<StackRoot<ObjectValue>>,
         prefix: Option<&str>,
         is_constructor: bool,
-    ) -> AllocResult<Handle<Closure>> {
+    ) -> AllocResult<StackRoot<Closure>> {
         let func = Self::create_builtin_function_without_properties(
             cx,
             builtin_func,
@@ -62,9 +62,9 @@ impl BuiltinFunction {
 
     fn install_common_properties(
         cx: Context,
-        func: Handle<ObjectValue>,
+        func: StackRoot<ObjectValue>,
         length: u32,
-        name: Handle<PropertyKey>,
+        name: StackRoot<PropertyKey>,
         prefix: Option<&str>,
     ) -> AllocResult<()> {
         set_function_length(cx, func, length)?;
@@ -80,11 +80,11 @@ impl BuiltinFunction {
     pub fn create_builtin_function_without_properties(
         cx: Context,
         builtin_func: RustRuntimeFunction,
-        name: Option<Handle<PropertyKey>>,
-        realm: Handle<Realm>,
-        prototype: Option<Handle<ObjectValue>>,
+        name: Option<StackRoot<PropertyKey>>,
+        realm: StackRoot<Realm>,
+        prototype: Option<StackRoot<ObjectValue>>,
         is_constructor: bool,
-    ) -> AllocResult<Handle<Closure>> {
+    ) -> AllocResult<StackRoot<Closure>> {
         let name = name
             .map(|name| build_function_name(cx, name, None))
             .transpose()?;
@@ -109,10 +109,10 @@ impl BuiltinFunction {
         cx: Context,
         builtin_func: RustRuntimeFunction,
         length: u32,
-        name: Handle<PropertyKey>,
-        realm: Handle<Realm>,
+        name: StackRoot<PropertyKey>,
+        realm: StackRoot<Realm>,
         prototype: Intrinsic,
-    ) -> AllocResult<Handle<ObjectValue>> {
+    ) -> AllocResult<StackRoot<ObjectValue>> {
         Ok(Self::create_builtin_function(
             cx,
             builtin_func,

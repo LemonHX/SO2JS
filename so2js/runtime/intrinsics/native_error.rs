@@ -11,7 +11,7 @@ use crate::runtime::{
     object_value::ObjectValue,
     realm::Realm,
     type_utilities::to_string,
-    Context, Handle, HeapPtr, Value,
+    Context, StackRoot, HeapPtr, Value,
 };
 use alloc::string::String;
 
@@ -24,7 +24,7 @@ macro_rules! create_native_error {
             pub fn new_with_message(
                 mut cx: Context,
                 message: String,
-            ) -> AllocResult<Handle<ErrorObject>> {
+            ) -> AllocResult<StackRoot<ErrorObject>> {
                 // Be sure to allocate before creating object
                 let message_value = cx.alloc_string(&message)?.into();
 
@@ -46,7 +46,7 @@ macro_rules! create_native_error {
                 mut cx: Context,
                 realm: HeapPtr<Realm>,
                 message: &str,
-            ) -> EvalResult<Handle<ObjectValue>> {
+            ) -> EvalResult<StackRoot<ObjectValue>> {
                 let type_error_constructor = realm.get_intrinsic(Intrinsic::$constructor);
                 let message_value = cx.alloc_string(message)?.into();
                 construct(cx, type_error_constructor, &[message_value], None)
@@ -57,7 +57,7 @@ macro_rules! create_native_error {
 
         impl $constructor {
             /// Properties of the NativeError Constructors (https://tc39.es/ecma262/#sec-properties-of-the-nativeerror-constructors)
-            pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+            pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
                 let mut func = BuiltinFunction::intrinsic_constructor(
                     cx,
                     Self::construct,
@@ -79,9 +79,9 @@ macro_rules! create_native_error {
             /// NativeError (https://tc39.es/ecma262/#sec-nativeerror)
             pub fn construct(
                 mut cx: Context,
-                _: Handle<Value>,
-                arguments: &[Handle<Value>],
-            ) -> EvalResult<Handle<Value>> {
+                _: StackRoot<Value>,
+                arguments: &[StackRoot<Value>],
+            ) -> EvalResult<StackRoot<Value>> {
                 let new_target = if let Some(new_target) = cx.current_new_target() {
                     new_target
                 } else {
@@ -117,7 +117,7 @@ macro_rules! create_native_error {
 
         impl $prototype {
             /// Properties of the NativeError Prototype Objects (https://tc39.es/ecma262/#sec-properties-of-the-nativeerror-prototype-objects)
-            pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+            pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
                 let proto = realm.get_intrinsic(Intrinsic::ErrorPrototype);
                 let mut object = ObjectValue::new(cx, Some(proto), true)?;
 

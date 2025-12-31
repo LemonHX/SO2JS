@@ -9,7 +9,7 @@ use crate::runtime::{
     to_string,
     type_utilities::{number_to_string, to_integer_or_infinity},
     value::Value,
-    Context, Handle,
+    Context, StackRoot,
 };
 use alloc::string::String;
 use alloc::string::ToString;
@@ -22,7 +22,7 @@ pub struct NumberPrototype;
 
 impl NumberPrototype {
     /// Properties of the Number Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-number-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let object_proto = realm.get_intrinsic(Intrinsic::ObjectPrototype);
         let mut object = NumberObject::new_with_proto(cx, object_proto, 0.0)?.as_object();
 
@@ -52,9 +52,9 @@ impl NumberPrototype {
     /// Number.prototype.toExponential (https://tc39.es/ecma262/#sec-number.prototype.toexponential)
     pub fn to_exponential(
         mut cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let number_value = this_number_value(cx, this_value)?;
         let mut number = number_value.as_number();
 
@@ -62,7 +62,7 @@ impl NumberPrototype {
         let num_fraction_digits = to_integer_or_infinity(cx, fraction_digits_arg)?;
 
         if !number.is_finite() {
-            return Ok(to_string(cx, number_value.to_handle(cx))?.as_value());
+            return Ok(to_string(cx, number_value.to_stack())?.as_value());
         }
 
         if !(0.0..=100.0).contains(&num_fraction_digits) {
@@ -131,9 +131,9 @@ impl NumberPrototype {
     /// Number.prototype.toFixed (https://tc39.es/ecma262/#sec-number.prototype.tofixed)
     pub fn to_fixed(
         mut cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let number_value = this_number_value(cx, this_value)?;
         let mut number = number_value.as_number();
 
@@ -176,28 +176,28 @@ impl NumberPrototype {
     /// Number.prototype.toLocaleString (https://tc39.es/ecma262/#sec-number.prototype.tolocalestring)
     pub fn to_locale_string(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         Self::to_string(cx, this_value, &[])
     }
 
     /// Number.prototype.toPrecision (https://tc39.es/ecma262/#sec-number.prototype.toprecision)
     pub fn to_precision(
         mut cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let number_value = this_number_value(cx, this_value)?;
 
         let precision_arg = get_argument(cx, arguments, 0);
         if precision_arg.is_undefined() {
-            return Ok(to_string(cx, number_value.to_handle(cx))?.as_value());
+            return Ok(to_string(cx, number_value.to_stack())?.as_value());
         }
 
         let precision = to_integer_or_infinity(cx, precision_arg)?;
         if !number_value.as_number().is_finite() {
-            return Ok(to_string(cx, number_value.to_handle(cx))?.as_value());
+            return Ok(to_string(cx, number_value.to_stack())?.as_value());
         }
 
         let precision = precision as i64;
@@ -269,9 +269,9 @@ impl NumberPrototype {
     /// Number.prototype.toString (https://tc39.es/ecma262/#sec-number.prototype.tostring)
     pub fn to_string(
         mut cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let number_value = this_number_value(cx, this_value)?;
 
         let radix = get_argument(cx, arguments, 0);
@@ -367,18 +367,18 @@ impl NumberPrototype {
         }
 
         Ok(FlatString::from_one_byte_slice(cx, &result_bytes)?
-            .to_handle()
+            .to_stack()
             .as_value())
     }
 
     /// Number.prototype.valueOf (https://tc39.es/ecma262/#sec-number.prototype.valueof)
     pub fn value_of(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let number_value = this_number_value(cx, this_value)?;
-        Ok(number_value.to_handle(cx))
+        Ok(number_value.to_stack())
     }
 }
 
@@ -391,7 +391,7 @@ const RADIX_TO_PRECISION: [u8; 37] = [
     11, 11, 11, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
 ];
 
-fn this_number_value(cx: Context, value_handle: Handle<Value>) -> EvalResult<Value> {
+fn this_number_value(cx: Context, value_handle: StackRoot<Value>) -> EvalResult<Value> {
     let value = *value_handle;
     if value.is_number() {
         return Ok(value);

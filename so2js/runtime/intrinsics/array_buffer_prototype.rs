@@ -12,7 +12,7 @@ use crate::runtime::{
     property::Property,
     realm::Realm,
     type_utilities::{to_index, to_integer_or_infinity},
-    Context, EvalResult, Handle, Value,
+    Context, EvalResult, StackRoot, Value,
 };
 
 use super::{
@@ -24,7 +24,7 @@ pub struct ArrayBufferPrototype;
 
 impl ArrayBufferPrototype {
     /// Properties of the ArrayBuffer Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -71,21 +71,21 @@ impl ArrayBufferPrototype {
     /// get ArrayBuffer.prototype.byteLength (https://tc39.es/ecma262/#sec-get-arraybuffer.prototype.bytelength)
     pub fn get_byte_length(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let array_buffer = require_array_buffer(cx, this_value, "byteLength")?;
 
         // Detached array buffers have byte length set to 0
-        Ok(Value::from(array_buffer.byte_length()).to_handle(cx))
+        Ok(Value::from(array_buffer.byte_length()).to_stack())
     }
 
     /// get ArrayBuffer.prototype.detached (https://tc39.es/ecma262/#sec-get-arraybuffer.prototype.detached)
     pub fn get_detached(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let array_buffer = require_array_buffer(cx, this_value, "detached")?;
         Ok(cx.bool(array_buffer.is_detached()))
     }
@@ -93,9 +93,9 @@ impl ArrayBufferPrototype {
     /// get ArrayBuffer.prototype.maxByteLength (https://tc39.es/ecma262/#sec-get-arraybuffer.prototype.maxbytelength)
     pub fn get_max_byte_length(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let array_buffer = require_array_buffer(cx, this_value, "maxByteLength")?;
 
         // Detached array buffers have max byte length set to 0
@@ -103,15 +103,15 @@ impl ArrayBufferPrototype {
             .max_byte_length()
             .unwrap_or(array_buffer.byte_length());
 
-        Ok(Value::from(max_byte_length).to_handle(cx))
+        Ok(Value::from(max_byte_length).to_stack())
     }
 
     /// get ArrayBuffer.prototype.resizable (https://tc39.es/ecma262/#sec-get-arraybuffer.prototype.resizable)
     pub fn get_resizable(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let array_buffer = require_array_buffer(cx, this_value, "resizable")?;
         Ok(cx.bool(!array_buffer.is_fixed_length()))
     }
@@ -119,9 +119,9 @@ impl ArrayBufferPrototype {
     /// ArrayBuffer.prototype.resize (https://tc39.es/ecma262/#sec-arraybuffer.prototype.resize)
     pub fn resize(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let mut array_buffer = require_array_buffer(cx, this_value, "resize")?;
 
         let max_byte_length = if let Some(max_byte_length) = array_buffer.max_byte_length() {
@@ -171,9 +171,9 @@ impl ArrayBufferPrototype {
     /// ArrayBuffer.prototype.slice (https://tc39.es/ecma262/#sec-arraybuffer.prototype.slice)
     pub fn slice(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let mut array_buffer = require_array_buffer(cx, this_value, "slice")?;
 
         throw_if_detached(cx, *array_buffer)?;
@@ -212,7 +212,7 @@ impl ArrayBufferPrototype {
         };
 
         let new_length = end_index.saturating_sub(start_index);
-        let new_length_value = Value::from(new_length).to_handle(cx);
+        let new_length_value = Value::from(new_length).to_stack();
 
         // Call species constructor to create new array buffer with the given length
         let constructor =
@@ -253,9 +253,9 @@ impl ArrayBufferPrototype {
     /// ArrayBuffer.prototype.transfer (https://tc39.es/ecma262/#sec-arraybuffer.prototype.transfer)
     pub fn transfer(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let array_buffer = require_array_buffer(cx, this_value, "transfer")?;
         let new_length = get_argument(cx, arguments, 0);
 
@@ -268,9 +268,9 @@ impl ArrayBufferPrototype {
     /// ArrayBuffer.prototype.transferToFixedLength (https://tc39.es/ecma262/#sec-arraybuffer.prototype.transfertofixedlength)
     pub fn transfer_to_fixed_length(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let array_buffer = require_array_buffer(cx, this_value, "transferToFixedLength")?;
         let new_length = get_argument(cx, arguments, 0);
 
@@ -283,9 +283,9 @@ impl ArrayBufferPrototype {
 
 fn require_array_buffer(
     cx: Context,
-    value: Handle<Value>,
+    value: StackRoot<Value>,
     method_name: &str,
-) -> EvalResult<Handle<ArrayBufferObject>> {
+) -> EvalResult<StackRoot<ArrayBufferObject>> {
     if value.is_object() {
         let object = value.as_object();
         if let Some(array_buffer) = object.as_array_buffer() {

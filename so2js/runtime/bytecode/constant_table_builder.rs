@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use hashbrown::HashMap;
 
 use crate::runtime::{
-    alloc_error::AllocResult, gc::AnyHeapItem, string_value::FlatString, Context, Handle, Value,
+    alloc_error::AllocResult, gc::AnyHeapItem, string_value::FlatString, Context, StackRoot, Value,
 };
 
 use super::{
@@ -16,10 +16,10 @@ use super::{
 #[derive(Clone, Copy)]
 enum ConstantTableEntry {
     /// Interned string such as an identifier or string literal.
-    String(Handle<FlatString>),
+    String(StackRoot<FlatString>),
     /// Generic heap items - not deduplicated, so keep a unique incremented index as a unique id.
     HeapItem {
-        item: Handle<AnyHeapItem>,
+        item: StackRoot<AnyHeapItem>,
         key: ConstantTableIndex,
     },
     /// Double encoded as a value.
@@ -35,7 +35,7 @@ impl ConstantTableEntry {
         match self {
             ConstantTableEntry::String(string) => ToValueResult::Value(string.cast()),
             ConstantTableEntry::HeapItem { item, .. } => ToValueResult::Value(item.cast()),
-            ConstantTableEntry::Double(double) => ToValueResult::Value(double.to_handle(cx)),
+            ConstantTableEntry::Double(double) => ToValueResult::Value(double.to_stack()),
             // Bytecode offsets are stored directly, not encoded as a value
             ConstantTableEntry::BytecodeOffset(offset) => {
                 ToValueResult::Raw(Value::from_raw_bits(offset as u64))
@@ -45,7 +45,7 @@ impl ConstantTableEntry {
 }
 
 enum ToValueResult {
-    Value(Handle<Value>),
+    Value(StackRoot<Value>),
     Raw(Value),
 }
 
@@ -303,12 +303,12 @@ impl ConstantTableBuilder {
     }
 
     /// Add a string to the constant table. Note that the string must already be interned.
-    pub fn add_string(&mut self, string: Handle<FlatString>) -> EmitResult<ConstantTableIndex> {
+    pub fn add_string(&mut self, string: StackRoot<FlatString>) -> EmitResult<ConstantTableIndex> {
         debug_assert!(string.is_interned());
         self.insert_if_missing(ConstantTableEntry::String(string))
     }
 
-    pub fn add_heap_item(&mut self, item: Handle<AnyHeapItem>) -> EmitResult<ConstantTableIndex> {
+    pub fn add_heap_item(&mut self, item: StackRoot<AnyHeapItem>) -> EmitResult<ConstantTableIndex> {
         let key = self.num_heap_items;
         self.num_heap_items += 1;
         self.insert_if_missing(ConstantTableEntry::HeapItem { item, key })
@@ -324,7 +324,7 @@ impl ConstantTableBuilder {
         self.insert_if_missing(offset)
     }
 
-    pub fn finish(&self, cx: Context) -> AllocResult<Option<Handle<ConstantTable>>> {
+    pub fn finish(&self, cx: Context) -> AllocResult<Option<StackRoot<ConstantTable>>> {
         // All reservations must be released once finished generating bytecode
         debug_assert!(
             self.narrow_reserved == 0 && self.wide_reserved == 0 && self.extra_wide_reserved == 0
@@ -343,7 +343,7 @@ impl ConstantTableBuilder {
         };
 
         // Start uninitialized and fill in constants that we have allocated
-        let mut constants = vec![Handle::dangling(); num_constants as usize];
+        let mut constants = vec![StackRoot::dangling(); num_constants as usize];
         let mut metadata = vec![0; ConstantTable::calculate_metadata_size(num_constants as usize)];
         let mut raw_values = vec![Value::undefined(); num_constants as usize];
 
@@ -358,7 +358,7 @@ impl ConstantTableBuilder {
                         // handle.
                         ToValueResult::Raw(raw_value) => {
                             raw_values[*index as usize] = raw_value;
-                            Handle::<Value>::from_fixed_non_heap_ptr(&raw_values[*index as usize])
+                            StackRoot::<Value>::from_fixed_non_heap_ptr(&raw_values[*index as usize])
                         }
                     };
 
@@ -375,7 +375,7 @@ impl ConstantTableBuilder {
         // patched later. Fill them in with undefined.
         for constant in &mut constants {
             if constant.is_dangling() {
-                *constant = Value::undefined().to_handle(cx);
+                *constant = Value::undefined().to_stack();
             }
         }
 

@@ -8,7 +8,7 @@ use crate::{
         error::{range_error, type_error},
         eval_result::EvalResult,
         function::get_argument,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         iterator::iter_iterator_method_values,
         object_value::{ObjectValue, VirtualObject},
@@ -27,7 +27,7 @@ use crate::{
             to_uint16, to_uint32, to_uint8, to_uint8_clamp,
         },
         value::{BigIntValue, Value},
-        Context, Handle, HeapPtr,
+        Context, StackRoot, HeapPtr,
     },
     set_uninit,
 };
@@ -68,9 +68,9 @@ pub trait TypedArray {
 
     fn viewed_array_buffer_ptr(&self) -> HeapPtr<ArrayBufferObject>;
 
-    fn viewed_array_buffer(&self) -> Handle<ArrayBufferObject>;
+    fn viewed_array_buffer(&self) -> StackRoot<ArrayBufferObject>;
 
-    fn name(&self, cx: Context) -> Handle<StringValue>;
+    fn name(&self, cx: Context) -> StackRoot<StringValue>;
 
     fn content_type(&self) -> ContentType;
 
@@ -83,7 +83,7 @@ pub trait TypedArray {
         cx: Context,
         array_buffer: HeapPtr<ArrayBufferObject>,
         byte_index: usize,
-    ) -> AllocResult<Handle<Value>>;
+    ) -> AllocResult<StackRoot<Value>>;
 
     /// Write the value at a particular byte index. Only valid to use on a value that will not
     /// invoke user code when converted to an array element (such as values read directly from
@@ -92,7 +92,7 @@ pub trait TypedArray {
         &mut self,
         cx: Context,
         byte_index: usize,
-        value: Handle<Value>,
+        value: StackRoot<Value>,
     ) -> EvalResult<()>;
 
     /// Write the value at a particular array index. Do not check that the index is in bounds.
@@ -100,7 +100,7 @@ pub trait TypedArray {
         &mut self,
         cx: Context,
         index: u64,
-        value: Handle<Value>,
+        value: StackRoot<Value>,
     ) -> EvalResult<()>;
 }
 
@@ -113,7 +113,7 @@ heap_trait_object!(
 );
 
 impl DynTypedArray {
-    pub fn into_object_value(self) -> Handle<ObjectValue> {
+    pub fn into_object_value(self) -> StackRoot<ObjectValue> {
         self.data.cast()
     }
 }
@@ -158,13 +158,13 @@ macro_rules! create_typed_array {
 }
 
 #[inline]
-pub fn to_int8_element(cx: Context, value: Handle<Value>) -> EvalResult<i8> {
+pub fn to_int8_element(cx: Context, value: StackRoot<Value>) -> EvalResult<i8> {
     to_int8(cx, value)
 }
 
 #[inline]
-pub fn from_int8_element(cx: Context, element: i8) -> AllocResult<Handle<Value>> {
-    Ok(Value::from(element).to_handle(cx))
+pub fn from_int8_element(cx: Context, element: i8) -> AllocResult<StackRoot<Value>> {
+    Ok(Value::from(element).to_stack())
 }
 
 create_typed_array!(
@@ -179,13 +179,13 @@ create_typed_array!(
 );
 
 #[inline]
-pub fn to_uint8_element(cx: Context, value: Handle<Value>) -> EvalResult<u8> {
+pub fn to_uint8_element(cx: Context, value: StackRoot<Value>) -> EvalResult<u8> {
     to_uint8(cx, value)
 }
 
 #[inline]
-pub fn from_uint8_element(cx: Context, element: u8) -> AllocResult<Handle<Value>> {
-    Ok(Value::from(element).to_handle(cx))
+pub fn from_uint8_element(cx: Context, element: u8) -> AllocResult<StackRoot<Value>> {
+    Ok(Value::from(element).to_stack())
 }
 
 create_typed_array!(
@@ -200,13 +200,13 @@ create_typed_array!(
 );
 
 #[inline]
-pub fn to_uint8_clamped_element(cx: Context, value: Handle<Value>) -> EvalResult<u8> {
+pub fn to_uint8_clamped_element(cx: Context, value: StackRoot<Value>) -> EvalResult<u8> {
     to_uint8_clamp(cx, value)
 }
 
 #[inline]
-pub fn from_uint8_clamped_element(cx: Context, element: u8) -> AllocResult<Handle<Value>> {
-    Ok(Value::from(element).to_handle(cx))
+pub fn from_uint8_clamped_element(cx: Context, element: u8) -> AllocResult<StackRoot<Value>> {
+    Ok(Value::from(element).to_stack())
 }
 
 create_typed_array!(
@@ -221,13 +221,13 @@ create_typed_array!(
 );
 
 #[inline]
-pub fn to_int16_element(cx: Context, value: Handle<Value>) -> EvalResult<i16> {
+pub fn to_int16_element(cx: Context, value: StackRoot<Value>) -> EvalResult<i16> {
     to_int16(cx, value)
 }
 
 #[inline]
-pub fn from_int16_element(cx: Context, element: i16) -> AllocResult<Handle<Value>> {
-    Ok(Value::from(element).to_handle(cx))
+pub fn from_int16_element(cx: Context, element: i16) -> AllocResult<StackRoot<Value>> {
+    Ok(Value::from(element).to_stack())
 }
 
 create_typed_array!(
@@ -242,13 +242,13 @@ create_typed_array!(
 );
 
 #[inline]
-pub fn to_uint16_element(cx: Context, value: Handle<Value>) -> EvalResult<u16> {
+pub fn to_uint16_element(cx: Context, value: StackRoot<Value>) -> EvalResult<u16> {
     to_uint16(cx, value)
 }
 
 #[inline]
-pub fn from_uint16_element(cx: Context, element: u16) -> AllocResult<Handle<Value>> {
-    Ok(Value::from(element).to_handle(cx))
+pub fn from_uint16_element(cx: Context, element: u16) -> AllocResult<StackRoot<Value>> {
+    Ok(Value::from(element).to_stack())
 }
 
 create_typed_array!(
@@ -263,13 +263,13 @@ create_typed_array!(
 );
 
 #[inline]
-pub fn to_int32_element(cx: Context, value: Handle<Value>) -> EvalResult<i32> {
+pub fn to_int32_element(cx: Context, value: StackRoot<Value>) -> EvalResult<i32> {
     to_int32(cx, value)
 }
 
 #[inline]
-pub fn from_int32_element(cx: Context, element: i32) -> AllocResult<Handle<Value>> {
-    Ok(Value::from(element).to_handle(cx))
+pub fn from_int32_element(cx: Context, element: i32) -> AllocResult<StackRoot<Value>> {
+    Ok(Value::from(element).to_stack())
 }
 
 create_typed_array!(
@@ -284,13 +284,13 @@ create_typed_array!(
 );
 
 #[inline]
-pub fn to_uint32_element(cx: Context, value: Handle<Value>) -> EvalResult<u32> {
+pub fn to_uint32_element(cx: Context, value: StackRoot<Value>) -> EvalResult<u32> {
     to_uint32(cx, value)
 }
 
 #[inline]
-pub fn from_uint32_element(cx: Context, element: u32) -> AllocResult<Handle<Value>> {
-    Ok(Value::from(element).to_handle(cx))
+pub fn from_uint32_element(cx: Context, element: u32) -> AllocResult<StackRoot<Value>> {
+    Ok(Value::from(element).to_stack())
 }
 
 create_typed_array!(
@@ -305,7 +305,7 @@ create_typed_array!(
 );
 
 #[inline]
-pub fn to_big_int64_element(cx: Context, value: Handle<Value>) -> EvalResult<i64> {
+pub fn to_big_int64_element(cx: Context, value: StackRoot<Value>) -> EvalResult<i64> {
     let bigint = to_big_int64(cx, value)?;
 
     // Guaranteed to have a single u64 component in i64 range from checks in to_big_int64
@@ -319,7 +319,7 @@ pub fn to_big_int64_element(cx: Context, value: Handle<Value>) -> EvalResult<i64
 }
 
 #[inline]
-pub fn from_big_int64_element(cx: Context, element: i64) -> AllocResult<Handle<Value>> {
+pub fn from_big_int64_element(cx: Context, element: i64) -> AllocResult<StackRoot<Value>> {
     let bigint = BigInt::from(element);
     Ok(BigIntValue::new(cx, bigint)?.into())
 }
@@ -336,7 +336,7 @@ create_typed_array!(
 );
 
 #[inline]
-pub fn to_big_uint64_element(cx: Context, value: Handle<Value>) -> EvalResult<u64> {
+pub fn to_big_uint64_element(cx: Context, value: StackRoot<Value>) -> EvalResult<u64> {
     let bigint = to_big_uint64(cx, value)?;
 
     // Guaranteed to have a single u64 component from checks in to_big_uint64
@@ -350,7 +350,7 @@ pub fn to_big_uint64_element(cx: Context, value: Handle<Value>) -> EvalResult<u6
 }
 
 #[inline]
-pub fn from_big_uint64_element(cx: Context, element: u64) -> AllocResult<Handle<Value>> {
+pub fn from_big_uint64_element(cx: Context, element: u64) -> AllocResult<StackRoot<Value>> {
     let bigint = BigInt::from(element);
     Ok(BigIntValue::new(cx, bigint)?.into())
 }
@@ -367,14 +367,14 @@ create_typed_array!(
 );
 
 #[inline]
-pub fn to_float16_element(cx: Context, value: Handle<Value>) -> EvalResult<f16> {
+pub fn to_float16_element(cx: Context, value: StackRoot<Value>) -> EvalResult<f16> {
     let number = to_number(cx, value)?;
     Ok(f64_to_f16(number.as_number()))
 }
 
 #[inline]
-pub fn from_float16_element(cx: Context, element: f16) -> AllocResult<Handle<Value>> {
-    Ok(Value::from(element.to_f64()).to_handle(cx))
+pub fn from_float16_element(cx: Context, element: f16) -> AllocResult<StackRoot<Value>> {
+    Ok(Value::from(element.to_f64()).to_stack())
 }
 
 create_typed_array!(
@@ -389,14 +389,14 @@ create_typed_array!(
 );
 
 #[inline]
-pub fn to_float32_element(cx: Context, value: Handle<Value>) -> EvalResult<f32> {
+pub fn to_float32_element(cx: Context, value: StackRoot<Value>) -> EvalResult<f32> {
     let number = to_number(cx, value)?;
     Ok(number.as_number() as f32)
 }
 
 #[inline]
-pub fn from_float32_element(cx: Context, element: f32) -> AllocResult<Handle<Value>> {
-    Ok(Value::from(element).to_handle(cx))
+pub fn from_float32_element(cx: Context, element: f32) -> AllocResult<StackRoot<Value>> {
+    Ok(Value::from(element).to_stack())
 }
 
 create_typed_array!(
@@ -411,14 +411,14 @@ create_typed_array!(
 );
 
 #[inline]
-pub fn to_float64_element(cx: Context, value: Handle<Value>) -> EvalResult<f64> {
+pub fn to_float64_element(cx: Context, value: StackRoot<Value>) -> EvalResult<f64> {
     let number = to_number(cx, value)?;
     Ok(number.as_number())
 }
 
 #[inline]
-pub fn from_float64_element(cx: Context, element: f64) -> AllocResult<Handle<Value>> {
-    Ok(Value::from(element).to_handle(cx))
+pub fn from_float64_element(cx: Context, element: f64) -> AllocResult<StackRoot<Value>> {
+    Ok(Value::from(element).to_stack())
 }
 
 create_typed_array!(

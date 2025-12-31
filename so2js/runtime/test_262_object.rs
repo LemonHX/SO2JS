@@ -14,7 +14,7 @@ use super::{
     intrinsics::{array_buffer_constructor::ArrayBufferObject, intrinsics::Intrinsic},
     object_value::ObjectValue,
     string_value::StringValue,
-    Context, EvalResult, Handle, PropertyKey, Realm, Value,
+    Context, EvalResult, StackRoot, PropertyKey, Realm, Value,
 };
 
 /// Utility functions used in test262 tests. Must be included in the main library for now so that
@@ -22,7 +22,7 @@ use super::{
 pub struct Test262Object;
 
 impl Test262Object {
-    fn new(mut cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    fn new(mut cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -53,10 +53,10 @@ impl Test262Object {
 
         object.intrinsic_func(cx, cx.names.gc(), GcObject::run, 0, realm)?;
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
-    pub fn install(mut cx: Context, realm: Handle<Realm>) -> AllocResult<()> {
+    pub fn install(mut cx: Context, realm: StackRoot<Realm>) -> AllocResult<()> {
         handle_scope!(cx, {
             // Create the test262 object
             let test_262_object = Test262Object::new(cx, realm)?;
@@ -86,15 +86,15 @@ impl Test262Object {
         })
     }
 
-    fn print_log_key(mut cx: Context) -> AllocResult<Handle<PropertyKey>> {
+    fn print_log_key(mut cx: Context) -> AllocResult<StackRoot<PropertyKey>> {
         let print_log_string = cx.alloc_string("$$printLog")?.as_string();
         PropertyKey::string_handle(cx, print_log_string)
     }
 
     pub fn get_print_log(
         cx: Context,
-        global_object: Handle<ObjectValue>,
-    ) -> EvalResult<Handle<StringValue>> {
+        global_object: StackRoot<ObjectValue>,
+    ) -> EvalResult<StackRoot<StringValue>> {
         let print_log = get(cx, global_object, Self::print_log_key(cx)?)?;
         if !print_log.is_string() {
             return type_error(cx, "printLog must be a string");
@@ -105,8 +105,8 @@ impl Test262Object {
 
     fn set_print_log(
         cx: Context,
-        global_object: Handle<ObjectValue>,
-        print_log: Handle<StringValue>,
+        global_object: StackRoot<ObjectValue>,
+        print_log: StackRoot<StringValue>,
     ) -> EvalResult<()> {
         set(
             cx,
@@ -120,9 +120,9 @@ impl Test262Object {
     /// Adds strings to a running print log stored on the global object.
     pub fn print(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let argument = get_argument(cx, arguments, 0);
         if !argument.is_string() {
             return type_error(cx, "print expects a string");
@@ -139,9 +139,9 @@ impl Test262Object {
 
     pub fn create_realm(
         cx: Context,
-        _: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         // Create a new realm that also has the test262 object installed
         let realm = Realm::new(cx)?;
         Test262Object::install(cx, realm)?;
@@ -151,9 +151,9 @@ impl Test262Object {
 
     pub fn eval_script(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let script_text = get_argument(cx, arguments, 0);
         if !script_text.is_string() {
             return type_error(cx, "expected string");
@@ -200,9 +200,9 @@ impl Test262Object {
 
     pub fn detach_array_buffer(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
         if !value.is_object() {
             return Ok(cx.undefined());
@@ -220,7 +220,7 @@ impl Test262Object {
     }
 }
 
-fn test_262_key(mut cx: Context) -> AllocResult<Handle<PropertyKey>> {
+fn test_262_key(mut cx: Context) -> AllocResult<StackRoot<PropertyKey>> {
     let test_262_string = cx.alloc_string("$262")?.as_string();
     PropertyKey::string_handle(cx, test_262_string)
 }

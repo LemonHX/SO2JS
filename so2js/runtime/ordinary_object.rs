@@ -2,7 +2,7 @@ use super::{
     abstract_operations::{call_object, create_data_property, get, get_function_realm},
     accessor::Accessor,
     eval_result::EvalResult,
-    gc::{Handle, HeapPtr},
+    gc::{StackRoot, HeapPtr},
     heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
     intrinsics::intrinsics::Intrinsic,
     object_value::{ObjectValue, VirtualObject},
@@ -35,8 +35,8 @@ impl From<OrdinaryObject> for ObjectValue {
 
 impl ObjectValue {
     /// OrdinaryGetPrototypeOf (https://tc39.es/ecma262/#sec-ordinarygetprototypeof)
-    pub fn ordinary_get_prototype_of(&self) -> EvalResult<Option<Handle<ObjectValue>>> {
-        Ok(self.prototype().map(|p| p.to_handle()))
+    pub fn ordinary_get_prototype_of(&self) -> EvalResult<Option<StackRoot<ObjectValue>>> {
+        Ok(self.prototype().map(|p| p.to_stack()))
     }
 
     /// OrdinaryIsExtensible (https://tc39.es/ecma262/#sec-ordinaryisextensible)
@@ -51,12 +51,12 @@ impl ObjectValue {
     }
 }
 
-impl Handle<ObjectValue> {
+impl StackRoot<ObjectValue> {
     /// OrdinarySetPrototypeOf (https://tc39.es/ecma262/#sec-ordinarysetprototypeof)
     pub fn ordinary_set_prototype_of(
         &mut self,
         cx: Context,
-        new_prototype: Option<Handle<ObjectValue>>,
+        new_prototype: Option<StackRoot<ObjectValue>>,
     ) -> EvalResult<bool> {
         if same_opt_object_value(self.prototype(), new_prototype.map(|p| *p)) {
             return Ok(true);
@@ -101,12 +101,12 @@ impl OrdinaryObject {
     pub const VIRTUAL_OBJECT_VTABLE: *const () = extract_virtual_object_vtable::<Self>();
 }
 
-impl VirtualObject for Handle<OrdinaryObject> {
+impl VirtualObject for StackRoot<OrdinaryObject> {
     /// [[GetOwnProperty]] (https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-getownproperty-p)
     fn get_own_property(
         &self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
     ) -> EvalResult<Option<PropertyDescriptor>> {
         Ok(ordinary_get_own_property(cx, self.as_object(), key))
     }
@@ -115,14 +115,14 @@ impl VirtualObject for Handle<OrdinaryObject> {
     fn define_own_property(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
         desc: PropertyDescriptor,
     ) -> EvalResult<bool> {
         ordinary_define_own_property(cx, self.as_object(), key, desc)
     }
 
     /// [[HasProperty]] (https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-hasproperty-p)
-    fn has_property(&self, cx: Context, key: Handle<PropertyKey>) -> EvalResult<bool> {
+    fn has_property(&self, cx: Context, key: StackRoot<PropertyKey>) -> EvalResult<bool> {
         ordinary_has_property(cx, self.as_object(), key)
     }
 
@@ -130,9 +130,9 @@ impl VirtualObject for Handle<OrdinaryObject> {
     fn get(
         &self,
         cx: Context,
-        key: Handle<PropertyKey>,
-        receiver: Handle<Value>,
-    ) -> EvalResult<Handle<Value>> {
+        key: StackRoot<PropertyKey>,
+        receiver: StackRoot<Value>,
+    ) -> EvalResult<StackRoot<Value>> {
         ordinary_get(cx, self.as_object(), key, receiver)
     }
 
@@ -140,20 +140,20 @@ impl VirtualObject for Handle<OrdinaryObject> {
     fn set(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
-        value: Handle<Value>,
-        receiver: Handle<Value>,
+        key: StackRoot<PropertyKey>,
+        value: StackRoot<Value>,
+        receiver: StackRoot<Value>,
     ) -> EvalResult<bool> {
         ordinary_set(cx, self.as_object(), key, value, receiver)
     }
 
     /// [[Delete]] (https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-delete-p)
-    fn delete(&mut self, cx: Context, key: Handle<PropertyKey>) -> EvalResult<bool> {
+    fn delete(&mut self, cx: Context, key: StackRoot<PropertyKey>) -> EvalResult<bool> {
         ordinary_delete(cx, self.as_object(), key)
     }
 
     /// [[OwnPropertyKeys]] (https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-ownpropertykeys)
-    fn own_property_keys(&self, cx: Context) -> EvalResult<Vec<Handle<Value>>> {
+    fn own_property_keys(&self, cx: Context) -> EvalResult<Vec<StackRoot<Value>>> {
         Ok(ordinary_own_property_keys(cx, self.as_object())?)
     }
 }
@@ -161,8 +161,8 @@ impl VirtualObject for Handle<OrdinaryObject> {
 /// OrdinaryGetOwnProperty (https://tc39.es/ecma262/#sec-ordinarygetownproperty)
 pub fn ordinary_get_own_property(
     cx: Context,
-    object: Handle<ObjectValue>,
-    key: Handle<PropertyKey>,
+    object: StackRoot<ObjectValue>,
+    key: StackRoot<PropertyKey>,
 ) -> Option<PropertyDescriptor> {
     match object.get_property(cx, key) {
         None => None,
@@ -173,8 +173,8 @@ pub fn ordinary_get_own_property(
             {
                 let accessor_value = value.as_pointer().cast::<Accessor>();
                 Some(PropertyDescriptor::accessor(
-                    accessor_value.get.map(|f| f.to_handle()),
-                    accessor_value.set.map(|f| f.to_handle()),
+                    accessor_value.get.map(|f| f.to_stack()),
+                    accessor_value.set.map(|f| f.to_stack()),
                     property.is_enumerable(),
                     property.is_configurable(),
                 ))
@@ -193,8 +193,8 @@ pub fn ordinary_get_own_property(
 /// OrdinaryDefineOwnProperty (https://tc39.es/ecma262/#sec-ordinarydefineownproperty)
 pub fn ordinary_define_own_property(
     cx: Context,
-    object: Handle<ObjectValue>,
-    key: Handle<PropertyKey>,
+    object: StackRoot<ObjectValue>,
+    key: StackRoot<PropertyKey>,
     desc: PropertyDescriptor,
 ) -> EvalResult<bool> {
     let current_desc = object.get_own_property(cx, key)?;
@@ -230,8 +230,8 @@ pub fn is_compatible_property_descriptor(
 /// ValidateAndApplyPropertyDescriptor (https://tc39.es/ecma262/#sec-validateandapplypropertydescriptor)
 pub fn validate_and_apply_property_descriptor(
     cx: Context,
-    mut object: Option<Handle<ObjectValue>>,
-    key: Handle<PropertyKey>,
+    mut object: Option<StackRoot<ObjectValue>>,
+    key: StackRoot<PropertyKey>,
     is_extensible: bool,
     desc: PropertyDescriptor,
     current_desc: Option<PropertyDescriptor>,
@@ -399,8 +399,8 @@ pub fn validate_and_apply_property_descriptor(
 /// OrdinaryHasProperty (https://tc39.es/ecma262/#sec-ordinaryhasproperty)
 pub fn ordinary_has_property(
     cx: Context,
-    object: Handle<ObjectValue>,
-    key: Handle<PropertyKey>,
+    object: StackRoot<ObjectValue>,
+    key: StackRoot<PropertyKey>,
 ) -> EvalResult<bool> {
     let own_property = object.get_own_property(cx, key)?;
     if own_property.is_some() {
@@ -417,10 +417,10 @@ pub fn ordinary_has_property(
 /// OrdinaryGet (https://tc39.es/ecma262/#sec-ordinaryget)
 pub fn ordinary_get(
     cx: Context,
-    object: Handle<ObjectValue>,
-    key: Handle<PropertyKey>,
-    receiver: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    object: StackRoot<ObjectValue>,
+    key: StackRoot<PropertyKey>,
+    receiver: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let desc = object.get_own_property(cx, key)?;
     match desc {
         None => {
@@ -442,10 +442,10 @@ pub fn ordinary_get(
 /// OrdinarySetWithOwnDescriptor (https://tc39.es/ecma262/#sec-ordinarysetwithowndescriptor)
 pub fn ordinary_set(
     cx: Context,
-    object: Handle<ObjectValue>,
-    key: Handle<PropertyKey>,
-    value: Handle<Value>,
-    receiver: Handle<Value>,
+    object: StackRoot<ObjectValue>,
+    key: StackRoot<PropertyKey>,
+    value: StackRoot<Value>,
+    receiver: StackRoot<Value>,
 ) -> EvalResult<bool> {
     let own_desc = object.get_own_property(cx, key)?;
     let own_desc = match own_desc {
@@ -496,8 +496,8 @@ pub fn ordinary_set(
 /// OrdinaryDelete (https://tc39.es/ecma262/#sec-ordinarydelete)
 pub fn ordinary_delete(
     cx: Context,
-    mut object: Handle<ObjectValue>,
-    key: Handle<PropertyKey>,
+    mut object: StackRoot<ObjectValue>,
+    key: StackRoot<PropertyKey>,
 ) -> EvalResult<bool> {
     let desc = object.get_own_property(cx, key)?;
     match desc {
@@ -516,9 +516,9 @@ pub fn ordinary_delete(
 /// OrdinaryOwnPropertyKeys (https://tc39.es/ecma262/#sec-ordinaryownpropertykeys)
 pub fn ordinary_own_property_keys(
     cx: Context,
-    object: Handle<ObjectValue>,
-) -> AllocResult<Vec<Handle<Value>>> {
-    let mut keys: Vec<Handle<Value>> = vec![];
+    object: StackRoot<ObjectValue>,
+) -> AllocResult<Vec<StackRoot<Value>>> {
+    let mut keys: Vec<StackRoot<Value>> = vec![];
 
     ordinary_filtered_own_indexed_property_keys(cx, object, &mut keys, |_| true)?;
     ordinary_own_string_symbol_property_keys(object, &mut keys);
@@ -529,14 +529,14 @@ pub fn ordinary_own_property_keys(
 #[inline]
 pub fn ordinary_filtered_own_indexed_property_keys<F: Fn(usize) -> bool>(
     mut cx: Context,
-    object: Handle<ObjectValue>,
-    keys: &mut Vec<Handle<Value>>,
+    object: StackRoot<ObjectValue>,
+    keys: &mut Vec<StackRoot<Value>>,
     filter: F,
 ) -> AllocResult<()> {
     // Return array index properties in numerical order
     let array_properties = object.array_properties();
     if let Some(dense_properties) = array_properties.as_dense_opt() {
-        let dense_properties = dense_properties.to_handle();
+        let dense_properties = dense_properties.to_stack();
         for (index, value) in dense_properties.iter().enumerate() {
             if filter(index) && !value.is_empty() {
                 let index_string = cx.alloc_string(&index.to_string())?;
@@ -559,13 +559,13 @@ pub fn ordinary_filtered_own_indexed_property_keys<F: Fn(usize) -> bool>(
 
 #[inline]
 pub fn ordinary_own_string_symbol_property_keys(
-    object: Handle<ObjectValue>,
-    keys: &mut Vec<Handle<Value>>,
+    object: StackRoot<ObjectValue>,
+    keys: &mut Vec<StackRoot<Value>>,
 ) {
     // Safe since we do not allocate on managed heap during iteration
     object.iter_named_property_keys_gc_unsafe(|property_key| {
         if property_key.is_string() {
-            keys.push(property_key.as_string().to_handle().into());
+            keys.push(property_key.as_string().to_stack().into());
         }
     });
 
@@ -573,19 +573,19 @@ pub fn ordinary_own_string_symbol_property_keys(
     object.iter_named_properties_gc_unsafe(|property_key, property| {
         // Make sure not to include private properties
         if property_key.is_symbol() && !property.is_private() {
-            keys.push(property_key.as_symbol().to_handle().into());
+            keys.push(property_key.as_symbol().to_stack().into());
         }
     });
 }
 
-pub fn ordinary_object_create(cx: Context) -> AllocResult<Handle<ObjectValue>> {
+pub fn ordinary_object_create(cx: Context) -> AllocResult<StackRoot<ObjectValue>> {
     let object = cx.alloc_uninit::<ObjectValue>()?;
 
     let descriptor = cx.base_descriptors.get(HeapItemKind::OrdinaryObject);
     let proto = cx.get_intrinsic_ptr(Intrinsic::ObjectPrototype);
     object_ordinary_init(cx, object, descriptor, Some(proto));
 
-    Ok(object.to_handle())
+    Ok(object.to_stack())
 }
 
 pub fn object_create<T>(
@@ -626,7 +626,7 @@ where
 pub fn object_create_with_proto<T>(
     cx: Context,
     descriptor_kind: HeapItemKind,
-    proto: Handle<ObjectValue>,
+    proto: StackRoot<ObjectValue>,
 ) -> AllocResult<HeapPtr<T>>
 where
     HeapPtr<T>: Into<HeapPtr<ObjectValue>>,
@@ -642,7 +642,7 @@ where
 pub fn object_create_with_optional_proto<T>(
     cx: Context,
     descriptor_kind: HeapItemKind,
-    proto: Option<Handle<ObjectValue>>,
+    proto: Option<StackRoot<ObjectValue>>,
 ) -> AllocResult<HeapPtr<T>>
 where
     HeapPtr<T>: Into<HeapPtr<ObjectValue>>,
@@ -674,7 +674,7 @@ pub fn object_ordinary_init(
 /// Creates an object of type T, and initializes the standard object fields.
 pub fn object_create_from_constructor<T>(
     cx: Context,
-    constructor: Handle<ObjectValue>,
+    constructor: StackRoot<ObjectValue>,
     descriptor_kind: HeapItemKind,
     intrinsic_default_proto: Intrinsic,
 ) -> EvalResult<HeapPtr<T>>
@@ -696,9 +696,9 @@ where
 /// May allocate.
 pub fn get_prototype_from_constructor(
     cx: Context,
-    constructor: Handle<ObjectValue>,
+    constructor: StackRoot<ObjectValue>,
     intrinsic_default_proto: Intrinsic,
-) -> EvalResult<Handle<ObjectValue>> {
+) -> EvalResult<StackRoot<ObjectValue>> {
     let proto = get(cx, constructor, cx.names.prototype())?;
     if proto.is_object() {
         Ok(proto.as_object())

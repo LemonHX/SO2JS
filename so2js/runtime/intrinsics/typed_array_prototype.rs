@@ -27,7 +27,7 @@ use crate::{
             is_callable, is_strictly_equal, same_object_value, same_value_zero, to_bigint,
             to_boolean, to_integer_or_infinity, to_number, to_object,
         },
-        Context, EvalResult, Handle, PropertyKey, Realm, Value,
+        Context, EvalResult, StackRoot, PropertyKey, Realm, Value,
     },
 };
 
@@ -41,7 +41,7 @@ pub struct TypedArrayPrototype;
 
 impl TypedArrayPrototype {
     /// Properties of the %TypedArray% Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-%typedarrayprototype%-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -127,9 +127,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.at (https://tc39.es/ecma262/#sec-%typedarray%.prototype.at)
     pub fn at(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -159,9 +159,9 @@ impl TypedArrayPrototype {
     /// get %TypedArray%.prototype.buffer (https://tc39.es/ecma262/#sec-get-%typedarray%.prototype.buffer)
     pub fn buffer(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array = require_typed_array(cx, this_value)?;
         Ok(typed_array.viewed_array_buffer().as_value())
     }
@@ -169,9 +169,9 @@ impl TypedArrayPrototype {
     /// get %TypedArray%.prototype.byteLength (https://tc39.es/ecma262/#sec-get-%typedarray%.prototype.bytelength)
     pub fn byte_length(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array = require_typed_array(cx, this_value)?;
 
         let typed_array_record = make_typed_array_with_buffer_witness_record(typed_array);
@@ -181,15 +181,15 @@ impl TypedArrayPrototype {
 
         let byte_length = typed_array_byte_length(&typed_array_record);
 
-        Ok(Value::from(byte_length).to_handle(cx))
+        Ok(Value::from(byte_length).to_stack())
     }
 
     /// get %TypedArray%.prototype.byteOffset (https://tc39.es/ecma262/#sec-get-%typedarray%.prototype.byteoffset)
     pub fn byte_offset(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array = require_typed_array(cx, this_value)?;
 
         let typed_array_record = make_typed_array_with_buffer_witness_record(typed_array);
@@ -197,15 +197,15 @@ impl TypedArrayPrototype {
             return Ok(cx.zero());
         }
 
-        Ok(Value::from(typed_array.byte_offset()).to_handle(cx))
+        Ok(Value::from(typed_array.byte_offset()).to_stack())
     }
 
     /// %TypedArray%.prototype.copyWithin (https://tc39.es/ecma262/#sec-%typedarray%.prototype.copywithin)
     pub fn copy_within(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -335,9 +335,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.entries (https://tc39.es/ecma262/#sec-%typedarray%.prototype.entries)
     pub fn entries(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array_object = typed_array_record.typed_array.into_object_value();
 
@@ -347,9 +347,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.every (https://tc39.es/ecma262/#sec-%typedarray%.prototype.every)
     pub fn every(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -365,8 +365,8 @@ impl TypedArrayPrototype {
         let this_arg = get_argument(cx, arguments, 1);
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
-        let mut index_value = Value::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_value = Value::uninit().to_stack();
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -387,9 +387,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.fill (https://tc39.es/ecma262/#sec-%typedarray%.prototype.fill)
     pub fn fill(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -439,7 +439,7 @@ impl TypedArrayPrototype {
         let end_index = u64::min(end_index, typed_array_length(&typed_array_record) as u64);
 
         // Shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for i in start_index..end_index {
             key.replace(PropertyKey::from_u64(cx, i)?);
@@ -452,9 +452,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.filter (https://tc39.es/ecma262/#sec-%typedarray%.prototype.filter)
     pub fn filter(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -472,8 +472,8 @@ impl TypedArrayPrototype {
         let mut kept_values = vec![];
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
-        let mut index_value = Value::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_value = Value::uninit().to_stack();
 
         // First collect all values that pass the predicate
         for i in 0..length {
@@ -492,11 +492,11 @@ impl TypedArrayPrototype {
 
         // Then create a new array that contains the kept values
         let num_kept_values = kept_values.len();
-        let num_kept_values_value = Value::from(num_kept_values).to_handle(cx);
+        let num_kept_values_value = Value::from(num_kept_values).to_stack();
         let array = typed_array_species_create_object(cx, typed_array, &[num_kept_values_value])?;
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
 
         for (i, value) in kept_values.into_iter().enumerate() {
             index_key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -509,9 +509,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.find (https://tc39.es/ecma262/#sec-%typedarray%.prototype.find)
     pub fn find(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -537,9 +537,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.findIndex (https://tc39.es/ecma262/#sec-%typedarray%.prototype.findindex)
     pub fn find_index(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -565,9 +565,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.findLast (https://tc39.es/ecma262/#sec-%typedarray%.prototype.findlast)
     pub fn find_last(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -594,9 +594,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.findLastIndex (https://tc39.es/ecma262/#sec-%typedarray%.prototype.findlastindex)
     pub fn find_last_index(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -623,9 +623,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.forEach (https://tc39.es/ecma262/#sec-%typedarray%.prototype.foreach)
     pub fn for_each(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -641,8 +641,8 @@ impl TypedArrayPrototype {
         let this_arg = get_argument(cx, arguments, 1);
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
-        let mut index_value = Value::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_value = Value::uninit().to_stack();
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -660,9 +660,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.includes (https://tc39.es/ecma262/#sec-%typedarray%.prototype.includes)
     pub fn includes(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -690,7 +690,7 @@ impl TypedArrayPrototype {
         };
 
         // Shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for i in start_index..length {
             key.replace(PropertyKey::from_u64(cx, i)?);
@@ -707,9 +707,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.indexOf (https://tc39.es/ecma262/#sec-%typedarray%.prototype.indexof)
     pub fn index_of(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -737,14 +737,14 @@ impl TypedArrayPrototype {
         };
 
         // Shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for i in start_index..length {
             key.replace(PropertyKey::from_u64(cx, i)?);
             if must!(has_property(cx, object, key)) {
                 let element = must!(get(cx, object, key));
                 if is_strictly_equal(search_element, element)? {
-                    return Ok(Value::from(i).to_handle(cx));
+                    return Ok(Value::from(i).to_stack());
                 }
             }
         }
@@ -755,9 +755,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.join (https://tc39.es/ecma262/#sec-%typedarray%.prototype.join)
     pub fn join(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -774,7 +774,7 @@ impl TypedArrayPrototype {
         let mut joined = cx.names.empty_string().as_string();
 
         // Shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for i in 0..length {
             if i > 0 {
@@ -796,9 +796,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.keys (https://tc39.es/ecma262/#sec-%typedarray%.prototype.keys)
     pub fn keys(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array_object = typed_array_record.typed_array.into_object_value();
 
@@ -808,9 +808,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.lastIndexOf (https://tc39.es/ecma262/#sec-%typedarray%.prototype.lastindexof)
     pub fn last_index_of(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -846,14 +846,14 @@ impl TypedArrayPrototype {
         };
 
         // Shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for i in (0..=start_index).rev() {
             key.replace(PropertyKey::from_u64(cx, i)?);
             if must!(has_property(cx, object, key)) {
                 let element = must!(get(cx, object, key));
                 if is_strictly_equal(search_element, element)? {
-                    return Ok(Value::from(i).to_handle(cx));
+                    return Ok(Value::from(i).to_stack());
                 }
             }
         }
@@ -864,9 +864,9 @@ impl TypedArrayPrototype {
     /// get %TypedArray%.prototype.length (https://tc39.es/ecma262/#sec-get-%typedarray%.prototype.length)
     pub fn length(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array = require_typed_array(cx, this_value)?;
 
         let typed_array_record = make_typed_array_with_buffer_witness_record(typed_array);
@@ -876,15 +876,15 @@ impl TypedArrayPrototype {
 
         let length = typed_array_length(&typed_array_record);
 
-        Ok(Value::from(length).to_handle(cx))
+        Ok(Value::from(length).to_stack())
     }
 
     /// %TypedArray%.prototype.map (https://tc39.es/ecma262/#sec-%typedarray%.prototype.map)
     pub fn map(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -899,12 +899,12 @@ impl TypedArrayPrototype {
         let callback_function = callback_function.as_object();
         let this_arg = get_argument(cx, arguments, 1);
 
-        let length_value = Value::from(length).to_handle(cx);
+        let length_value = Value::from(length).to_stack();
         let array = typed_array_species_create_object(cx, typed_array, &[length_value])?;
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
-        let mut index_value = Value::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_value = Value::uninit().to_stack();
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -923,9 +923,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.reduce (https://tc39.es/ecma262/#sec-%typedarray%.prototype.reduce)
     pub fn reduce(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -951,8 +951,8 @@ impl TypedArrayPrototype {
         };
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
-        let mut index_value = Value::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_value = Value::uninit().to_stack();
 
         for i in initial_index..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -970,9 +970,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.reduceRight (https://tc39.es/ecma262/#sec-%typedarray%.prototype.reduceright)
     pub fn reduce_right(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -998,8 +998,8 @@ impl TypedArrayPrototype {
         };
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
-        let mut index_value = Value::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_value = Value::uninit().to_stack();
 
         for i in (0..=initial_index).rev() {
             index_key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -1017,9 +1017,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.reverse (https://tc39.es/ecma262/#sec-%typedarray%.prototype.reverse)
     pub fn reverse(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -1032,8 +1032,8 @@ impl TypedArrayPrototype {
         let mut upper = length.wrapping_sub(1);
 
         // Shared between iterations
-        let mut lower_key = PropertyKey::uninit().to_handle(cx);
-        let mut upper_key = PropertyKey::uninit().to_handle(cx);
+        let mut lower_key = PropertyKey::uninit().to_stack();
+        let mut upper_key = PropertyKey::uninit().to_stack();
 
         while lower != middle {
             lower_key.replace(PropertyKey::from_u64(cx, lower)?);
@@ -1055,9 +1055,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.set (https://tc39.es/ecma262/#sec-%typedarray%.prototype.set)
     pub fn set(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -1169,7 +1169,7 @@ impl TypedArrayPrototype {
         cx: Context,
         mut target: DynTypedArray,
         offset: f64,
-        source: Handle<Value>,
+        source: StackRoot<Value>,
     ) -> EvalResult<()> {
         let target_record = make_typed_array_with_buffer_witness_record(target);
         if is_typed_array_out_of_bounds(&target_record) {
@@ -1187,7 +1187,7 @@ impl TypedArrayPrototype {
         let offset = offset as u64;
 
         // Keys are shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for i in 0..source_length {
             key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1204,9 +1204,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.slice (https://tc39.es/ecma262/#sec-%typedarray%.prototype.slice)
     pub fn slice(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -1243,7 +1243,7 @@ impl TypedArrayPrototype {
         };
 
         let count = end_index.saturating_sub(start_index);
-        let count_value = Value::from(count).to_handle(cx);
+        let count_value = Value::from(count).to_stack();
         let new_typed_array = typed_array_species_create(cx, typed_array, &[count_value])?;
         let array = new_typed_array.into_object_value();
 
@@ -1262,8 +1262,8 @@ impl TypedArrayPrototype {
         // If types are different then must call get and set and convert types
         if typed_array.kind() != new_typed_array.kind() {
             // Shared between iterations
-            let mut from_key = PropertyKey::uninit().to_handle(cx);
-            let mut to_key = PropertyKey::uninit().to_handle(cx);
+            let mut from_key = PropertyKey::uninit().to_stack();
+            let mut to_key = PropertyKey::uninit().to_stack();
 
             let mut current_index = start_index;
             for i in 0..count {
@@ -1305,9 +1305,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.some (https://tc39.es/ecma262/#sec-%typedarray%.prototype.some)
     pub fn some(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -1323,8 +1323,8 @@ impl TypedArrayPrototype {
         let this_arg = get_argument(cx, arguments, 1);
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
-        let mut index_value = Value::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_value = Value::uninit().to_stack();
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -1345,9 +1345,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.sort (https://tc39.es/ecma262/#sec-%typedarray%.prototype.sort)
     pub fn sort(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let compare_function_arg = get_argument(cx, arguments, 0);
         if !compare_function_arg.is_undefined() && !is_callable(compare_function_arg) {
             return type_error(cx, "Sort comparator must be a function");
@@ -1367,7 +1367,7 @@ impl TypedArrayPrototype {
         )?;
 
         // Reuse handle between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
 
         // Copy sorted values into array
         for (i, value) in sorted_values.iter().enumerate() {
@@ -1381,9 +1381,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.subarray (https://tc39.es/ecma262/#sec-%typedarray%.prototype.subarray)
     pub fn subarray(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array = require_typed_array(cx, this_value)?;
         let buffer = typed_array.viewed_array_buffer();
 
@@ -1428,7 +1428,7 @@ impl TypedArrayPrototype {
         let element_size = typed_array.element_size();
         let source_byte_offset = typed_array.byte_offset();
         let begin_byte_offset = source_byte_offset + (start_index as usize) * element_size;
-        let begin_byte_offset_value = Value::from(begin_byte_offset).to_handle(cx);
+        let begin_byte_offset_value = Value::from(begin_byte_offset).to_stack();
 
         let subarray = if typed_array.array_length().is_none() && end_argument.is_undefined() {
             typed_array_species_create_object(
@@ -1437,7 +1437,7 @@ impl TypedArrayPrototype {
                 &[buffer.into(), begin_byte_offset_value],
             )?
         } else {
-            let new_length_value = Value::from(new_length).to_handle(cx);
+            let new_length_value = Value::from(new_length).to_stack();
             typed_array_species_create_object(
                 cx,
                 typed_array,
@@ -1451,9 +1451,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.toLocaleString (https://tc39.es/ecma262/#sec-%typedarray%.prototype.tolocalestring)
     pub fn to_locale_string(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -1468,7 +1468,7 @@ impl TypedArrayPrototype {
                 result = StringValue::concat(cx, result, separator)?;
             }
 
-            let key = PropertyKey::from_u64(cx, i as u64)?.to_handle(cx);
+            let key = PropertyKey::from_u64(cx, i as u64)?.to_stack();
             let next_element = must!(get(cx, object, key));
 
             if !next_element.is_nullish() {
@@ -1485,9 +1485,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.toReversed (https://tc39.es/ecma262/#sec-%typedarray%.prototype.toreversed)
     pub fn to_reversed(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -1497,8 +1497,8 @@ impl TypedArrayPrototype {
         let array = typed_array_create_same_type(cx, typed_array, length)?;
 
         // Keys are shared between iterations
-        let mut from_key = PropertyKey::uninit().to_handle(cx);
-        let mut to_key = PropertyKey::uninit().to_handle(cx);
+        let mut from_key = PropertyKey::uninit().to_stack();
+        let mut to_key = PropertyKey::uninit().to_stack();
 
         for i in 0..length {
             from_key.replace(PropertyKey::from_u64(cx, length - i - 1)?);
@@ -1514,9 +1514,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.toSorted (https://tc39.es/ecma262/#sec-%typedarray%.prototype.tosorted)
     pub fn to_sorted(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let compare_function_arg = get_argument(cx, arguments, 0);
         if !compare_function_arg.is_undefined() && !is_callable(compare_function_arg) {
             return type_error(cx, "Sort comparator must be a function");
@@ -1538,7 +1538,7 @@ impl TypedArrayPrototype {
         )?;
 
         // Reuse handle between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
 
         // Copy sorted values into array
         for (i, value) in sorted_values.iter().enumerate() {
@@ -1552,9 +1552,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.values (https://tc39.es/ecma262/#sec-%typedarray%.prototype.values)
     pub fn values(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array_object = typed_array_record.typed_array.into_object_value();
 
@@ -1564,9 +1564,9 @@ impl TypedArrayPrototype {
     /// %TypedArray%.prototype.with (https://tc39.es/ecma262/#sec-%typedarray%.prototype.with)
     pub fn with(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let typed_array_record = validate_typed_array(cx, this_value)?;
         let typed_array = typed_array_record.typed_array;
 
@@ -1615,7 +1615,7 @@ impl TypedArrayPrototype {
         let array = typed_array_create_same_type(cx, typed_array, length as u64)?;
 
         // Key is shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for i in 0..(length as u64) {
             key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1636,9 +1636,9 @@ impl TypedArrayPrototype {
     /// get %TypedArray%.prototype [ @@toStringTag ] (https://tc39.es/ecma262/#sec-get-%typedarray%.prototype-%symbol.tostringtag%)
     pub fn get_to_string_tag(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return Ok(cx.undefined());
         }
@@ -1659,7 +1659,7 @@ macro_rules! create_typed_array_prototype {
 
         impl $prototype {
             /// Properties of the TypedArray Prototype Objects (https://tc39.es/ecma262/#sec-properties-of-typedarray-prototype-objects)
-            pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+            pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
                 let mut object = ObjectValue::new(
                     cx,
                     Some(realm.get_intrinsic(Intrinsic::TypedArrayPrototype)),
@@ -1681,7 +1681,7 @@ macro_rules! create_typed_array_prototype {
 }
 
 #[inline]
-fn require_typed_array(cx: Context, value: Handle<Value>) -> EvalResult<DynTypedArray> {
+fn require_typed_array(cx: Context, value: StackRoot<Value>) -> EvalResult<DynTypedArray> {
     if !value.is_object() {
         return type_error(cx, "expected typed array");
     }
@@ -1698,8 +1698,8 @@ fn require_typed_array(cx: Context, value: Handle<Value>) -> EvalResult<DynTyped
 fn typed_array_species_create_object(
     cx: Context,
     exemplar: DynTypedArray,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<ObjectValue>> {
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<ObjectValue>> {
     let result = typed_array_species_create(cx, exemplar, arguments)?;
     Ok(result.into_object_value())
 }
@@ -1707,7 +1707,7 @@ fn typed_array_species_create_object(
 fn typed_array_species_create(
     cx: Context,
     exemplar: DynTypedArray,
-    arguments: &[Handle<Value>],
+    arguments: &[StackRoot<Value>],
 ) -> EvalResult<DynTypedArray> {
     let intrinsic = match exemplar.kind() {
         TypedArrayKind::Int8Array => Intrinsic::Int8ArrayConstructor,
@@ -1741,17 +1741,17 @@ fn typed_array_species_create(
 /// TypedArrayCreateFromConstructor (https://tc39.es/ecma262/#sec-typedarraycreatefromconstructor)
 pub fn typed_array_create_from_constructor_object(
     cx: Context,
-    constructor: Handle<ObjectValue>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<ObjectValue>> {
+    constructor: StackRoot<ObjectValue>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<ObjectValue>> {
     let result = typed_array_create_from_constructor(cx, constructor, arguments)?;
     Ok(result.into_object_value())
 }
 
 pub fn typed_array_create_from_constructor(
     cx: Context,
-    constructor: Handle<ObjectValue>,
-    arguments: &[Handle<Value>],
+    constructor: StackRoot<ObjectValue>,
+    arguments: &[StackRoot<Value>],
 ) -> EvalResult<DynTypedArray> {
     let new_typed_array = construct(cx, constructor, arguments, None)?;
 
@@ -1777,7 +1777,7 @@ fn typed_array_create_same_type(
     cx: Context,
     exemplar: DynTypedArray,
     length: u64,
-) -> EvalResult<Handle<ObjectValue>> {
+) -> EvalResult<StackRoot<ObjectValue>> {
     let constructor_instrinsic = match exemplar.kind() {
         TypedArrayKind::Int8Array => Intrinsic::Int8ArrayConstructor,
         TypedArrayKind::UInt8Array => Intrinsic::UInt8ArrayConstructor,
@@ -1794,7 +1794,7 @@ fn typed_array_create_same_type(
     };
 
     let constructor = cx.get_intrinsic(constructor_instrinsic);
-    let length_value = Value::from(length).to_handle(cx);
+    let length_value = Value::from(length).to_stack();
 
     typed_array_create_from_constructor_object(cx, constructor, &[length_value])
 }
@@ -1803,7 +1803,7 @@ fn typed_array_create_same_type(
 #[inline]
 fn validate_typed_array(
     cx: Context,
-    value: Handle<Value>,
+    value: StackRoot<Value>,
 ) -> EvalResult<TypedArrayWithBufferWitnessRecord> {
     let typed_array = require_typed_array(cx, value)?;
     let typed_array_record = make_typed_array_with_buffer_witness_record(typed_array);
@@ -1902,9 +1902,9 @@ pub fn is_typed_array_out_of_bounds(
 /// Will only be called on numbers and BigInts.
 pub fn compare_typed_array_elements(
     cx: Context,
-    v1: Handle<Value>,
-    v2: Handle<Value>,
-    compare_function: Handle<Value>,
+    v1: StackRoot<Value>,
+    v2: StackRoot<Value>,
+    compare_function: StackRoot<Value>,
 ) -> EvalResult<Ordering> {
     // Use the compare function if provided
     if !compare_function.is_undefined() {

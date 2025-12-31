@@ -10,7 +10,7 @@ use crate::{
         error::syntax_parse_error,
         intrinsics::json_object::JSONObject,
         module::{module::DynModule, source_text_module::ModuleRequest},
-        Context, EvalResult, Handle, Realm, Value,
+        Context, EvalResult, Realm, StackRoot, Value,
     },
 };
 pub trait Sys {
@@ -26,13 +26,13 @@ pub trait Sys {
         cx: Context,
         source_file_path: &str,
         module_request: ModuleRequest,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
     ) -> EvalResult<DynModule>;
 
     fn host_load_imported_source_module(
         &self,
         mut cx: Context,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
         module_request: ModuleRequest,
         new_module_path_string: &str,
         source_code: &str,
@@ -80,7 +80,7 @@ pub trait Sys {
         &self,
         mut cx: Context,
         string: &str,
-    ) -> EvalResult<Handle<Value>> {
+    ) -> EvalResult<StackRoot<Value>> {
         JSONObject::parse(cx, cx.undefined(), &[cx.alloc_string(&string)?.as_value()])
     }
 }

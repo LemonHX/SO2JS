@@ -7,7 +7,7 @@ use super::{
     abstract_operations::{get, has_property},
     error::type_error,
     eval_result::EvalResult,
-    gc::Handle,
+    gc::StackRoot,
     object_value::ObjectValue,
     ordinary_object::ordinary_object_create,
     type_utilities::{is_callable, to_boolean},
@@ -18,7 +18,7 @@ use super::{
 #[derive(Clone, Copy)]
 pub struct PropertyDescriptor {
     /// The [[Value]] field. None if [[Value]] field is not present.
-    pub value: Option<Handle<Value>>,
+    pub value: Option<StackRoot<Value>>,
     /// The [[Writable]] field. None if [[Writable]] field is not present.
     pub is_writable: Option<bool>,
     /// The [[Enumerable]] field. None if [[Enumerable]] field is not present.
@@ -30,14 +30,14 @@ pub struct PropertyDescriptor {
     /// Whether the [[Set]] field is present.
     pub has_set: bool,
     /// The [[Get]] field. Default value of None if [[Get]] field is not present.
-    pub get: Option<Handle<ObjectValue>>,
+    pub get: Option<StackRoot<ObjectValue>>,
     /// The [[Set]] field. Default value of None if [[Set]] field is not present.
-    pub set: Option<Handle<ObjectValue>>,
+    pub set: Option<StackRoot<ObjectValue>>,
 }
 
 impl PropertyDescriptor {
     pub fn data(
-        value: Handle<Value>,
+        value: StackRoot<Value>,
         is_writable: bool,
         is_enumerable: bool,
         is_configurable: bool,
@@ -54,7 +54,7 @@ impl PropertyDescriptor {
         }
     }
 
-    pub fn data_value_only(value: Handle<Value>) -> PropertyDescriptor {
+    pub fn data_value_only(value: StackRoot<Value>) -> PropertyDescriptor {
         PropertyDescriptor {
             value: Some(value),
             is_writable: None,
@@ -68,8 +68,8 @@ impl PropertyDescriptor {
     }
 
     pub fn accessor(
-        get: Option<Handle<ObjectValue>>,
-        set: Option<Handle<ObjectValue>>,
+        get: Option<StackRoot<ObjectValue>>,
+        set: Option<StackRoot<ObjectValue>>,
         is_enumerable: bool,
         is_configurable: bool,
     ) -> PropertyDescriptor {
@@ -86,7 +86,7 @@ impl PropertyDescriptor {
     }
 
     pub fn get_only(
-        get: Option<Handle<ObjectValue>>,
+        get: Option<StackRoot<ObjectValue>>,
         is_enumerable: bool,
         is_configurable: bool,
     ) -> PropertyDescriptor {
@@ -103,7 +103,7 @@ impl PropertyDescriptor {
     }
 
     pub fn set_only(
-        set: Option<Handle<ObjectValue>>,
+        set: Option<StackRoot<ObjectValue>>,
         is_enumerable: bool,
         is_configurable: bool,
     ) -> PropertyDescriptor {
@@ -200,7 +200,7 @@ impl PropertyDescriptor {
 pub fn from_property_descriptor(
     cx: Context,
     desc: PropertyDescriptor,
-) -> AllocResult<Handle<ObjectValue>> {
+) -> AllocResult<StackRoot<ObjectValue>> {
     let object = ordinary_object_create(cx)?;
 
     if let Some(value) = desc.value {
@@ -276,7 +276,7 @@ pub fn from_property_descriptor(
 }
 
 /// ToPropertyDescriptor (https://tc39.es/ecma262/#sec-topropertydescriptor)
-pub fn to_property_descriptor(cx: Context, value: Handle<Value>) -> EvalResult<PropertyDescriptor> {
+pub fn to_property_descriptor(cx: Context, value: StackRoot<Value>) -> EvalResult<PropertyDescriptor> {
     if !value.is_object() {
         return type_error(cx, "property descriptor must be an object");
     }

@@ -1,6 +1,6 @@
+use alloc::format;
 use alloc::vec;
 use alloc::vec::Vec;
-use alloc::format;
 use hashbrown::HashSet;
 
 use crate::{
@@ -21,7 +21,7 @@ use super::{
     error::{err_cannot_set_property, type_error},
     eval::expression::eval_instanceof_expression,
     eval_result::EvalResult,
-    gc::{Handle, HeapPtr},
+    gc::{StackRoot, HeapPtr},
     heap_item_descriptor::HeapItemKind,
     intrinsics::intrinsics::Intrinsic,
     object_value::ObjectValue,
@@ -39,25 +39,25 @@ use super::{
 
 /// IsExtensible (https://tc39.es/ecma262/#sec-isextensible-o)
 #[inline]
-pub fn is_extensible(cx: Context, object: Handle<ObjectValue>) -> EvalResult<bool> {
+pub fn is_extensible(cx: Context, object: StackRoot<ObjectValue>) -> EvalResult<bool> {
     object.is_extensible(cx)
 }
 
 /// Get (https://tc39.es/ecma262/#sec-get-o-p)
 pub fn get(
     cx: Context,
-    object: Handle<ObjectValue>,
-    key: Handle<PropertyKey>,
-) -> EvalResult<Handle<Value>> {
+    object: StackRoot<ObjectValue>,
+    key: StackRoot<PropertyKey>,
+) -> EvalResult<StackRoot<Value>> {
     object.get(cx, key, object.into())
 }
 
 /// GetV (https://tc39.es/ecma262/#sec-getv)
 pub fn get_v(
     cx: Context,
-    value: Handle<Value>,
-    key: Handle<PropertyKey>,
-) -> EvalResult<Handle<Value>> {
+    value: StackRoot<Value>,
+    key: StackRoot<PropertyKey>,
+) -> EvalResult<StackRoot<Value>> {
     let object = to_object(cx, value)?;
     object.get(cx, key, value)
 }
@@ -65,9 +65,9 @@ pub fn get_v(
 /// Set (https://tc39.es/ecma262/#sec-set-o-p-v-throw)
 pub fn set(
     cx: Context,
-    mut object: Handle<ObjectValue>,
-    key: Handle<PropertyKey>,
-    value: Handle<Value>,
+    mut object: StackRoot<ObjectValue>,
+    key: StackRoot<PropertyKey>,
+    value: StackRoot<Value>,
     should_throw: bool,
 ) -> EvalResult<()> {
     let success = object.set(cx, key, value, object.into())?;
@@ -81,9 +81,9 @@ pub fn set(
 /// CreateDataProperty (https://tc39.es/ecma262/#sec-createdataproperty)
 pub fn create_data_property(
     cx: Context,
-    mut object: Handle<ObjectValue>,
-    key: Handle<PropertyKey>,
-    value: Handle<Value>,
+    mut object: StackRoot<ObjectValue>,
+    key: StackRoot<PropertyKey>,
+    value: StackRoot<Value>,
 ) -> EvalResult<bool> {
     let new_desc = PropertyDescriptor::data(value, true, true, true);
     object.define_own_property(cx, key, new_desc)
@@ -92,9 +92,9 @@ pub fn create_data_property(
 /// CreateDataPropertyOrThrow (https://tc39.es/ecma262/#sec-createdatapropertyorthrow)
 pub fn create_data_property_or_throw(
     cx: Context,
-    object: Handle<ObjectValue>,
-    key: Handle<PropertyKey>,
-    value: Handle<Value>,
+    object: StackRoot<ObjectValue>,
+    key: StackRoot<PropertyKey>,
+    value: StackRoot<Value>,
 ) -> EvalResult<()> {
     let success = create_data_property(cx, object, key, value)?;
     if !success {
@@ -107,9 +107,9 @@ pub fn create_data_property_or_throw(
 /// CreateNonEnumerableDataPropertyOrThrow (https://tc39.es/ecma262/#sec-createnonenumerabledatapropertyorthrow)
 pub fn create_non_enumerable_data_property_or_throw(
     cx: Context,
-    object: Handle<ObjectValue>,
-    key: Handle<PropertyKey>,
-    value: Handle<Value>,
+    object: StackRoot<ObjectValue>,
+    key: StackRoot<PropertyKey>,
+    value: StackRoot<Value>,
 ) -> AllocResult<()> {
     let new_desc = PropertyDescriptor::data(value, true, false, true);
     must_a!(define_property_or_throw(cx, object, key, new_desc));
@@ -120,8 +120,8 @@ pub fn create_non_enumerable_data_property_or_throw(
 /// DefinePropertyOrThrow (https://tc39.es/ecma262/#sec-definepropertyorthrow)
 pub fn define_property_or_throw(
     cx: Context,
-    mut object: Handle<ObjectValue>,
-    key: Handle<PropertyKey>,
+    mut object: StackRoot<ObjectValue>,
+    key: StackRoot<PropertyKey>,
     prop_desc: PropertyDescriptor,
 ) -> EvalResult<()> {
     let success = object.define_own_property(cx, key, prop_desc)?;
@@ -135,8 +135,8 @@ pub fn define_property_or_throw(
 /// DeletePropertyOrThrow (https://tc39.es/ecma262/#sec-deletepropertyorthrow)
 pub fn delete_property_or_throw(
     cx: Context,
-    mut object: Handle<ObjectValue>,
-    key: Handle<PropertyKey>,
+    mut object: StackRoot<ObjectValue>,
+    key: StackRoot<PropertyKey>,
 ) -> EvalResult<()> {
     if !object.delete(cx, key)? {
         return type_error(cx, &format!("cannot delete property {}", key.format()?));
@@ -148,9 +148,9 @@ pub fn delete_property_or_throw(
 /// GetMethod (https://tc39.es/ecma262/#sec-getmethod)
 pub fn get_method(
     cx: Context,
-    value: Handle<Value>,
-    key: Handle<PropertyKey>,
-) -> EvalResult<Option<Handle<ObjectValue>>> {
+    value: StackRoot<Value>,
+    key: StackRoot<PropertyKey>,
+) -> EvalResult<Option<StackRoot<ObjectValue>>> {
     let func = get_v(cx, value, key)?;
     if func.is_nullish() {
         return Ok(None);
@@ -166,8 +166,8 @@ pub fn get_method(
 /// HasProperty (https://tc39.es/ecma262/#sec-hasproperty)
 pub fn has_property(
     cx: Context,
-    object: Handle<ObjectValue>,
-    key: Handle<PropertyKey>,
+    object: StackRoot<ObjectValue>,
+    key: StackRoot<PropertyKey>,
 ) -> EvalResult<bool> {
     object.has_property(cx, key)
 }
@@ -175,8 +175,8 @@ pub fn has_property(
 /// HasOwnProperty (https://tc39.es/ecma262/#sec-hasownproperty)
 pub fn has_own_property(
     cx: Context,
-    object: Handle<ObjectValue>,
-    key: Handle<PropertyKey>,
+    object: StackRoot<ObjectValue>,
+    key: StackRoot<PropertyKey>,
 ) -> EvalResult<bool> {
     let desc = object.get_own_property(cx, key)?;
     Ok(desc.is_some())
@@ -185,29 +185,29 @@ pub fn has_own_property(
 /// Call (https://tc39.es/ecma262/#sec-call)
 pub fn call(
     mut cx: Context,
-    func: Handle<Value>,
-    receiver: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    func: StackRoot<Value>,
+    receiver: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     cx.vm().call_from_rust(func, receiver, arguments)
 }
 
 pub fn call_object(
     mut cx: Context,
-    func: Handle<ObjectValue>,
-    receiver: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    func: StackRoot<ObjectValue>,
+    receiver: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     cx.vm().call_from_rust(func.into(), receiver, arguments)
 }
 
 /// Construct (https://tc39.es/ecma262/#sec-construct)
 pub fn construct(
     mut cx: Context,
-    func: Handle<ObjectValue>,
-    arguments: &[Handle<Value>],
-    new_target: Option<Handle<ObjectValue>>,
-) -> EvalResult<Handle<ObjectValue>> {
+    func: StackRoot<ObjectValue>,
+    arguments: &[StackRoot<Value>],
+    new_target: Option<StackRoot<ObjectValue>>,
+) -> EvalResult<StackRoot<ObjectValue>> {
     let new_target = new_target.unwrap_or(func);
     cx.vm()
         .construct_from_rust(func.into(), arguments, new_target)
@@ -222,7 +222,7 @@ pub enum IntegrityLevel {
 /// SetIntegrityLevel (https://tc39.es/ecma262/#sec-setintegritylevel)
 pub fn set_integrity_level(
     cx: Context,
-    mut object: Handle<ObjectValue>,
+    mut object: StackRoot<ObjectValue>,
     level: IntegrityLevel,
 ) -> EvalResult<bool> {
     if !object.prevent_extensions(cx)? {
@@ -234,7 +234,7 @@ pub fn set_integrity_level(
     match level {
         IntegrityLevel::Sealed => {
             // Property key is shared between iterations
-            let mut key = PropertyKey::uninit().to_handle(cx);
+            let mut key = PropertyKey::uninit().to_stack();
 
             for key_value in keys {
                 key.replace(must!(PropertyKey::from_value(cx, key_value)));
@@ -244,7 +244,7 @@ pub fn set_integrity_level(
         }
         IntegrityLevel::Frozen => {
             // Property key is shared between iterations
-            let mut key = PropertyKey::uninit().to_handle(cx);
+            let mut key = PropertyKey::uninit().to_stack();
 
             for key_value in keys {
                 key.replace(must!(PropertyKey::from_value(cx, key_value)));
@@ -268,7 +268,7 @@ pub fn set_integrity_level(
 /// TestIntegrityLevel (https://tc39.es/ecma262/#sec-testintegritylevel)
 pub fn test_integrity_level(
     cx: Context,
-    object: Handle<ObjectValue>,
+    object: StackRoot<ObjectValue>,
     level: IntegrityLevel,
 ) -> EvalResult<bool> {
     if object.is_extensible(cx)? {
@@ -278,7 +278,7 @@ pub fn test_integrity_level(
     let keys = object.own_property_keys(cx)?;
 
     // Property key is shared between iterations
-    let mut key = PropertyKey::uninit().to_handle(cx);
+    let mut key = PropertyKey::uninit().to_stack();
 
     for key_value in keys {
         key.replace(must!(PropertyKey::from_value(cx, key_value)));
@@ -300,7 +300,7 @@ pub fn test_integrity_level(
 }
 
 /// LengthOfArrayLike (https://tc39.es/ecma262/#sec-lengthofarraylike)
-pub fn length_of_array_like(cx: Context, object: Handle<ObjectValue>) -> EvalResult<u64> {
+pub fn length_of_array_like(cx: Context, object: StackRoot<ObjectValue>) -> EvalResult<u64> {
     let length_value = get(cx, object, cx.names.length())?;
     to_length(cx, length_value)
 }
@@ -308,8 +308,8 @@ pub fn length_of_array_like(cx: Context, object: Handle<ObjectValue>) -> EvalRes
 /// CreateListFromArrayLike (https://tc39.es/ecma262/#sec-createlistfromarraylike)
 pub fn create_list_from_array_like(
     cx: Context,
-    object: Handle<Value>,
-) -> EvalResult<Vec<Handle<Value>>> {
+    object: StackRoot<Value>,
+) -> EvalResult<Vec<StackRoot<Value>>> {
     if !object.is_object() {
         return type_error(cx, "value is not an object");
     }
@@ -320,7 +320,7 @@ pub fn create_list_from_array_like(
     let mut vec = Vec::with_capacity(length as usize);
 
     // Property key is shared between iterations
-    let mut key = PropertyKey::uninit().to_handle(cx);
+    let mut key = PropertyKey::uninit().to_stack();
 
     for i in 0..length {
         key.replace(PropertyKey::array_index(cx, i as u32)?);
@@ -334,10 +334,10 @@ pub fn create_list_from_array_like(
 /// Invoke (https://tc39.es/ecma262/#sec-invoke)
 pub fn invoke(
     cx: Context,
-    value: Handle<Value>,
-    key: Handle<PropertyKey>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    value: StackRoot<Value>,
+    key: StackRoot<PropertyKey>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let func = get_v(cx, value, key)?;
     call(cx, func, value, arguments)
 }
@@ -345,8 +345,8 @@ pub fn invoke(
 /// OrdinaryHasInstance (https://tc39.es/ecma262/#sec-ordinaryhasinstance)
 pub fn ordinary_has_instance(
     cx: Context,
-    func: Handle<Value>,
-    object: Handle<Value>,
+    func: StackRoot<Value>,
+    object: StackRoot<Value>,
 ) -> EvalResult<bool> {
     if !is_callable(func) {
         return Ok(false);
@@ -387,9 +387,9 @@ pub fn ordinary_has_instance(
 /// SpeciesConstructor (https://tc39.es/ecma262/#sec-speciesconstructor)
 pub fn species_constructor(
     cx: Context,
-    object: Handle<ObjectValue>,
+    object: StackRoot<ObjectValue>,
     default_constructor: Intrinsic,
-) -> EvalResult<Handle<ObjectValue>> {
+) -> EvalResult<StackRoot<ObjectValue>> {
     let constructor = get(cx, object, cx.names.constructor())?;
 
     if constructor.is_undefined() {
@@ -423,15 +423,15 @@ pub enum KeyOrValue {
 /// EnumerableOwnProperties (https://tc39.es/ecma262/#sec-enumerableownproperties)
 pub fn enumerable_own_property_names(
     cx: Context,
-    object: Handle<ObjectValue>,
+    object: StackRoot<ObjectValue>,
     kind: KeyOrValue,
-) -> EvalResult<Vec<Handle<Value>>> {
+) -> EvalResult<Vec<StackRoot<Value>>> {
     let keys = object.own_property_keys(cx)?;
 
     let mut properties = vec![];
 
     // Property key is shared between iterations
-    let mut key = PropertyKey::uninit().to_handle(cx);
+    let mut key = PropertyKey::uninit().to_stack();
 
     for key_value in keys {
         if key_value.is_symbol() {
@@ -464,7 +464,7 @@ pub fn enumerable_own_property_names(
 }
 
 /// GetFunctionRealm (https://tc39.es/ecma262/#sec-getfunctionrealm)
-pub fn get_function_realm(cx: Context, func: Handle<ObjectValue>) -> EvalResult<HeapPtr<Realm>> {
+pub fn get_function_realm(cx: Context, func: StackRoot<ObjectValue>) -> EvalResult<HeapPtr<Realm>> {
     match get_function_realm_no_error(cx, func) {
         Some(realm) => Ok(realm),
         None => type_error(cx, "operation attempted on revoked proxy"),
@@ -475,7 +475,7 @@ pub fn get_function_realm(cx: Context, func: Handle<ObjectValue>) -> EvalResult<
 /// but does not allocate an error on the error path.
 pub fn get_function_realm_no_error(
     cx: Context,
-    func: Handle<ObjectValue>,
+    func: StackRoot<ObjectValue>,
 ) -> Option<HeapPtr<Realm>> {
     let kind = func.descriptor().kind();
 
@@ -502,9 +502,9 @@ pub fn get_function_realm_no_error(
 /// CopyDataProperties (https://tc39.es/ecma262/#sec-copydataproperties)
 pub fn copy_data_properties(
     cx: Context,
-    target: Handle<ObjectValue>,
-    source: Handle<Value>,
-    excluded_items: &HashSet<Handle<PropertyKey>>,
+    target: StackRoot<ObjectValue>,
+    source: StackRoot<Value>,
+    excluded_items: &HashSet<StackRoot<PropertyKey>>,
 ) -> EvalResult<()> {
     if source.is_nullish() {
         return Ok(());
@@ -514,7 +514,7 @@ pub fn copy_data_properties(
     let keys = from.own_property_keys(cx)?;
 
     // Property key is shared between iterations
-    let mut next_key = PropertyKey::uninit().to_handle(cx);
+    let mut next_key = PropertyKey::uninit().to_stack();
 
     for next_key_value in keys {
         next_key.replace(must!(PropertyKey::from_value(cx, next_key_value)));
@@ -539,9 +539,9 @@ pub fn copy_data_properties(
 /// PrivateGet (https://tc39.es/ecma262/#sec-privateget)
 pub fn private_get(
     cx: Context,
-    object: Handle<ObjectValue>,
-    private_name: Handle<SymbolValue>,
-) -> EvalResult<Handle<Value>> {
+    object: StackRoot<ObjectValue>,
+    private_name: StackRoot<SymbolValue>,
+) -> EvalResult<StackRoot<Value>> {
     let property = match object.private_element_find(cx, private_name) {
         None => return type_error(cx, "can't access private field or method"),
         Some(property) => property,
@@ -555,7 +555,7 @@ pub fn private_get(
     match accessor.get {
         None => type_error(cx, "cannot access private field or method"),
         Some(getter) => {
-            let getter_handle = getter.to_handle();
+            let getter_handle = getter.to_stack();
             call_object(cx, getter_handle, object.into(), &[])
         }
     }
@@ -564,9 +564,9 @@ pub fn private_get(
 /// PrivateSet (https://tc39.es/ecma262/#sec-privateset)
 pub fn private_set(
     cx: Context,
-    mut object: Handle<ObjectValue>,
-    private_name: Handle<SymbolValue>,
-    value: Handle<Value>,
+    mut object: StackRoot<ObjectValue>,
+    private_name: StackRoot<SymbolValue>,
+    value: StackRoot<Value>,
 ) -> EvalResult<()> {
     let property = match object.private_element_find(cx, private_name) {
         None => return type_error(cx, "cannot set private field or method"),
@@ -584,7 +584,7 @@ pub fn private_set(
         match accessor.set {
             None => type_error(cx, "cannot set getter-only private property"),
             Some(setter) => {
-                let setter_handle = setter.to_handle();
+                let setter_handle = setter.to_stack();
                 call_object(cx, setter_handle, object.into(), &[value])?;
                 Ok(())
             }
@@ -593,8 +593,8 @@ pub fn private_set(
 }
 
 pub struct Group {
-    pub key: Handle<Value>,
-    pub items: Vec<Handle<Value>>,
+    pub key: StackRoot<Value>,
+    pub items: Vec<StackRoot<Value>>,
 }
 
 pub enum GroupByKeyCoercion {
@@ -606,8 +606,8 @@ pub enum GroupByKeyCoercion {
 /// GroupBy (https://tc39.es/ecma262/#sec-groupby)
 pub fn group_by(
     cx: Context,
-    items: Handle<Value>,
-    callback: Handle<Value>,
+    items: StackRoot<Value>,
+    callback: StackRoot<Value>,
     key_coercion: GroupByKeyCoercion,
 ) -> EvalResult<Vec<Group>> {
     require_object_coercible(cx, items)?;
@@ -621,8 +621,8 @@ pub fn group_by(
     let mut groups: Vec<Group> = vec![];
     let mut k = 0;
 
-    // Handle is shared between iterations
-    let mut k_handle: Handle<Value> = Handle::empty(cx);
+    // StackRoot is shared between iterations
+    let mut k_handle: StackRoot<Value> = StackRoot::empty(cx);
 
     iter_iterator_values(cx, items, &mut |cx, item| {
         k_handle.replace(Value::from(k));
@@ -687,7 +687,7 @@ pub fn group_by(
     Ok(groups)
 }
 
-pub fn canonicalize_keyed_collection_key(cx: Context, key: Handle<Value>) -> Handle<Value> {
+pub fn canonicalize_keyed_collection_key(cx: Context, key: StackRoot<Value>) -> StackRoot<Value> {
     if key.is_negative_zero() {
         cx.zero()
     } else {
@@ -698,10 +698,10 @@ pub fn canonicalize_keyed_collection_key(cx: Context, key: Handle<Value>) -> Han
 /// SetterThatIgnoresPrototypeProperties (https://tc39.es/ecma262/#sec-SetterThatIgnoresPrototypeProperties)
 pub fn setter_that_ignores_prototype_properties(
     cx: Context,
-    this_value: Handle<Value>,
-    home_object: Handle<ObjectValue>,
-    key: Handle<PropertyKey>,
-    value: Handle<Value>,
+    this_value: StackRoot<Value>,
+    home_object: StackRoot<ObjectValue>,
+    key: StackRoot<PropertyKey>,
+    value: StackRoot<Value>,
 ) -> EvalResult<()> {
     if !this_value.is_object() {
         return type_error(cx, "this is not an object");

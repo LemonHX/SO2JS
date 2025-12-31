@@ -2,7 +2,7 @@ use crate::{
     field_offset,
     runtime::{
         alloc_error::AllocResult,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
         Context, HeapPtr, Value,
     },
@@ -76,7 +76,7 @@ impl<T: Clone + Copy> HeapItem for HeapPtr<BsVec<T>> {
     }
 
     /// Visit pointers intrinsic to all BsVecs. Do not visit elements as they could be of any type.
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
     }
 }
@@ -104,7 +104,7 @@ pub trait BsVecField<T: Clone + Copy> {
         }
 
         // Save old vec behind handle before allocating
-        let old_vec = old_vec.to_handle();
+        let old_vec = old_vec.to_stack();
 
         // Double size of vector, starting at a length of 4
         let new_capacity = (capacity * 2).max(4);
@@ -128,7 +128,7 @@ pub fn value_vec_byte_size(value_array: HeapPtr<ValueVec>) -> usize {
     BsVec::<Value>::calculate_size_in_bytes(value_array.capacity())
 }
 
-pub fn value_vec_visit_pointers(value_vec: &mut HeapPtr<ValueVec>, visitor: &mut impl HeapVisitor) {
+pub fn value_vec_visit_pointers(value_vec: &mut HeapPtr<ValueVec>, visitor: &mut impl GcVisitorExt) {
     value_vec.visit_pointers(visitor);
 
     for value in value_vec.as_mut_slice() {

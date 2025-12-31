@@ -1,6 +1,6 @@
 use crate::runtime::{
     alloc_error::AllocResult, object_value::ObjectValue, property::Property, realm::Realm, Context,
-    Handle,
+    StackRoot,
 };
 
 use super::intrinsics::Intrinsic;
@@ -9,7 +9,7 @@ pub struct AsyncFunctionPrototype;
 
 impl AsyncFunctionPrototype {
     /// Properties of the AsyncFunction Prototype Object (https://tc39.es/ecma262/#sec-async-function-prototype-properties)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::FunctionPrototype)),

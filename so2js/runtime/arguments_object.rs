@@ -16,7 +16,7 @@ use super::{
     abstract_operations::{create_data_property_or_throw, define_property_or_throw},
     bytecode::function::Closure,
     collections::InlineArray,
-    gc::{Handle, HeapItem, HeapVisitor},
+    gc::{StackRoot, HeapItem, GcVisitorExt},
     heap_item_descriptor::HeapItemKind,
     intrinsics::intrinsics::Intrinsic,
     object_value::{ObjectValue, VirtualObject},
@@ -39,13 +39,13 @@ extend_object! {
 }
 
 impl UnmappedArgumentsObject {
-    pub fn new(cx: Context) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context) -> AllocResult<StackRoot<ObjectValue>> {
         Ok(object_create::<ObjectValue>(
             cx,
             HeapItemKind::UnmappedArgumentsObject,
             Intrinsic::ObjectPrototype,
         )?
-        .to_handle())
+        .to_stack())
     }
 }
 
@@ -70,11 +70,11 @@ impl MappedArgumentsObject {
 
     pub fn new(
         cx: Context,
-        callee: Handle<Closure>,
-        arguments: &[Handle<Value>],
-        scope: Handle<Scope>,
+        callee: StackRoot<Closure>,
+        arguments: &[StackRoot<Value>],
+        scope: StackRoot<Scope>,
         num_parameters: usize,
-    ) -> EvalResult<Handle<MappedArgumentsObject>> {
+    ) -> EvalResult<StackRoot<MappedArgumentsObject>> {
         let shadowed_name = InternedStrings::alloc_wtf8_str(cx, &SHADOWED_SCOPE_SLOT_NAME)?;
 
         let size = Self::calculate_size_in_bytes(num_parameters);
@@ -97,7 +97,7 @@ impl MappedArgumentsObject {
             object.mapped_parameters.as_mut_slice()[i] = is_mapped;
         }
 
-        let object = object.to_handle();
+        let object = object.to_stack();
 
         Self::init_properties(cx, object, callee, arguments)?;
 
@@ -106,12 +106,12 @@ impl MappedArgumentsObject {
 
     fn init_properties(
         cx: Context,
-        object: Handle<MappedArgumentsObject>,
-        callee: Handle<Closure>,
-        arguments: &[Handle<Value>],
+        object: StackRoot<MappedArgumentsObject>,
+        callee: StackRoot<Closure>,
+        arguments: &[StackRoot<Value>],
     ) -> EvalResult<()> {
         // Property key is shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
 
         // Set indexed argument properties
         for (i, argument) in arguments.iter().enumerate() {
@@ -125,7 +125,7 @@ impl MappedArgumentsObject {
         }
 
         // Set length property
-        let length_value = Value::from(arguments.len()).to_handle(cx);
+        let length_value = Value::from(arguments.len()).to_stack();
         let length_desc = PropertyDescriptor::data(length_value, true, false, true);
         must!(define_property_or_throw(
             cx,
@@ -166,7 +166,7 @@ impl MappedArgumentsObject {
     /// If this key corresponds to the index of a mapped parameter, return the index in the scope
     /// where that argument is stored.
     #[inline]
-    fn get_mapped_scope_index_for_key(&self, key: Handle<PropertyKey>) -> Option<usize> {
+    fn get_mapped_scope_index_for_key(&self, key: StackRoot<PropertyKey>) -> Option<usize> {
         if key.is_array_index() {
             let key_index = key.as_array_index() as usize;
             if key_index < self.mapped_parameters.len() {
@@ -183,22 +183,22 @@ impl MappedArgumentsObject {
         self.mapped_parameters.as_mut_slice()[index] = false;
     }
 
-    fn get_mapped_argument(&self, cx: Context, index: usize) -> Handle<Value> {
-        self.scope.get_slot(index).to_handle(cx)
+    fn get_mapped_argument(&self, cx: Context, index: usize) -> StackRoot<Value> {
+        self.scope.get_slot(index).to_stack()
     }
 
-    fn set_mapped_argument(&mut self, index: usize, value: Handle<Value>) {
+    fn set_mapped_argument(&mut self, index: usize, value: StackRoot<Value>) {
         self.scope.set_slot(index, *value);
     }
 }
 
 #[wrap_ordinary_object]
-impl VirtualObject for Handle<MappedArgumentsObject> {
+impl VirtualObject for StackRoot<MappedArgumentsObject> {
     /// [[GetOwnProperty]] (https://tc39.es/ecma262/#sec-arguments-exotic-objects-getownproperty-p)
     fn get_own_property(
         &self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
     ) -> EvalResult<Option<PropertyDescriptor>> {
         let mut desc = ordinary_get_own_property(cx, self.as_object(), key);
         if let Some(desc) = &mut desc {
@@ -216,7 +216,7 @@ impl VirtualObject for Handle<MappedArgumentsObject> {
     fn define_own_property(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
         desc: PropertyDescriptor,
     ) -> EvalResult<bool> {
         let scope_index = self.get_mapped_scope_index_for_key(key);
@@ -262,9 +262,9 @@ impl VirtualObject for Handle<MappedArgumentsObject> {
     fn get(
         &self,
         cx: Context,
-        key: Handle<PropertyKey>,
-        receiver: Handle<Value>,
-    ) -> EvalResult<Handle<Value>> {
+        key: StackRoot<PropertyKey>,
+        receiver: StackRoot<Value>,
+    ) -> EvalResult<StackRoot<Value>> {
         if let Some(scope_index) = self.get_mapped_scope_index_for_key(key) {
             Ok(self.get_mapped_argument(cx, scope_index))
         } else {
@@ -276,9 +276,9 @@ impl VirtualObject for Handle<MappedArgumentsObject> {
     fn set(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
-        value: Handle<Value>,
-        receiver: Handle<Value>,
+        key: StackRoot<PropertyKey>,
+        value: StackRoot<Value>,
+        receiver: StackRoot<Value>,
     ) -> EvalResult<bool> {
         if receiver.is_object() && same_object_value_handles(self.as_object(), receiver.as_object())
         {
@@ -291,7 +291,7 @@ impl VirtualObject for Handle<MappedArgumentsObject> {
     }
 
     /// [[Delete]] (https://tc39.es/ecma262/#sec-arguments-exotic-objects-delete-p)
-    fn delete(&mut self, cx: Context, key: Handle<PropertyKey>) -> EvalResult<bool> {
+    fn delete(&mut self, cx: Context, key: StackRoot<PropertyKey>) -> EvalResult<bool> {
         let scope_index = self.get_mapped_scope_index_for_key(key);
 
         let result = ordinary_delete(cx, self.as_object(), key)?;
@@ -309,8 +309,8 @@ impl VirtualObject for Handle<MappedArgumentsObject> {
 /// CreateUnmappedArgumentsObject (https://tc39.es/ecma262/#sec-createunmappedargumentsobject)
 pub fn create_unmapped_arguments_object(
     cx: Context,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let object = UnmappedArgumentsObject::new(cx)?;
 
     // Set length property
@@ -324,7 +324,7 @@ pub fn create_unmapped_arguments_object(
     ));
 
     // Property key is shared between iterations
-    let mut index_key = PropertyKey::uninit().to_handle(cx);
+    let mut index_key = PropertyKey::uninit().to_stack();
 
     // Set indexed argument properties
     for (i, argument) in arguments.iter().enumerate() {
@@ -364,7 +364,7 @@ impl HeapItem for HeapPtr<MappedArgumentsObject> {
         MappedArgumentsObject::calculate_size_in_bytes(self.mapped_parameters.len())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.scope);
     }
@@ -375,7 +375,7 @@ impl HeapItem for HeapPtr<UnmappedArgumentsObject> {
         size_of::<UnmappedArgumentsObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
     }
 }

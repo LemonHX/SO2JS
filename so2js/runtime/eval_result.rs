@@ -1,6 +1,6 @@
 use crate::runtime::{gc::Escapable, Context};
 
-use super::{value::Value, Handle};
+use super::{value::Value, StackRoot};
 
 #[cfg(feature = "alloc_error")]
 use super::alloc_error::AllocError;
@@ -11,7 +11,7 @@ use super::alloc_error::AllocError;
 #[derive(Clone, Copy, Debug)]
 pub enum EvalError {
     /// A thrown error JS value.
-    Value(Handle<Value>),
+    Value(StackRoot<Value>),
     /// An allocation error.
     #[cfg(feature = "alloc_error")]
     Alloc(AllocError),
@@ -19,7 +19,7 @@ pub enum EvalError {
 
 impl EvalError {
     #[inline]
-    pub fn new_value(value: Handle<Value>) -> Self {
+    pub fn new_value(value: StackRoot<Value>) -> Self {
         EvalError::Value(value)
     }
 

@@ -15,7 +15,7 @@ use crate::{
 
 use super::{
     array_object::ArrayObject,
-    gc::{Handle, HeapItem, HeapPtr, HeapVisitor},
+    gc::{StackRoot, HeapItem, HeapPtr, GcVisitorExt},
     intrinsics::typed_array::{
         BigInt64Array, BigUInt64Array, Float16Array, Float32Array, Float64Array, Int16Array,
         Int32Array, Int8Array, UInt16Array, UInt32Array, UInt8Array, UInt8ClampedArray,
@@ -112,7 +112,7 @@ pub enum HeapItemKind {
     Closure,
     BytecodeFunction,
     ConstantTable,
-    ExceptionHandlers,
+    ExceptionStackRootrs,
     SourceFile,
 
     Scope,
@@ -182,12 +182,12 @@ bitflags! {
 impl HeapItemDescriptor {
     pub fn new<T>(
         cx: Context,
-        descriptor: Handle<HeapItemDescriptor>,
+        descriptor: StackRoot<HeapItemDescriptor>,
         kind: HeapItemKind,
         flags: DescFlags,
     ) -> AllocResult<HeapPtr<HeapItemDescriptor>>
     where
-        Handle<T>: VirtualObject,
+        StackRoot<T>: VirtualObject,
     {
         let mut desc = cx.alloc_uninit::<HeapItemDescriptor>()?;
 
@@ -241,7 +241,7 @@ impl BaseDescriptors {
 
         // Create fake handle which will be read from, in order to initialize descriptor descriptor
         let value = Value::empty();
-        let fake_descriptor_handle = Handle::<Value>::from_fixed_non_heap_ptr(&value).cast();
+        let fake_descriptor_handle = StackRoot::<Value>::from_fixed_non_heap_ptr(&value).cast();
 
         // First set up the singleton descriptor descriptor, using an arbitrary vtable
         // (e.g. OrdinaryObject). Can only set self pointer after object initially created.
@@ -251,7 +251,7 @@ impl BaseDescriptors {
             HeapItemKind::Descriptor,
             DescFlags::empty(),
         )?
-        .to_handle();
+        .to_stack();
         descriptor.descriptor = *descriptor;
         descriptors[HeapItemKind::Descriptor as usize] = *descriptor;
 
@@ -371,7 +371,7 @@ impl BaseDescriptors {
         ordinary_object_descriptor!(HeapItemKind::Closure);
         other_heap_item_descriptor!(HeapItemKind::BytecodeFunction);
         other_heap_item_descriptor!(HeapItemKind::ConstantTable);
-        other_heap_item_descriptor!(HeapItemKind::ExceptionHandlers);
+        other_heap_item_descriptor!(HeapItemKind::ExceptionStackRootrs);
         other_heap_item_descriptor!(HeapItemKind::SourceFile);
 
         other_heap_item_descriptor!(HeapItemKind::Scope);
@@ -428,7 +428,7 @@ impl BaseDescriptors {
         self.descriptors[kind as usize]
     }
 
-    pub fn visit_roots(&mut self, visitor: &mut impl HeapVisitor) {
+    pub fn visit_roots(&mut self, visitor: &mut impl GcVisitorExt) {
         for descriptor in &mut self.descriptors {
             visitor.visit_pointer(descriptor);
         }
@@ -440,7 +440,7 @@ impl HeapItem for HeapPtr<HeapItemDescriptor> {
         size_of::<HeapItemDescriptor>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
         visitor.visit_rust_vtable_pointer(&mut self.vtable);
     }

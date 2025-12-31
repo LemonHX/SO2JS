@@ -25,7 +25,7 @@ use crate::{
             is_callable, is_constructor_value, is_integral_number, to_number, to_object,
         },
         value::Value,
-        Context, Handle, PropertyKey, Realm,
+        Context, StackRoot, PropertyKey, Realm,
     },
 };
 use alloc::vec;
@@ -34,7 +34,7 @@ use alloc::vec;
 pub struct TypedArrayConstructor;
 
 impl TypedArrayConstructor {
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -63,9 +63,9 @@ impl TypedArrayConstructor {
     /// %TypedArray% (https://tc39.es/ecma262/#sec-%typedarray%)
     pub fn construct(
         cx: Context,
-        _: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         type_error(
             cx,
             "TypedArray constructor is abstract and cannot be called",
@@ -75,9 +75,9 @@ impl TypedArrayConstructor {
     /// %TypedArray%.from (https://tc39.es/ecma262/#sec-%typedarray%.from)
     pub fn from(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !is_constructor_value(this_value) {
             return type_error(cx, "TypedArray.from must be called on constructor");
         }
@@ -112,13 +112,13 @@ impl TypedArrayConstructor {
 
             let length = values.len();
 
-            let length_value = Value::from(length).to_handle(cx);
+            let length_value = Value::from(length).to_stack();
             let target_object =
                 typed_array_create_from_constructor_object(cx, this_constructor, &[length_value])?;
 
             // Shared between iterations
-            let mut index_key = PropertyKey::uninit().to_handle(cx);
-            let mut index_value = Value::uninit().to_handle(cx);
+            let mut index_key = PropertyKey::uninit().to_stack();
+            let mut index_value = Value::uninit().to_stack();
 
             for (i, value) in values.into_iter().enumerate() {
                 index_key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -140,13 +140,13 @@ impl TypedArrayConstructor {
         let array_like = must!(to_object(cx, source));
         let length = length_of_array_like(cx, array_like)? as usize;
 
-        let length_value = Value::from(length).to_handle(cx);
+        let length_value = Value::from(length).to_stack();
         let target_object =
             typed_array_create_from_constructor_object(cx, this_constructor, &[length_value])?;
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
-        let mut index_value = Value::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_value = Value::uninit().to_stack();
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -169,23 +169,23 @@ impl TypedArrayConstructor {
     /// %TypedArray%.of (https://tc39.es/ecma262/#sec-%typedarray%.of)
     pub fn of(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !is_constructor_value(this_value) {
             return type_error(cx, "TypedArray.of must be called on constructor");
         }
 
         let this_constructor = this_value.as_object();
         let length = arguments.len();
-        let length_value = Value::from(length).to_handle(cx);
+        let length_value = Value::from(length).to_stack();
 
         let typed_array =
             typed_array_create_from_constructor(cx, this_constructor, &[length_value])?;
         let object = typed_array.into_object_value();
 
         // Shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for (i, value) in arguments.iter().enumerate() {
             key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -220,12 +220,12 @@ macro_rules! create_typed_array_constructor {
 
             fn new_with_proto(
                 cx: Context,
-                proto: Handle<ObjectValue>,
-                viewed_array_buffer: Handle<ArrayBufferObject>,
+                proto: StackRoot<ObjectValue>,
+                viewed_array_buffer: StackRoot<ArrayBufferObject>,
                 byte_length: Option<usize>,
                 byte_offset: usize,
                 array_length: Option<usize>,
-            ) -> AllocResult<Handle<ObjectValue>> {
+            ) -> AllocResult<StackRoot<ObjectValue>> {
                 let mut object = object_create_with_proto::<$typed_array>(
                     cx,
                     HeapItemKind::$typed_array,
@@ -237,7 +237,7 @@ macro_rules! create_typed_array_constructor {
                 set_uninit!(object.array_length, array_length);
                 set_uninit!(object.byte_offset, byte_offset);
 
-                Ok(object.to_handle().into())
+                Ok(object.to_stack().into())
             }
 
             #[inline]
@@ -256,12 +256,12 @@ macro_rules! create_typed_array_constructor {
         }
 
         #[wrap_ordinary_object]
-        impl VirtualObject for Handle<$typed_array> {
+        impl VirtualObject for StackRoot<$typed_array> {
             /// [[GetOwnProperty]] (https://tc39.es/ecma262/#sec-typedarray-getownproperty)
             fn get_own_property(
                 &self,
                 cx: Context,
-                key: Handle<PropertyKey>,
+                key: StackRoot<PropertyKey>,
             ) -> EvalResult<Option<PropertyDescriptor>> {
                 match canonical_numeric_index_string(cx, key, self.as_typed_array())? {
                     CanonicalIndexType::NotAnIndex => {
@@ -282,7 +282,7 @@ macro_rules! create_typed_array_constructor {
             }
 
             /// [[HasProperty]] (https://tc39.es/ecma262/#sec-typedarray-hasproperty)
-            fn has_property(&self, cx: Context, key: Handle<PropertyKey>) -> EvalResult<bool> {
+            fn has_property(&self, cx: Context, key: StackRoot<PropertyKey>) -> EvalResult<bool> {
                 match canonical_numeric_index_string(cx, key, self.as_typed_array())? {
                     CanonicalIndexType::NotAnIndex => {
                         ordinary_has_property(cx, self.as_object(), key)
@@ -296,7 +296,7 @@ macro_rules! create_typed_array_constructor {
             fn define_own_property(
                 &mut self,
                 cx: Context,
-                key: Handle<PropertyKey>,
+                key: StackRoot<PropertyKey>,
                 desc: PropertyDescriptor,
             ) -> EvalResult<bool> {
                 match canonical_numeric_index_string(cx, key, self.as_typed_array())? {
@@ -361,9 +361,9 @@ macro_rules! create_typed_array_constructor {
             fn get(
                 &self,
                 cx: Context,
-                key: Handle<PropertyKey>,
-                receiver: Handle<Value>,
-            ) -> EvalResult<Handle<Value>> {
+                key: StackRoot<PropertyKey>,
+                receiver: StackRoot<Value>,
+            ) -> EvalResult<StackRoot<Value>> {
                 match canonical_numeric_index_string(cx, key, self.as_typed_array())? {
                     CanonicalIndexType::NotAnIndex => {
                         ordinary_get(cx, self.as_object(), key, receiver)
@@ -382,9 +382,9 @@ macro_rules! create_typed_array_constructor {
             fn set(
                 &mut self,
                 cx: Context,
-                key: Handle<PropertyKey>,
-                value: Handle<Value>,
-                receiver: Handle<Value>,
+                key: StackRoot<PropertyKey>,
+                value: StackRoot<Value>,
+                receiver: StackRoot<Value>,
             ) -> EvalResult<bool> {
                 match canonical_numeric_index_string(cx, key, self.as_typed_array())? {
                     CanonicalIndexType::NotAnIndex => {
@@ -442,7 +442,7 @@ macro_rules! create_typed_array_constructor {
             }
 
             /// [[Delete]] (https://tc39.es/ecma262/#sec-typedarray-delete)
-            fn delete(&mut self, cx: Context, key: Handle<PropertyKey>) -> EvalResult<bool> {
+            fn delete(&mut self, cx: Context, key: StackRoot<PropertyKey>) -> EvalResult<bool> {
                 match canonical_numeric_index_string(cx, key, self.as_typed_array())? {
                     CanonicalIndexType::NotAnIndex => ordinary_delete(cx, self.as_object(), key),
                     CanonicalIndexType::Invalid => Ok(true),
@@ -451,7 +451,7 @@ macro_rules! create_typed_array_constructor {
             }
 
             /// [[OwnPropertyKeys]] (https://tc39.es/ecma262/#sec-typedarray-ownpropertykeys)
-            fn own_property_keys(&self, mut cx: Context) -> EvalResult<Vec<Handle<Value>>> {
+            fn own_property_keys(&self, mut cx: Context) -> EvalResult<Vec<StackRoot<Value>>> {
                 let typed_array_record =
                     make_typed_array_with_buffer_witness_record(self.as_typed_array());
 
@@ -475,7 +475,7 @@ macro_rules! create_typed_array_constructor {
             }
         }
 
-        impl TypedArray for Handle<$typed_array> {
+        impl TypedArray for StackRoot<$typed_array> {
             fn array_length(&self) -> Option<usize> {
                 self.array_length
             }
@@ -492,11 +492,11 @@ macro_rules! create_typed_array_constructor {
                 self.viewed_array_buffer
             }
 
-            fn viewed_array_buffer(&self) -> Handle<ArrayBufferObject> {
-                self.viewed_array_buffer.to_handle()
+            fn viewed_array_buffer(&self) -> StackRoot<ArrayBufferObject> {
+                self.viewed_array_buffer.to_stack()
             }
 
-            fn name(&self, cx: Context) -> Handle<StringValue> {
+            fn name(&self, cx: Context) -> StackRoot<StringValue> {
                 cx.names.$rust_name().as_string()
             }
 
@@ -518,7 +518,7 @@ macro_rules! create_typed_array_constructor {
                 cx: Context,
                 mut array_buffer: HeapPtr<ArrayBufferObject>,
                 byte_index: usize,
-            ) -> AllocResult<Handle<Value>> {
+            ) -> AllocResult<StackRoot<Value>> {
                 let element = unsafe {
                     let byte_ptr = array_buffer.data().as_ptr().add(byte_index);
                     byte_ptr.cast::<$element_type>().read()
@@ -533,7 +533,7 @@ macro_rules! create_typed_array_constructor {
                 &mut self,
                 cx: Context,
                 byte_index: usize,
-                value: Handle<Value>,
+                value: StackRoot<Value>,
             ) -> EvalResult<()> {
                 // May allocate, so call before accessing array buffer
                 let element_value = $to_element(cx, value)?;
@@ -557,7 +557,7 @@ macro_rules! create_typed_array_constructor {
                 &mut self,
                 cx: Context,
                 array_index: u64,
-                value: Handle<Value>,
+                value: StackRoot<Value>,
             ) -> EvalResult<()> {
                 // May allocate, so call before accessing array buffer
                 let element_value = $to_element(cx, value)?;
@@ -589,7 +589,7 @@ macro_rules! create_typed_array_constructor {
 
         impl $constructor {
             /// Properties of the TypedArray Constructors (https://tc39.es/ecma262/#sec-properties-of-the-typedarray-constructors)
-            pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+            pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
                 let mut func = BuiltinFunction::intrinsic_constructor(
                     cx,
                     Self::construct,
@@ -618,9 +618,9 @@ macro_rules! create_typed_array_constructor {
             /// TypedArray (https://tc39.es/ecma262/#sec-typedarray)
             pub fn construct(
                 mut cx: Context,
-                _: Handle<Value>,
-                arguments: &[Handle<Value>],
-            ) -> EvalResult<Handle<Value>> {
+                _: StackRoot<Value>,
+                arguments: &[StackRoot<Value>],
+            ) -> EvalResult<StackRoot<Value>> {
                 let new_target = if let Some(new_target) = cx.current_new_target() {
                     new_target
                 } else {
@@ -679,9 +679,9 @@ macro_rules! create_typed_array_constructor {
             /// AllocateTypedArrayBuffer (https://tc39.es/ecma262/#sec-allocatetypedarraybuffer)
             fn allocate_with_length(
                 cx: Context,
-                new_target: Handle<ObjectValue>,
+                new_target: StackRoot<ObjectValue>,
                 length: usize,
-            ) -> EvalResult<Handle<Value>> {
+            ) -> EvalResult<StackRoot<Value>> {
                 let proto = get_prototype_from_constructor(cx, new_target, Intrinsic::$prototype)?;
 
                 Ok(Self::allocate_from_object_with_length(cx, proto, length)?.as_value())
@@ -690,9 +690,9 @@ macro_rules! create_typed_array_constructor {
             #[inline]
             fn allocate_from_object_with_length(
                 cx: Context,
-                proto: Handle<ObjectValue>,
+                proto: StackRoot<ObjectValue>,
                 length: usize,
-            ) -> EvalResult<Handle<ObjectValue>> {
+            ) -> EvalResult<StackRoot<ObjectValue>> {
                 let byte_length = element_size!() * length;
 
                 let array_buffer_constructor = cx.get_intrinsic(Intrinsic::ArrayBufferConstructor);
@@ -719,9 +719,9 @@ macro_rules! create_typed_array_constructor {
             /// InitializeTypedArrayFromTypedArray (https://tc39.es/ecma262/#sec-initializetypedarrayfromtypedarray)
             fn initialize_typed_array_from_typed_array(
                 cx: Context,
-                proto: Handle<ObjectValue>,
+                proto: StackRoot<ObjectValue>,
                 source_typed_array: DynTypedArray,
-            ) -> EvalResult<Handle<Value>> {
+            ) -> EvalResult<StackRoot<Value>> {
                 let source_data = source_typed_array.viewed_array_buffer();
                 let source_element_size = source_typed_array.element_size();
                 let source_byte_offset = source_typed_array.byte_offset();
@@ -807,11 +807,11 @@ macro_rules! create_typed_array_constructor {
             /// InitializeTypedArrayFromArrayBuffer (https://tc39.es/ecma262/#sec-initializetypedarrayfromarraybuffer)
             fn initialize_typed_array_from_array_buffer(
                 cx: Context,
-                proto: Handle<ObjectValue>,
-                array_buffer: Handle<ArrayBufferObject>,
-                byte_offset: Handle<Value>,
-                length: Handle<Value>,
-            ) -> EvalResult<Handle<Value>> {
+                proto: StackRoot<ObjectValue>,
+                array_buffer: StackRoot<ArrayBufferObject>,
+                byte_offset: StackRoot<Value>,
+                length: StackRoot<Value>,
+            ) -> EvalResult<StackRoot<Value>> {
                 let offset = to_index(cx, byte_offset)?;
                 if offset % element_size!() != 0 {
                     return range_error(
@@ -894,10 +894,10 @@ macro_rules! create_typed_array_constructor {
             /// InitializeTypedArrayFromList (https://tc39.es/ecma262/#sec-initializetypedarrayfromlist)
             fn initialize_typed_array_from_list(
                 cx: Context,
-                proto: Handle<ObjectValue>,
-                iterable: Handle<Value>,
-                iterator: Handle<ObjectValue>,
-            ) -> EvalResult<Handle<Value>> {
+                proto: StackRoot<ObjectValue>,
+                iterable: StackRoot<Value>,
+                iterator: StackRoot<ObjectValue>,
+            ) -> EvalResult<StackRoot<Value>> {
                 // Collect all values from iterator
                 let mut values = vec![];
                 iter_iterator_method_values(cx, iterable, iterator, &mut |_, value| {
@@ -910,7 +910,7 @@ macro_rules! create_typed_array_constructor {
                 let typed_array_object = Self::allocate_from_object_with_length(cx, proto, length)?;
 
                 // Shared between iterations
-                let mut key = PropertyKey::uninit().to_handle(cx);
+                let mut key = PropertyKey::uninit().to_stack();
 
                 // Add each value from iterator into typed array
                 for (i, value) in values.into_iter().enumerate() {
@@ -924,16 +924,16 @@ macro_rules! create_typed_array_constructor {
             /// InitializeTypedArrayFromArrayLike (https://tc39.es/ecma262/#sec-initializetypedarrayfromarraylike)
             fn initialize_typed_array_from_array_like(
                 cx: Context,
-                proto: Handle<ObjectValue>,
-                array_like: Handle<ObjectValue>,
-            ) -> EvalResult<Handle<Value>> {
+                proto: StackRoot<ObjectValue>,
+                array_like: StackRoot<ObjectValue>,
+            ) -> EvalResult<StackRoot<Value>> {
                 // Allocated typed array
                 let length = length_of_array_like(cx, array_like)?;
                 let typed_array_object =
                     Self::allocate_from_object_with_length(cx, proto, length as usize)?;
 
                 // Shared between iterations
-                let mut key = PropertyKey::uninit().to_handle(cx);
+                let mut key = PropertyKey::uninit().to_stack();
 
                 // Add each value from array into typed array
                 for i in 0..length {
@@ -951,7 +951,7 @@ macro_rules! create_typed_array_constructor {
                 size_of::<$typed_array>()
             }
 
-            fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+            fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
                 self.visit_object_pointers(visitor);
                 visitor.visit_pointer(&mut self.viewed_array_buffer);
             }
@@ -974,7 +974,7 @@ pub enum CanonicalIndexType {
 /// used as the index into a typed array with a particular length.
 pub fn canonical_numeric_index_string(
     cx: Context,
-    key: Handle<PropertyKey>,
+    key: StackRoot<PropertyKey>,
     typed_array: DynTypedArray,
 ) -> AllocResult<CanonicalIndexType> {
     let result = if key.is_array_index() {

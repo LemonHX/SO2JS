@@ -8,7 +8,7 @@ use crate::{
         collections::{index_map::GcSafeEntriesIter, BsIndexMap},
         error::type_error,
         eval_result::EvalResult,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         iterator::create_iter_result_object,
         object_value::ObjectValue,
@@ -16,7 +16,7 @@ use crate::{
         property::Property,
         realm::Realm,
         value::ValueCollectionKey,
-        Context, Handle, HeapPtr, Value,
+        Context, StackRoot, HeapPtr, Value,
     },
     set_uninit,
 };
@@ -42,9 +42,9 @@ pub enum SetIteratorKind {
 impl SetIterator {
     pub fn new(
         cx: Context,
-        set: Handle<SetObject>,
+        set: StackRoot<SetObject>,
         kind: SetIteratorKind,
-    ) -> AllocResult<Handle<SetIterator>> {
+    ) -> AllocResult<StackRoot<SetIterator>> {
         let mut object = object_create::<SetIterator>(
             cx,
             HeapItemKind::SetIterator,
@@ -56,14 +56,14 @@ impl SetIterator {
         set_uninit!(object.kind, kind);
         set_uninit!(object.is_done, false);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     cast_from_value_fn!(SetIterator, "Set Iterator");
 
     fn get_iter(&self) -> GcSafeEntriesIter<ValueCollectionKey, ()> {
         GcSafeEntriesIter::<ValueCollectionKey, ()>::from_parts(
-            self.set.to_handle(),
+            self.set.to_stack(),
             self.next_entry_index,
         )
     }
@@ -79,7 +79,7 @@ impl SetIterator {
 pub struct SetIteratorPrototype;
 
 impl SetIteratorPrototype {
-    pub fn new(mut cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(mut cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::IteratorPrototype)),
@@ -105,9 +105,9 @@ impl SetIteratorPrototype {
     /// Adapted from the abstract closure in CreateSetIterator (https://tc39.es/ecma262/#sec-createsetiterator)
     pub fn next(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let mut set_iterator = SetIterator::cast_from_value(cx, this_value)?;
 
         // Check if iterator is already done
@@ -136,7 +136,7 @@ impl SetIteratorPrototype {
             }
             Some((value, _)) => {
                 let value_value: Value = value.into();
-                let value_handle = value_value.to_handle(cx);
+                let value_handle = value_value.to_stack();
 
                 match set_iterator.kind {
                     SetIteratorKind::Value => {
@@ -158,7 +158,7 @@ impl HeapItem for HeapPtr<SetIterator> {
         size_of::<SetIterator>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.set);
     }

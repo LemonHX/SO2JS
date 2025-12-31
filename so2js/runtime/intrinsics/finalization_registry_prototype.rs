@@ -1,7 +1,7 @@
 use crate::runtime::{
     alloc_error::AllocResult, error::type_error, eval_result::EvalResult, function::get_argument,
     intrinsics::weak_ref_constructor::can_be_held_weakly, object_value::ObjectValue,
-    property::Property, realm::Realm, type_utilities::same_value, Context, Handle, Value,
+    property::Property, realm::Realm, type_utilities::same_value, Context, StackRoot, Value,
 };
 
 use super::{
@@ -15,7 +15,7 @@ pub struct FinalizationRegistryPrototype;
 
 impl FinalizationRegistryPrototype {
     /// Properties of the FinalizationRegistry Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-finalization-registry-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -45,9 +45,9 @@ impl FinalizationRegistryPrototype {
     /// FinalizationRegistry.prototype.register (https://tc39.es/ecma262/#sec-finalization-registry.prototype.register)
     pub fn register(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let registry_object =
             if let Some(registry_object) = this_finalization_registry_value(this_value) {
                 registry_object
@@ -97,9 +97,9 @@ impl FinalizationRegistryPrototype {
     /// FinalizationRegistry.prototype.unregister (https://tc39.es/ecma262/#sec-finalization-registry.prototype.unregister)
     pub fn unregister(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let registry_object =
             if let Some(registry_object) = this_finalization_registry_value(this_value) {
                 registry_object
@@ -126,8 +126,8 @@ impl FinalizationRegistryPrototype {
 }
 
 fn this_finalization_registry_value(
-    value: Handle<Value>,
-) -> Option<Handle<FinalizationRegistryObject>> {
+    value: StackRoot<Value>,
+) -> Option<StackRoot<FinalizationRegistryObject>> {
     if !value.is_object() {
         return None;
     }

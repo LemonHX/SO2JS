@@ -1,7 +1,7 @@
 use crate::runtime::{
     alloc_error::AllocResult, builtin_function::BuiltinFunction,
     eval::create_dynamic_function::create_dynamic_function, eval_result::EvalResult,
-    object_value::ObjectValue, realm::Realm, Context, Handle, Value,
+    object_value::ObjectValue, realm::Realm, Context, StackRoot, Value,
 };
 
 use super::intrinsics::Intrinsic;
@@ -10,7 +10,7 @@ pub struct AsyncGeneratorFunctionConstructor;
 
 impl AsyncGeneratorFunctionConstructor {
     /// Properties of the AsyncGeneratorFunction Constructor (https://tc39.es/ecma262/#sec-properties-of-asyncgeneratorfunction)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -34,9 +34,9 @@ impl AsyncGeneratorFunctionConstructor {
     /// AsyncGeneratorFunction (https://tc39.es/ecma262/#sec-asyncgeneratorfunction)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let constructor = cx.current_function();
         Ok(create_dynamic_function(
             cx,

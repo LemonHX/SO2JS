@@ -24,7 +24,7 @@ use crate::{
             is_array, is_callable, is_less_than, is_strictly_equal, same_value_zero, to_boolean,
             to_integer_or_infinity, to_number, to_object,
         },
-        Context, EvalResult, Handle, Value,
+        Context, EvalResult, StackRoot, Value,
     },
 };
 use alloc::vec;
@@ -41,7 +41,7 @@ pub struct ArrayPrototype;
 
 impl ArrayPrototype {
     /// Properties of the Array Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-array-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let object_proto = realm.get_intrinsic(Intrinsic::ObjectPrototype);
         let mut array = ArrayObject::new(cx, object_proto)?.as_object();
 
@@ -120,9 +120,9 @@ impl ArrayPrototype {
     /// Array.prototype.at (https://tc39.es/ecma262/#sec-array.prototype.at)
     pub fn at(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -149,9 +149,9 @@ impl ArrayPrototype {
     /// Array.prototype.concat (https://tc39.es/ecma262/#sec-array.prototype.concat)
     pub fn concat(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let array = array_species_create(cx, object, 0)?;
 
@@ -163,14 +163,14 @@ impl ArrayPrototype {
             Self::apply_concat_to_element(cx, *element, array, &mut n)?;
         }
 
-        let new_length_value = Value::from(n).to_handle(cx);
+        let new_length_value = Value::from(n).to_stack();
         set(cx, array, cx.names.length(), new_length_value, true)?;
 
         Ok(array.as_value())
     }
 
     /// IsConcatSpreadable (https://tc39.es/ecma262/#sec-isconcatspreadable)
-    pub fn is_concat_spreadable(cx: Context, object: Handle<Value>) -> EvalResult<bool> {
+    pub fn is_concat_spreadable(cx: Context, object: StackRoot<Value>) -> EvalResult<bool> {
         if !object.is_object() {
             return Ok(false);
         }
@@ -191,8 +191,8 @@ impl ArrayPrototype {
     #[inline]
     fn apply_concat_to_element(
         cx: Context,
-        element: Handle<Value>,
-        array: Handle<ObjectValue>,
+        element: StackRoot<Value>,
+        array: StackRoot<ObjectValue>,
         n: &mut u64,
     ) -> EvalResult<()> {
         if Self::is_concat_spreadable(cx, element)? {
@@ -204,7 +204,7 @@ impl ArrayPrototype {
             }
 
             // Property key is shared between iterations
-            let mut element_index_key = PropertyKey::uninit().to_handle(cx);
+            let mut element_index_key = PropertyKey::uninit().to_stack();
 
             for i in 0..length {
                 element_index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -238,9 +238,9 @@ impl ArrayPrototype {
     /// Array.prototype.copyWithin (https://tc39.es/ecma262/#sec-array.prototype.copywithin)
     pub fn copy_within(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -297,8 +297,8 @@ impl ArrayPrototype {
         let mut count = count as u64;
 
         // Property keys are shared between iterations
-        let mut from_key = PropertyKey::uninit().to_handle(cx);
-        let mut to_key = PropertyKey::uninit().to_handle(cx);
+        let mut from_key = PropertyKey::uninit().to_stack();
+        let mut to_key = PropertyKey::uninit().to_stack();
 
         if from_index < to_index && to_index < from_index + count {
             // Treat as i64 due to potential subtraction below 0. Guaranteed to not need number
@@ -345,9 +345,9 @@ impl ArrayPrototype {
     /// Array.prototype.entries (https://tc39.es/ecma262/#sec-array.prototype.entries)
     pub fn entries(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         Ok(ArrayIterator::new(cx, object, ArrayIteratorKind::KeyAndValue)?.as_value())
     }
@@ -355,9 +355,9 @@ impl ArrayPrototype {
     /// Array.prototype.every (https://tc39.es/ecma262/#sec-array.prototype.every)
     pub fn every(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -370,8 +370,8 @@ impl ArrayPrototype {
         let this_arg = get_argument(cx, arguments, 1);
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
-        let mut index_value = Value::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_value = Value::uninit().to_stack();
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -394,9 +394,9 @@ impl ArrayPrototype {
     /// Array.prototype.fill (https://tc39.es/ecma262/#sec-array.prototype.fill)
     pub fn fill(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -432,7 +432,7 @@ impl ArrayPrototype {
         };
 
         // Property key is shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for i in start_index..end_index {
             key.replace(PropertyKey::from_u64(cx, i)?);
@@ -445,9 +445,9 @@ impl ArrayPrototype {
     /// Array.prototype.filter (https://tc39.es/ecma262/#sec-array.prototype.filter)
     pub fn filter(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -464,8 +464,8 @@ impl ArrayPrototype {
         let mut result_index = 0;
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
-        let mut index_value = Value::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_value = Value::uninit().to_stack();
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -495,9 +495,9 @@ impl ArrayPrototype {
     /// Array.prototype.find (https://tc39.es/ecma262/#sec-array.prototype.find)
     pub fn find(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -520,9 +520,9 @@ impl ArrayPrototype {
     /// Array.prototype.findIndex (https://tc39.es/ecma262/#sec-array.prototype.findindex)
     pub fn find_index(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -545,9 +545,9 @@ impl ArrayPrototype {
     /// Array.prototype.findLast (https://tc39.es/ecma262/#sec-array.prototype.findlast)
     pub fn find_last(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -571,9 +571,9 @@ impl ArrayPrototype {
     /// Array.prototype.findLastIndex (https://tc39.es/ecma262/#sec-array.prototype.findlastindex)
     pub fn find_last_index(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -597,9 +597,9 @@ impl ArrayPrototype {
     /// Array.prototype.flat (https://tc39.es/ecma262/#sec-array.prototype.flat)
     pub fn flat(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -621,19 +621,19 @@ impl ArrayPrototype {
     /// FlattenIntoArray (https://tc39.es/ecma262/#sec-flattenintoarray)
     pub fn flatten_into_array(
         cx: Context,
-        target: Handle<ObjectValue>,
-        source: Handle<ObjectValue>,
+        target: StackRoot<ObjectValue>,
+        source: StackRoot<ObjectValue>,
         source_length: u64,
         start: u64,
         depth: f64,
-        mapper_function: Option<Handle<Value>>,
-        this_arg: Handle<Value>,
+        mapper_function: Option<StackRoot<Value>>,
+        this_arg: StackRoot<Value>,
     ) -> EvalResult<u64> {
         let mut target_index = start;
 
         // Property key is shared between iterations
-        let mut source_key = PropertyKey::uninit().to_handle(cx);
-        let mut target_key = PropertyKey::uninit().to_handle(cx);
+        let mut source_key = PropertyKey::uninit().to_stack();
+        let mut target_key = PropertyKey::uninit().to_stack();
 
         for i in 0..source_length {
             source_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -641,7 +641,7 @@ impl ArrayPrototype {
                 let mut element = get(cx, source, source_key)?;
 
                 if let Some(mapper_function) = mapper_function {
-                    let index_value = Value::from(i).to_handle(cx);
+                    let index_value = Value::from(i).to_stack();
                     let arguments = [element, index_value, source.into()];
                     element = call(cx, mapper_function, this_arg, &arguments)?;
                 }
@@ -691,9 +691,9 @@ impl ArrayPrototype {
     /// Array.prototype.flatMap (https://tc39.es/ecma262/#sec-array.prototype.flatmap)
     pub fn flat_map(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -723,9 +723,9 @@ impl ArrayPrototype {
     /// Array.prototype.forEach (https://tc39.es/ecma262/#sec-array.prototype.foreach)
     pub fn for_each(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -738,8 +738,8 @@ impl ArrayPrototype {
         let this_arg = get_argument(cx, arguments, 1);
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
-        let mut index_value = Value::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_value = Value::uninit().to_stack();
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -759,9 +759,9 @@ impl ArrayPrototype {
     /// Array.prototype.includes (https://tc39.es/ecma262/#sec-array.prototype.includes)
     pub fn includes(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -786,7 +786,7 @@ impl ArrayPrototype {
         };
 
         // Property key is shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for i in start_index..length {
             key.replace(PropertyKey::from_u64(cx, i)?);
@@ -803,9 +803,9 @@ impl ArrayPrototype {
     /// Array.prototype.indexOf (https://tc39.es/ecma262/#sec-array.prototype.indexof)
     pub fn index_of(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -830,14 +830,14 @@ impl ArrayPrototype {
         };
 
         // Property key is shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for i in start_index..length {
             key.replace(PropertyKey::from_u64(cx, i)?);
             if has_property(cx, object, key)? {
                 let element = get(cx, object, key)?;
                 if is_strictly_equal(search_element, element)? {
-                    return Ok(Value::from(i).to_handle(cx));
+                    return Ok(Value::from(i).to_stack());
                 }
             }
         }
@@ -848,9 +848,9 @@ impl ArrayPrototype {
     /// Array.prototype.join (https://tc39.es/ecma262/#sec-array.prototype.join)
     pub fn join(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -864,7 +864,7 @@ impl ArrayPrototype {
         let mut joined = cx.names.empty_string().as_string();
 
         // Property key is shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for i in 0..length {
             if i > 0 {
@@ -886,9 +886,9 @@ impl ArrayPrototype {
     /// Array.prototype.keys (https://tc39.es/ecma262/#sec-array.prototype.keys)
     pub fn keys(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         Ok(ArrayIterator::new(cx, object, ArrayIteratorKind::Key)?.as_value())
     }
@@ -896,9 +896,9 @@ impl ArrayPrototype {
     /// Array.prototype.lastIndexOf (https://tc39.es/ecma262/#sec-array.prototype.lastindexof)
     pub fn last_index_of(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -931,14 +931,14 @@ impl ArrayPrototype {
         };
 
         // Property key is shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for i in (0..=start_index).rev() {
             key.replace(PropertyKey::from_u64(cx, i)?);
             if has_property(cx, object, key)? {
                 let element = get(cx, object, key)?;
                 if is_strictly_equal(search_element, element)? {
-                    return Ok(Value::from(i).to_handle(cx));
+                    return Ok(Value::from(i).to_stack());
                 }
             }
         }
@@ -949,9 +949,9 @@ impl ArrayPrototype {
     /// Array.prototype.map (https://tc39.es/ecma262/#sec-array.prototype.map)
     pub fn map(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -966,8 +966,8 @@ impl ArrayPrototype {
         let array = array_species_create(cx, object, length)?;
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
-        let mut index_value = Value::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_value = Value::uninit().to_stack();
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -988,9 +988,9 @@ impl ArrayPrototype {
     /// Array.prototype.pop (https://tc39.es/ecma262/#sec-array.prototype.pop)
     pub fn pop(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -1006,7 +1006,7 @@ impl ArrayPrototype {
         let element = get(cx, object, index_key)?;
         delete_property_or_throw(cx, object, index_key)?;
 
-        let new_length_value = Value::from(new_length).to_handle(cx);
+        let new_length_value = Value::from(new_length).to_stack();
         set(cx, object, cx.names.length(), new_length_value, true)?;
 
         Ok(element)
@@ -1015,9 +1015,9 @@ impl ArrayPrototype {
     /// Array.prototype.push (https://tc39.es/ecma262/#sec-array.prototype.push)
     pub fn push(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -1027,14 +1027,14 @@ impl ArrayPrototype {
         }
 
         // Property key is shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for (i, argument) in arguments.iter().enumerate() {
             key.replace(PropertyKey::from_u64(cx, length + i as u64)?);
             set(cx, object, key, *argument, true)?;
         }
 
-        let new_length_value = Value::from(new_length).to_handle(cx);
+        let new_length_value = Value::from(new_length).to_stack();
         set(cx, object, cx.names.length(), new_length_value, true)?;
 
         Ok(new_length_value)
@@ -1043,9 +1043,9 @@ impl ArrayPrototype {
     /// Array.prototype.reduce (https://tc39.es/ecma262/#sec-array.prototype.reduce)
     pub fn reduce(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -1063,7 +1063,7 @@ impl ArrayPrototype {
             return type_error(cx, "reduce does not have initial value");
         } else {
             // Property key is shared between iterations
-            let mut index_key = PropertyKey::uninit().to_handle(cx);
+            let mut index_key = PropertyKey::uninit().to_stack();
 
             // Find the first value in the array if an initial value was not specified
             loop {
@@ -1081,8 +1081,8 @@ impl ArrayPrototype {
         };
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
-        let mut index_value = Value::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_value = Value::uninit().to_stack();
 
         for i in initial_index..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1102,9 +1102,9 @@ impl ArrayPrototype {
     /// Array.prototype.reduceRight (https://tc39.es/ecma262/#sec-array.prototype.reduceright)
     pub fn reduce_right(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -1121,7 +1121,7 @@ impl ArrayPrototype {
         } else if length == 0 {
             return type_error(cx, "reduceRight does not have initial value");
         } else {
-            let mut index_key = PropertyKey::uninit().to_handle(cx);
+            let mut index_key = PropertyKey::uninit().to_stack();
 
             // Find the first value in the array if an initial value was not specified
             loop {
@@ -1139,8 +1139,8 @@ impl ArrayPrototype {
         };
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
-        let mut index_value = Value::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_value = Value::uninit().to_stack();
 
         for i in (0..=initial_index).rev() {
             index_key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -1160,9 +1160,9 @@ impl ArrayPrototype {
     /// Array.prototype.reverse (https://tc39.es/ecma262/#sec-array.prototype.reverse)
     pub fn reverse(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -1172,8 +1172,8 @@ impl ArrayPrototype {
         let mut upper = length.wrapping_sub(1);
 
         // Shared between iterations
-        let mut lower_key = PropertyKey::uninit().to_handle(cx);
-        let mut upper_key = PropertyKey::uninit().to_handle(cx);
+        let mut lower_key = PropertyKey::uninit().to_stack();
+        let mut upper_key = PropertyKey::uninit().to_stack();
 
         while lower != middle {
             lower_key.replace(PropertyKey::from_u64(cx, lower)?);
@@ -1217,9 +1217,9 @@ impl ArrayPrototype {
     /// Array.prototype.shift (https://tc39.es/ecma262/#sec-array.prototype.shift)
     pub fn shift(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -1233,8 +1233,8 @@ impl ArrayPrototype {
         let first = get(cx, object, first_key)?;
 
         // Shared between iterations
-        let mut from_key = PropertyKey::uninit().to_handle(cx);
-        let mut to_key = PropertyKey::uninit().to_handle(cx);
+        let mut from_key = PropertyKey::uninit().to_stack();
+        let mut to_key = PropertyKey::uninit().to_stack();
 
         for i in 1..length {
             from_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1251,7 +1251,7 @@ impl ArrayPrototype {
         let last_key = PropertyKey::from_u64_handle(cx, length - 1)?;
         delete_property_or_throw(cx, object, last_key)?;
 
-        let new_length_value = Value::from(length - 1).to_handle(cx);
+        let new_length_value = Value::from(length - 1).to_stack();
         set(cx, object, cx.names.length(), new_length_value, true)?;
 
         Ok(first)
@@ -1260,9 +1260,9 @@ impl ArrayPrototype {
     /// Array.prototype.slice (https://tc39.es/ecma262/#sec-array.prototype.slice)
     pub fn slice(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -1301,7 +1301,7 @@ impl ArrayPrototype {
         let mut to_index = 0;
 
         // Shared between iterations
-        let mut from_key = PropertyKey::uninit().to_handle(cx);
+        let mut from_key = PropertyKey::uninit().to_stack();
 
         for i in start_index..end_index {
             from_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1318,7 +1318,7 @@ impl ArrayPrototype {
             to_index += 1;
         }
 
-        let to_index_value = Value::from(to_index).to_handle(cx);
+        let to_index_value = Value::from(to_index).to_stack();
         set(cx, array, cx.names.length(), to_index_value, true)?;
 
         Ok(array.as_value())
@@ -1327,9 +1327,9 @@ impl ArrayPrototype {
     /// Array.prototype.some (https://tc39.es/ecma262/#sec-array.prototype.some)
     pub fn some(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -1342,8 +1342,8 @@ impl ArrayPrototype {
         let this_arg = get_argument(cx, arguments, 1);
 
         // Shared between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
-        let mut index_value = Value::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
+        let mut index_value = Value::uninit().to_stack();
 
         for i in 0..length {
             index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1366,9 +1366,9 @@ impl ArrayPrototype {
     /// Array.prototype.sort (https://tc39.es/ecma262/#sec-array.prototype.sort)
     pub fn sort(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let compare_function_arg = get_argument(cx, arguments, 0);
         if !compare_function_arg.is_undefined() && !is_callable(compare_function_arg) {
             return type_error(cx, "Array.prototype.sort expects a function");
@@ -1385,7 +1385,7 @@ impl ArrayPrototype {
         )?;
 
         // Reuse handle between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
 
         // Copy sorted values into start of array
         for (i, value) in sorted_values.iter().enumerate() {
@@ -1405,9 +1405,9 @@ impl ArrayPrototype {
     /// Array.prototype.splice (https://tc39.es/ecma262/#sec-array.prototype.splice)
     pub fn splice(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -1444,8 +1444,8 @@ impl ArrayPrototype {
         let array = array_species_create(cx, object, actual_delete_count)?;
 
         // Shared between iterations
-        let mut from_key = PropertyKey::uninit().to_handle(cx);
-        let mut to_key = PropertyKey::uninit().to_handle(cx);
+        let mut from_key = PropertyKey::uninit().to_stack();
+        let mut to_key = PropertyKey::uninit().to_stack();
 
         for i in 0..actual_delete_count {
             from_key.replace(PropertyKey::from_u64(cx, start_index + i)?);
@@ -1456,7 +1456,7 @@ impl ArrayPrototype {
             }
         }
 
-        let actual_delete_count_value = Value::from(actual_delete_count).to_handle(cx);
+        let actual_delete_count_value = Value::from(actual_delete_count).to_stack();
         set(
             cx,
             array,
@@ -1503,7 +1503,7 @@ impl ArrayPrototype {
             set(cx, object, to_key, *item, true)?;
         }
 
-        let new_length_value = Value::from(new_length).to_handle(cx);
+        let new_length_value = Value::from(new_length).to_stack();
         set(cx, object, cx.names.length(), new_length_value, true)?;
 
         Ok(array.as_value())
@@ -1512,9 +1512,9 @@ impl ArrayPrototype {
     /// Array.prototype.toLocaleString (https://tc39.es/ecma262/#sec-array.prototype.tolocalestring)
     pub fn to_locale_string(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -1522,7 +1522,7 @@ impl ArrayPrototype {
         let separator = cx.names.comma().as_string();
 
         // Shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for i in 0..length {
             if i > 0 {
@@ -1546,17 +1546,17 @@ impl ArrayPrototype {
     /// Array.prototype.toReversed (https://tc39.es/ecma262/#sec-array.prototype.toreversed)
     pub fn to_reversed(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
         let array = array_create(cx, length, None)?;
 
         // Keys are shared between iterations
-        let mut from_key = PropertyKey::uninit().to_handle(cx);
-        let mut to_key = PropertyKey::uninit().to_handle(cx);
+        let mut from_key = PropertyKey::uninit().to_stack();
+        let mut to_key = PropertyKey::uninit().to_stack();
 
         for i in 0..length {
             from_key.replace(PropertyKey::from_u64(cx, length - i - 1)?);
@@ -1577,9 +1577,9 @@ impl ArrayPrototype {
     /// Array.prototype.toSorted (https://tc39.es/ecma262/#sec-array.prototype.tosorted)
     pub fn to_sorted(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let compare_function_arg = get_argument(cx, arguments, 0);
         if !compare_function_arg.is_undefined() && !is_callable(compare_function_arg) {
             return type_error(cx, "Array.prototype.toSorted expects a function");
@@ -1598,7 +1598,7 @@ impl ArrayPrototype {
         )?;
 
         // Reuse handle between iterations
-        let mut index_key = PropertyKey::uninit().to_handle(cx);
+        let mut index_key = PropertyKey::uninit().to_stack();
 
         // Copy sorted values into array
         for (i, value) in sorted_values.iter().enumerate() {
@@ -1612,9 +1612,9 @@ impl ArrayPrototype {
     /// Array.prototype.toSpliced (https://tc39.es/ecma262/#sec-array.prototype.tospliced)
     pub fn to_spliced(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -1659,8 +1659,8 @@ impl ArrayPrototype {
         let array = array_create(cx, new_length, None)?;
 
         // Keys are shared between iterations
-        let mut from_key = PropertyKey::uninit().to_handle(cx);
-        let mut to_key = PropertyKey::uninit().to_handle(cx);
+        let mut from_key = PropertyKey::uninit().to_stack();
+        let mut to_key = PropertyKey::uninit().to_stack();
 
         // Elements before the start index are unchanged and can be copied
         for i in 0..actual_start_index {
@@ -1703,9 +1703,9 @@ impl ArrayPrototype {
     /// Array.prototype.toString (https://tc39.es/ecma262/#sec-array.prototype.tostring)
     pub fn to_string(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let array = to_object(cx, this_value)?;
         let func = get(cx, array, cx.names.join())?;
 
@@ -1721,9 +1721,9 @@ impl ArrayPrototype {
     /// Array.prototype.unshift (https://tc39.es/ecma262/#sec-array.prototype.unshift)
     pub fn unshift(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -1734,8 +1734,8 @@ impl ArrayPrototype {
             }
 
             // Shared between iterations
-            let mut from_key = PropertyKey::uninit().to_handle(cx);
-            let mut to_key = PropertyKey::uninit().to_handle(cx);
+            let mut from_key = PropertyKey::uninit().to_stack();
+            let mut to_key = PropertyKey::uninit().to_stack();
 
             for i in (0..length).rev() {
                 from_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1755,7 +1755,7 @@ impl ArrayPrototype {
             }
         }
 
-        let new_length = Value::from(length + num_arguments).to_handle(cx);
+        let new_length = Value::from(length + num_arguments).to_stack();
         set(cx, object, cx.names.length(), new_length, true)?;
 
         Ok(new_length)
@@ -1764,9 +1764,9 @@ impl ArrayPrototype {
     /// Array.prototype.values (https://tc39.es/ecma262/#sec-array.prototype.values)
     pub fn values(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         Ok(ArrayIterator::new(cx, object, ArrayIteratorKind::Value)?.as_value())
     }
@@ -1774,9 +1774,9 @@ impl ArrayPrototype {
     /// Array.prototype.with (https://tc39.es/ecma262/#sec-array.prototype.with)
     pub fn with(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
         let length = length_of_array_like(cx, object)?;
 
@@ -1803,7 +1803,7 @@ impl ArrayPrototype {
         let new_value = get_argument(cx, arguments, 1);
 
         // Key is shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for i in 0..length {
             key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1822,13 +1822,13 @@ impl ArrayPrototype {
     }
 
     /// Array.prototype [ @@unscopables ] (https://tc39.es/ecma262/#sec-array.prototype-%symbol.unscopables%)
-    fn create_unscopables(cx: Context) -> AllocResult<Handle<ObjectValue>> {
+    fn create_unscopables(cx: Context) -> AllocResult<StackRoot<ObjectValue>> {
         let list = object_create_with_optional_proto::<ObjectValue>(
             cx,
             HeapItemKind::OrdinaryObject,
             None,
         )?
-        .to_handle();
+        .to_stack();
 
         let true_value = cx.bool(true);
 
@@ -1937,14 +1937,14 @@ impl ArrayPrototype {
 #[inline]
 pub fn find_via_predicate(
     cx: Context,
-    object: Handle<ObjectValue>,
+    object: StackRoot<ObjectValue>,
     indices_iter: impl Iterator<Item = u64>,
-    predicate: Handle<ObjectValue>,
-    this_arg: Handle<Value>,
-) -> EvalResult<Option<(Handle<Value>, Handle<Value>)>> {
+    predicate: StackRoot<ObjectValue>,
+    this_arg: StackRoot<Value>,
+) -> EvalResult<Option<(StackRoot<Value>, StackRoot<Value>)>> {
     // Shared between iterations
-    let mut index_key = PropertyKey::uninit().to_handle(cx);
-    let mut index_value = Value::uninit().to_handle(cx);
+    let mut index_key = PropertyKey::uninit().to_stack();
+    let mut index_value = Value::uninit().to_stack();
 
     for i in indices_iter {
         index_key.replace(PropertyKey::from_u64(cx, i)?);
@@ -1973,12 +1973,12 @@ pub const REGULAR_ARRAY: bool = false;
 /// SortIndexedProperties (https://tc39.es/ecma262/#sec-sortindexedproperties)
 pub fn sort_indexed_properties<const IGNORE_HOLES: bool, const IS_TYPED_ARRAY: bool>(
     cx: Context,
-    object: Handle<ObjectValue>,
+    object: StackRoot<ObjectValue>,
     length: u64,
-    compare_function: Handle<Value>,
-) -> EvalResult<Vec<Handle<Value>>> {
+    compare_function: StackRoot<Value>,
+) -> EvalResult<Vec<StackRoot<Value>>> {
     // Reuse handle between iterations
-    let mut index_key = PropertyKey::uninit().to_handle(cx);
+    let mut index_key = PropertyKey::uninit().to_stack();
 
     // Gather all non-empty values
     let mut values = vec![];
@@ -2003,9 +2003,9 @@ pub fn sort_indexed_properties<const IGNORE_HOLES: bool, const IS_TYPED_ARRAY: b
 /// CompareArrayElements (https://tc39.es/ecma262/#sec-comparearrayelements)
 fn compare_array_elements(
     cx: Context,
-    v1: Handle<Value>,
-    v2: Handle<Value>,
-    compare_function: Handle<Value>,
+    v1: StackRoot<Value>,
+    v2: StackRoot<Value>,
+    compare_function: StackRoot<Value>,
 ) -> EvalResult<Ordering> {
     let v1_is_undefined = v1.is_undefined();
     let v2_is_undefined = v2.is_undefined();
@@ -2054,9 +2054,9 @@ fn compare_array_elements(
 /// Naive merge sort where comparator function may have an abrupt completion.
 ///
 /// Much room for optimization.
-fn merge_sort<F>(cx: Context, items: &[Handle<Value>], f: &mut F) -> EvalResult<Vec<Handle<Value>>>
+fn merge_sort<F>(cx: Context, items: &[StackRoot<Value>], f: &mut F) -> EvalResult<Vec<StackRoot<Value>>>
 where
-    F: FnMut(Context, Handle<Value>, Handle<Value>) -> EvalResult<Ordering>,
+    F: FnMut(Context, StackRoot<Value>, StackRoot<Value>) -> EvalResult<Ordering>,
 {
     if items.len() <= 1 {
         return Ok(items.to_vec());

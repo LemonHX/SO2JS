@@ -6,18 +6,14 @@ use crate::{
 };
 
 use super::{
-    eval_result::EvalResult,
-    gc::{GcType, Heap},
-    intrinsics::intrinsics::Intrinsic,
-    object_value::ObjectValue,
-    realm::Realm,
-    Context, Handle, Value,
+    eval_result::EvalResult, gc::Heap, intrinsics::intrinsics::Intrinsic,
+    object_value::ObjectValue, realm::Realm, Context, StackRoot, Value,
 };
 
 pub struct GcObject;
 
 impl GcObject {
-    fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -26,11 +22,11 @@ impl GcObject {
 
         object.intrinsic_func(cx, cx.names.run(), Self::run, 0, realm)?;
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     /// Install the GC object on the realm's global object.
-    pub fn install(cx: Context, realm: Handle<Realm>) -> AllocResult<()> {
+    pub fn install(cx: Context, realm: StackRoot<Realm>) -> AllocResult<()> {
         handle_scope!(cx, {
             let gc_object = GcObject::new(cx, realm)?;
             let desc = PropertyDescriptor::data(gc_object.as_value(), true, false, true);
@@ -45,8 +41,8 @@ impl GcObject {
         })
     }
 
-    pub fn run(cx: Context, _: Handle<Value>, _: &[Handle<Value>]) -> EvalResult<Handle<Value>> {
-        Heap::run_gc(cx, GcType::Normal);
+    pub fn run(cx: Context, _: StackRoot<Value>, _: &[StackRoot<Value>]) -> EvalResult<StackRoot<Value>> {
+        Heap::run_gc(cx);
         Ok(cx.undefined())
     }
 }

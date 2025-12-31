@@ -4,7 +4,7 @@ use crate::{
         abstract_operations::call_object,
         alloc_error::AllocResult,
         eval_result::EvalResult,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
         intrinsics::intrinsics::Intrinsic,
         iterator::create_iter_result_object,
@@ -12,7 +12,7 @@ use crate::{
         ordinary_object::{get_prototype_from_constructor, object_ordinary_init},
         promise_object::PromiseCapability,
         realm::Realm,
-        Context, Handle, HeapPtr,
+        Context, StackRoot, HeapPtr,
     },
     set_uninit,
 };
@@ -108,7 +108,7 @@ pub struct AsyncGeneratorRequest {
 impl AsyncGeneratorObject {
     pub fn new(
         cx: Context,
-        closure: Handle<Closure>,
+        closure: StackRoot<Closure>,
         pc_to_resume_offset: usize,
         fp_index: usize,
         stack_frame: &[StackSlotValue],
@@ -194,8 +194,8 @@ impl AsyncGeneratorObject {
         self.request_queue
     }
 
-    fn peek_request(&self) -> Option<Handle<AsyncGeneratorRequest>> {
-        self.request_queue.map(|r| r.to_handle())
+    fn peek_request(&self) -> Option<StackRoot<AsyncGeneratorRequest>> {
+        self.request_queue.map(|r| r.to_stack())
     }
 
     fn pop_request(&mut self) -> Option<HeapPtr<AsyncGeneratorRequest>> {
@@ -217,7 +217,7 @@ impl AsyncGeneratorObject {
     }
 }
 
-impl TGeneratorObject for Handle<AsyncGeneratorObject> {
+impl TGeneratorObject for StackRoot<AsyncGeneratorObject> {
     fn pc_to_resume_offset(&self) -> usize {
         self.pc_to_resume_offset
     }
@@ -235,12 +235,12 @@ impl TGeneratorObject for Handle<AsyncGeneratorObject> {
     }
 }
 
-impl Handle<AsyncGeneratorObject> {
+impl StackRoot<AsyncGeneratorObject> {
     pub fn enqueue_request(
         &mut self,
         cx: Context,
-        capability: Handle<PromiseCapability>,
-        completion_value: Handle<Value>,
+        capability: StackRoot<PromiseCapability>,
+        completion_value: StackRoot<Value>,
         completion_type: GeneratorCompletionType,
     ) -> AllocResult<()> {
         let new_request =
@@ -261,8 +261,8 @@ impl Handle<AsyncGeneratorObject> {
 impl AsyncGeneratorRequest {
     fn new(
         cx: Context,
-        capability: Handle<PromiseCapability>,
-        completion_value: Handle<Value>,
+        capability: StackRoot<PromiseCapability>,
+        completion_value: StackRoot<Value>,
         completion_type: GeneratorCompletionType,
     ) -> AllocResult<HeapPtr<AsyncGeneratorRequest>> {
         let mut request = cx.alloc_uninit::<AsyncGeneratorRequest>()?;
@@ -291,14 +291,14 @@ impl AsyncGeneratorRequest {
 /// AsyncGeneratorCompleteStep (https://tc39.es/ecma262/#sec-asyncgeneratorcompletestep)
 pub fn async_generator_complete_step(
     cx: Context,
-    mut async_generator: Handle<AsyncGeneratorObject>,
-    completion: EvalResult<Handle<Value>>,
+    mut async_generator: StackRoot<AsyncGeneratorObject>,
+    completion: EvalResult<StackRoot<Value>>,
     is_done: bool,
 ) -> AllocResult<()> {
     debug_assert!(async_generator.request_queue.is_some());
 
     let next_request = async_generator.pop_request().unwrap();
-    let capability = next_request.capability.to_handle();
+    let capability = next_request.capability.to_stack();
 
     match completion_value!(completion) {
         Ok(value) => {
@@ -326,8 +326,8 @@ pub fn async_generator_complete_step(
 /// AsyncGeneratorValidate (https://tc39.es/ecma262/#sec-asyncgeneratorvalidate)
 pub fn async_generator_validate(
     cx: Context,
-    generator: Handle<Value>,
-) -> EvalResult<Handle<AsyncGeneratorObject>> {
+    generator: StackRoot<Value>,
+) -> EvalResult<StackRoot<AsyncGeneratorObject>> {
     if generator.is_object() {
         if let Some(async_generator) = generator.as_object().as_async_generator() {
             return Ok(async_generator);
@@ -340,8 +340,8 @@ pub fn async_generator_validate(
 /// AsyncGeneratorResume (https://tc39.es/ecma262/#sec-asyncgeneratorresume)
 pub fn async_generator_resume(
     mut cx: Context,
-    mut async_generator: Handle<AsyncGeneratorObject>,
-    completion_value: Handle<Value>,
+    mut async_generator: StackRoot<AsyncGeneratorObject>,
+    completion_value: StackRoot<Value>,
     completion_type: GeneratorCompletionType,
 ) -> AllocResult<()> {
     async_generator.state = AsyncGeneratorState::Executing;
@@ -370,12 +370,12 @@ pub fn async_generator_resume(
 /// AsyncGeneratorAwaitReturn (https://tc39.es/ecma262/#sec-asyncgeneratorawaitreturn)
 pub fn async_generator_await_return(
     cx: Context,
-    mut async_generator: Handle<AsyncGeneratorObject>,
+    mut async_generator: StackRoot<AsyncGeneratorObject>,
 ) -> AllocResult<()> {
     async_generator.state = AsyncGeneratorState::AwaitingReturn;
 
     let request = async_generator.peek_request_ptr().unwrap();
-    let completion_value = request.completion_value().to_handle(cx);
+    let completion_value = request.completion_value().to_stack();
 
     let promise_completion = coerce_to_ordinary_promise(cx, completion_value);
 
@@ -422,9 +422,9 @@ pub fn async_generator_await_return(
 
 pub fn await_return_resolve(
     mut cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let value = get_argument(cx, arguments, 0);
 
     let current_function = cx.current_function();
@@ -440,9 +440,9 @@ pub fn await_return_resolve(
 
 pub fn await_return_reject(
     mut cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let value = get_argument(cx, arguments, 0);
 
     let current_function = cx.current_function();
@@ -461,7 +461,7 @@ pub fn await_return_reject(
     Ok(cx.undefined())
 }
 
-fn get_async_generator(cx: Context, function: Handle<ObjectValue>) -> Handle<AsyncGeneratorObject> {
+fn get_async_generator(cx: Context, function: StackRoot<ObjectValue>) -> StackRoot<AsyncGeneratorObject> {
     function
         .private_element_find(cx, cx.well_known_symbols.async_generator().cast())
         .unwrap()
@@ -472,8 +472,8 @@ fn get_async_generator(cx: Context, function: Handle<ObjectValue>) -> Handle<Asy
 
 fn set_async_generator(
     cx: Context,
-    mut function: Handle<ObjectValue>,
-    async_generator: Handle<AsyncGeneratorObject>,
+    mut function: StackRoot<ObjectValue>,
+    async_generator: StackRoot<AsyncGeneratorObject>,
 ) -> AllocResult<()> {
     function.private_element_set(
         cx,
@@ -485,7 +485,7 @@ fn set_async_generator(
 /// AsyncGeneratorDrainQueue (https://tc39.es/ecma262/#sec-asyncgeneratordrainqueue)
 pub fn async_generator_drain_queue(
     cx: Context,
-    async_generator: Handle<AsyncGeneratorObject>,
+    async_generator: StackRoot<AsyncGeneratorObject>,
 ) -> AllocResult<()> {
     loop {
         let request = match async_generator.peek_request() {
@@ -508,7 +508,7 @@ pub fn async_generator_drain_queue(
                 )?;
             }
             GeneratorCompletionType::Throw => {
-                let completion = eval_err!(request.completion_value().to_handle(cx));
+                let completion = eval_err!(request.completion_value().to_stack());
                 async_generator_complete_step(
                     cx,
                     async_generator,
@@ -525,7 +525,7 @@ impl HeapItem for HeapPtr<AsyncGeneratorObject> {
         AsyncGeneratorObject::calculate_size_in_bytes(self.stack_frame.len())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer_opt(&mut self.request_queue);
 
@@ -541,7 +541,7 @@ impl HeapItem for HeapPtr<AsyncGeneratorRequest> {
         core::mem::size_of::<AsyncGeneratorRequest>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
         visitor.visit_pointer(&mut self.capability);
         visitor.visit_value(&mut self.completion_value);

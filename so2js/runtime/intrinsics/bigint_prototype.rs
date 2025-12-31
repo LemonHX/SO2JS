@@ -8,7 +8,7 @@ use crate::runtime::{
     realm::Realm,
     type_utilities::to_integer_or_infinity,
     value::BigIntValue,
-    Context, Handle, Value,
+    Context, StackRoot, Value,
 };
 
 use super::{bigint_constructor::BigIntObject, intrinsics::Intrinsic};
@@ -17,7 +17,7 @@ pub struct BigIntPrototype;
 
 impl BigIntPrototype {
     /// Properties of the BigInt Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-bigint-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -42,9 +42,9 @@ impl BigIntPrototype {
     /// BigInt.prototype.toString (https://tc39.es/ecma262/#sec-bigint.prototype.tostring)
     pub fn to_string(
         mut cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let bigint_value = this_bigint_value(cx, this_value)?;
 
         let radix = get_argument(cx, arguments, 0);
@@ -67,14 +67,14 @@ impl BigIntPrototype {
     /// BigInt.prototype.valueOf (https://tc39.es/ecma262/#sec-bigint.prototype.valueof)
     pub fn value_of(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         Ok(this_bigint_value(cx, this_value)?.into())
     }
 }
 
-fn this_bigint_value(cx: Context, value: Handle<Value>) -> EvalResult<Handle<BigIntValue>> {
+fn this_bigint_value(cx: Context, value: StackRoot<Value>) -> EvalResult<StackRoot<BigIntValue>> {
     if value.is_bigint() {
         return Ok(value.as_bigint());
     }

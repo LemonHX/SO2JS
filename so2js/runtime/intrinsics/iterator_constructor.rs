@@ -7,7 +7,7 @@ use crate::{
         error::type_error,
         eval_result::EvalResult,
         function::get_argument,
-        gc::{Handle, HeapItem, HeapVisitor},
+        gc::{StackRoot, HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         iterator::{create_iter_result_object, get_iterator_flattenable},
         object_value::ObjectValue,
@@ -24,7 +24,7 @@ pub struct IteratorConstructor;
 
 impl IteratorConstructor {
     /// Properties of the Iterator Constructor (https://tc39.es/ecma262/#sec-properties-of-the-iterator-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -48,9 +48,9 @@ impl IteratorConstructor {
     /// Iterator (https://tc39.es/ecma262/#sec-iterator-constructor)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let new_target = cx.current_new_target();
         let throw_type_error = match new_target {
             None => true,
@@ -68,14 +68,14 @@ impl IteratorConstructor {
             Intrinsic::IteratorPrototype,
         )?;
 
-        Ok(object.to_handle().as_value())
+        Ok(object.to_stack().as_value())
     }
 
     pub fn from(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
         let iterator = get_iterator_flattenable(cx, value, /* reject_primitives */ false)?;
 
@@ -103,9 +103,9 @@ extend_object! {
 impl WrappedValidIterator {
     fn new(
         cx: Context,
-        iterator: Handle<ObjectValue>,
-        next_method: Handle<Value>,
-    ) -> AllocResult<Handle<ObjectValue>> {
+        iterator: StackRoot<ObjectValue>,
+        next_method: StackRoot<Value>,
+    ) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = object_create_with_proto::<WrappedValidIterator>(
             cx,
             HeapItemKind::WrappedValidIterator,
@@ -115,15 +115,15 @@ impl WrappedValidIterator {
         set_uninit!(object.iterator, *iterator);
         set_uninit!(object.next_method, *next_method);
 
-        Ok(object.as_object().to_handle())
+        Ok(object.as_object().to_stack())
     }
 
-    fn iterator(&self) -> Handle<ObjectValue> {
-        self.iterator.to_handle()
+    fn iterator(&self) -> StackRoot<ObjectValue> {
+        self.iterator.to_stack()
     }
 
-    fn next_method(&self, cx: Context) -> Handle<Value> {
-        self.next_method.to_handle(cx)
+    fn next_method(&self, cx: Context) -> StackRoot<Value> {
+        self.next_method.to_stack()
     }
 }
 
@@ -132,7 +132,7 @@ impl HeapItem for HeapPtr<WrappedValidIterator> {
         size_of::<WrappedValidIterator>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.iterator);
         visitor.visit_value(&mut self.next_method);
@@ -143,14 +143,14 @@ impl HeapItem for HeapPtr<WrappedValidIterator> {
 pub struct WrapForValidIteratorPrototype;
 
 impl WrapForValidIteratorPrototype {
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let iterator_prototype = realm.get_intrinsic(Intrinsic::IteratorPrototype);
         let mut object = object_create_with_proto::<ObjectValue>(
             cx,
             HeapItemKind::OrdinaryObject,
             iterator_prototype,
         )?
-        .to_handle();
+        .to_stack();
 
         object.intrinsic_func(cx, cx.names.next(), Self::next, 0, realm)?;
         object.intrinsic_func(cx, cx.names.return_(), Self::return_, 0, realm)?;
@@ -161,9 +161,9 @@ impl WrapForValidIteratorPrototype {
     /// %WrapForValidIteratorPrototype%.next (https://tc39.es/ecma262/#sec-%wrapforvaliditeratorprototype%.next)
     pub fn next(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         // Check if called on a WrappedIteratorObject
         if this_value.is_object() {
             if let Some(wrapper) = this_value.as_object().as_wrapped_valid_iterator_object() {
@@ -182,9 +182,9 @@ impl WrapForValidIteratorPrototype {
     /// %WrapForValidIteratorPrototype%.next (https://tc39.es/ecma262/#sec-%wrapforvaliditeratorprototype%.next)
     pub fn return_(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         // Check if called on a WrappedIteratorObject
         if this_value.is_object() {
             if let Some(wrapper) = this_value.as_object().as_wrapped_valid_iterator_object() {

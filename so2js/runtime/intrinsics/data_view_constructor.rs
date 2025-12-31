@@ -6,14 +6,14 @@ use crate::{
         error::{range_error, type_error},
         eval_result::EvalResult,
         function::get_argument,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         intrinsics::array_buffer_constructor::throw_if_detached,
         object_value::ObjectValue,
         ordinary_object::object_create_from_constructor,
         realm::Realm,
         type_utilities::to_index,
-        Context, Handle, HeapPtr, Value,
+        Context, StackRoot, HeapPtr, Value,
     },
 };
 use alloc::format;
@@ -34,11 +34,11 @@ extend_object! {
 impl DataViewObject {
     pub fn new_from_constructor(
         cx: Context,
-        constructor: Handle<ObjectValue>,
-        viewed_array_buffer: Handle<ArrayBufferObject>,
+        constructor: StackRoot<ObjectValue>,
+        viewed_array_buffer: StackRoot<ArrayBufferObject>,
         byte_length: Option<usize>,
         byte_offset: usize,
-    ) -> EvalResult<Handle<DataViewObject>> {
+    ) -> EvalResult<StackRoot<DataViewObject>> {
         let mut object = object_create_from_constructor::<DataViewObject>(
             cx,
             constructor,
@@ -52,15 +52,15 @@ impl DataViewObject {
         object.byte_length = byte_length;
         object.byte_offset = byte_offset;
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     pub fn viewed_array_buffer_ptr(&self) -> HeapPtr<ArrayBufferObject> {
         self.viewed_array_buffer
     }
 
-    pub fn viewed_array_buffer(&self) -> Handle<ArrayBufferObject> {
-        self.viewed_array_buffer.to_handle()
+    pub fn viewed_array_buffer(&self) -> StackRoot<ArrayBufferObject> {
+        self.viewed_array_buffer.to_stack()
     }
 
     pub fn byte_length(&self) -> Option<usize> {
@@ -76,7 +76,7 @@ pub struct DataViewConstructor;
 
 impl DataViewConstructor {
     /// Properties of the DataView Constructor (https://tc39.es/ecma262/#sec-properties-of-the-dataview-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -98,9 +98,9 @@ impl DataViewConstructor {
     /// DataView (https://tc39.es/ecma262/#sec-dataview-buffer-byteoffset-bytelength)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let new_target = if let Some(new_target) = cx.current_new_target() {
             new_target
         } else {
@@ -183,7 +183,7 @@ impl HeapItem for HeapPtr<DataViewObject> {
         size_of::<DataViewObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.viewed_array_buffer);
     }

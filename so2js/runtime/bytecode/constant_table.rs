@@ -4,9 +4,9 @@ use crate::{
         alloc_error::AllocResult,
         collections::InlineArray,
         debug_print::{DebugPrint, DebugPrintMode, DebugPrinter},
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
-        Context, Handle, HeapPtr, Value,
+        Context, StackRoot, HeapPtr, Value,
     },
     set_uninit,
 };
@@ -26,9 +26,9 @@ pub struct ConstantTable {
 impl ConstantTable {
     pub fn new(
         cx: Context,
-        constants: Vec<Handle<Value>>,
+        constants: Vec<StackRoot<Value>>,
         metadata: Vec<u8>,
-    ) -> AllocResult<Handle<ConstantTable>> {
+    ) -> AllocResult<StackRoot<ConstantTable>> {
         let size = Self::calculate_size_in_bytes(constants.len());
         let mut object = cx.alloc_uninit_with_size::<ConstantTable>(size)?;
 
@@ -47,7 +47,7 @@ impl ConstantTable {
         let metadata_ptr = object.get_metadata_ptr() as *mut u8;
         unsafe { core::ptr::copy_nonoverlapping(metadata.as_ptr(), metadata_ptr, metadata.len()) };
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     const CONSTANTS_BYTE_OFFSET: usize = field_offset!(ConstantTable, constants);
@@ -126,7 +126,7 @@ impl HeapItem for HeapPtr<ConstantTable> {
         ConstantTable::calculate_size_in_bytes(self.constants.len())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
 
         // Only visit constants that are values, not raw offsets

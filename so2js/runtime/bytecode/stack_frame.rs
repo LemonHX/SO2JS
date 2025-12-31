@@ -1,4 +1,4 @@
-use crate::runtime::{gc::HeapVisitor, scope::Scope, HeapPtr, Value};
+use crate::runtime::{gc::GcVisitorExt, scope::Scope, HeapPtr, Value};
 
 use super::{constant_table::ConstantTable, function::Closure};
 
@@ -265,7 +265,7 @@ impl StackFrame {
     ///
     /// The only stack slot that is not updated is the return address, as this is calculated
     /// separately since it is an internal pointer to the caller frame's BytecodeFunction.
-    pub fn visit_simple_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    pub fn visit_simple_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         // Visit all args and registers in stack frame
         for arg in self.all_args_with_receiver_mut() {
             visitor.visit_value(arg);

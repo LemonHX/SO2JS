@@ -43,17 +43,18 @@ zerotrie.workspace = true
 zerovec.workspace = true
 
 [features]
-default = []
+default = ["nightly", "handle_stats", "alloc_error", "annex_b"]
 # Enable Annex B extensions by default
 annex_b = []
-# Run the garbage collector in stress test mode
-gc_stress_test = []
 # Collect handle use statistics
 handle_stats = []
 # Return allocation errors instead of panicking
 alloc_error = []
 # Enable features only available on nightly (e.g. never_type)
 nightly = []
+
+# Run the garbage collector in stress test mode
+gc_stress_test = []
 
 [lints]
 workspace = true

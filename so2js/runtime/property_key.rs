@@ -5,7 +5,7 @@ use alloc::{borrow::ToOwned, format};
 use core::hash;
 
 use super::{
-    gc::{Handle, HandleContents, ToHandleContents},
+    gc::{StackRoot, StackRootContents, ToStackRootContents},
     heap_item_descriptor::HeapItemKind,
     interned_strings::InternedStrings,
     numeric_constants::MAX_U32_AS_F64,
@@ -37,7 +37,7 @@ impl PropertyKey {
     }
 
     #[inline]
-    pub fn string(cx: Context, value: Handle<StringValue>) -> AllocResult<PropertyKey> {
+    pub fn string(cx: Context, value: StackRoot<StringValue>) -> AllocResult<PropertyKey> {
         let lexer = StringLexer::new(value)?;
         // String value may represent an array index
         match parse_string_to_u32(lexer) {
@@ -50,10 +50,10 @@ impl PropertyKey {
     #[inline]
     pub fn string_handle(
         cx: Context,
-        value: Handle<StringValue>,
-    ) -> AllocResult<Handle<PropertyKey>> {
+        value: StackRoot<StringValue>,
+    ) -> AllocResult<StackRoot<PropertyKey>> {
         let property_key = PropertyKey::string(cx, value)?;
-        Ok(property_key.to_handle(cx))
+        Ok(property_key.to_stack())
     }
 
     /// Create a string property key that is known to not be an array index. Be sure to not pass
@@ -61,7 +61,7 @@ impl PropertyKey {
     #[inline]
     pub fn string_not_array_index(
         cx: Context,
-        value: Handle<StringValue>,
+        value: StackRoot<StringValue>,
     ) -> AllocResult<PropertyKey> {
         // Enforce that all string property keys are interned
         let flat_string = value.flatten()?;
@@ -74,14 +74,14 @@ impl PropertyKey {
     #[inline]
     pub fn string_not_array_index_handle(
         cx: Context,
-        value: Handle<StringValue>,
-    ) -> AllocResult<Handle<PropertyKey>> {
+        value: StackRoot<StringValue>,
+    ) -> AllocResult<StackRoot<PropertyKey>> {
         let property_key = PropertyKey::string_not_array_index(cx, value)?;
-        Ok(property_key.to_handle(cx))
+        Ok(property_key.to_stack())
     }
 
     #[inline]
-    pub fn symbol(value: Handle<SymbolValue>) -> Handle<PropertyKey> {
+    pub fn symbol(value: StackRoot<SymbolValue>) -> StackRoot<PropertyKey> {
         value.cast()
     }
 
@@ -99,9 +99,9 @@ impl PropertyKey {
     }
 
     #[inline]
-    pub fn array_index_handle(cx: Context, value: u32) -> AllocResult<Handle<PropertyKey>> {
+    pub fn array_index_handle(cx: Context, value: u32) -> AllocResult<StackRoot<PropertyKey>> {
         let property_key = PropertyKey::array_index(cx, value)?;
-        Ok(property_key.to_handle(cx))
+        Ok(property_key.to_stack())
     }
 
     pub const fn from_u8(value: u8) -> PropertyKey {
@@ -122,12 +122,12 @@ impl PropertyKey {
     }
 
     #[inline]
-    pub fn from_u64_handle(cx: Context, value: u64) -> AllocResult<Handle<PropertyKey>> {
+    pub fn from_u64_handle(cx: Context, value: u64) -> AllocResult<StackRoot<PropertyKey>> {
         let property_key = PropertyKey::from_u64(cx, value)?;
-        Ok(property_key.to_handle(cx))
+        Ok(property_key.to_stack())
     }
 
-    pub fn from_value(cx: Context, value_handle: Handle<Value>) -> EvalResult<PropertyKey> {
+    pub fn from_value(cx: Context, value_handle: StackRoot<Value>) -> EvalResult<PropertyKey> {
         let value = *value_handle;
         if is_integral_number(value) {
             let number = value.as_double();
@@ -176,21 +176,21 @@ impl PropertyKey {
     }
 }
 
-impl Handle<PropertyKey> {
+impl StackRoot<PropertyKey> {
     #[inline]
-    pub fn as_string(&self) -> Handle<StringValue> {
+    pub fn as_string(&self) -> StackRoot<StringValue> {
         self.cast()
     }
 
     #[inline]
-    pub fn as_symbol(&self) -> Handle<SymbolValue> {
+    pub fn as_symbol(&self) -> StackRoot<SymbolValue> {
         self.cast()
     }
 
     /// Convert this property key to a string or symbol value as defined in the spec. All array
     /// index keys will be converted to strings.
     #[inline]
-    pub fn to_value(self, mut cx: Context) -> AllocResult<Handle<Value>> {
+    pub fn to_value(self, mut cx: Context) -> AllocResult<StackRoot<Value>> {
         if self.value.is_smi() {
             let array_index_string = self.as_array_index().to_string();
             Ok(cx.alloc_string(&array_index_string)?.into())
@@ -230,7 +230,7 @@ impl PropertyKey {
         if self.is_array_index() {
             Ok(format!("{}", self.as_array_index()))
         } else if self.value.as_pointer().descriptor().kind() == HeapItemKind::String {
-            Ok(self.as_string().to_handle().format()?)
+            Ok(self.as_string().to_stack().format()?)
         } else {
             match self.as_symbol().description_ptr() {
                 None => Ok("Symbol()".to_owned()),
@@ -240,39 +240,39 @@ impl PropertyKey {
     }
 }
 
-impl PartialEq for Handle<PropertyKey> {
+impl PartialEq for StackRoot<PropertyKey> {
     fn eq(&self, other: &Self) -> bool {
         (**self).eq(other)
     }
 }
 
-impl Eq for Handle<PropertyKey> {}
+impl Eq for StackRoot<PropertyKey> {}
 
-impl hash::Hash for Handle<PropertyKey> {
+impl hash::Hash for StackRoot<PropertyKey> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         (**self).hash(state)
     }
 }
 
-impl Handle<PropertyKey> {
+impl StackRoot<PropertyKey> {
     #[inline]
-    pub fn from_fixed_non_heap_ptr(value_ref: &PropertyKey) -> Handle<PropertyKey> {
-        Handle::<Value>::from_fixed_non_heap_ptr(&value_ref.value).cast()
+    pub fn from_fixed_non_heap_ptr(value_ref: &PropertyKey) -> StackRoot<PropertyKey> {
+        StackRoot::<Value>::from_fixed_non_heap_ptr(&value_ref.value).cast()
     }
 }
 
-impl ToHandleContents for PropertyKey {
+impl ToStackRootContents for PropertyKey {
     type Impl = PropertyKey;
 
     #[inline]
-    fn to_handle_contents(key: PropertyKey) -> HandleContents {
+    fn to_handle_contents(key: PropertyKey) -> StackRootContents {
         Value::to_handle_contents(key.value)
     }
 }
 
 impl PropertyKey {
     #[inline]
-    pub fn to_handle(self, cx: Context) -> Handle<PropertyKey> {
-        self.value.to_handle(cx).cast()
+    pub fn to_stack(self) -> StackRoot<PropertyKey> {
+        self.value.to_stack().cast()
     }
 }

@@ -1,7 +1,7 @@
 use crate::runtime::{
     alloc_error::AllocResult, builtin_function::BuiltinFunction, error::type_error,
     eval_result::EvalResult, function::get_argument, object_value::ObjectValue, realm::Realm,
-    type_utilities::is_callable, Context, Handle, Value,
+    type_utilities::is_callable, Context, StackRoot, Value,
 };
 
 use super::{finalization_registry_object::FinalizationRegistryObject, intrinsics::Intrinsic};
@@ -10,7 +10,7 @@ pub struct FinalizationRegistryConstructor;
 
 impl FinalizationRegistryConstructor {
     /// Properties of the FinalizationRegistry Constructor (https://tc39.es/ecma262/#sec-properties-of-the-finalization-registry-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -34,9 +34,9 @@ impl FinalizationRegistryConstructor {
     /// FinalizationRegistry (https://tc39.es/ecma262/#sec-finalization-registry-cleanup-callback)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let new_target = if let Some(new_target) = cx.current_new_target() {
             new_target
         } else {

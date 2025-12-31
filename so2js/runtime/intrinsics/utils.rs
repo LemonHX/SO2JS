@@ -4,8 +4,8 @@ macro_rules! cast_from_value_fn {
     ($type:ident $(<$($generics:tt),*>)?, $name:expr) => {
         pub fn cast_from_value(
             cx: Context,
-            value: Handle<Value>,
-        ) -> EvalResult<Handle<$type $(<$($generics),*>)?>> {
+            value: StackRoot<Value>,
+        ) -> EvalResult<StackRoot<$type $(<$($generics),*>)?>> {
             if !value.is_object() {
                 return type_error(cx, concat!("expected object of type ", $name));
             }

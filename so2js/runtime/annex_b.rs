@@ -5,12 +5,12 @@ use crate::runtime::{
         intrinsics::Intrinsic, regexp_prototype::RegExpPrototype,
         string_prototype::StringPrototype,
     },
-    Context, Handle, Realm,
+    Context, StackRoot, Realm,
 };
 
 /// Annex B methods are not guaranteed to be part of the serialized heap so we must initialize them
 /// separately.
-pub fn init_annex_b_methods(cx: Context, realm: Handle<Realm>) -> AllocResult<()> {
+pub fn init_annex_b_methods(cx: Context, realm: StackRoot<Realm>) -> AllocResult<()> {
     init_global_annex_b_methods(cx, realm)?;
 
     let string_prototype = realm.get_intrinsic(Intrinsic::StringPrototype);

@@ -2,9 +2,9 @@ use core::hash::Hash;
 
 use crate::runtime::{
     alloc_error::AllocResult,
-    gc::{HeapItem, HeapVisitor},
+    gc::{HeapItem, GcVisitorExt},
     heap_item_descriptor::HeapItemKind,
-    Context, Handle, HeapPtr,
+    Context, StackRoot, HeapPtr,
 };
 
 use super::{
@@ -28,7 +28,7 @@ impl<T: Eq + Hash + Clone> BsIndexSet<T> {
     }
 
     /// Create a new set whose entries are copied from the provided set.
-    pub fn new_from_set(cx: Context, set: Handle<Self>) -> AllocResult<HeapPtr<Self>> {
+    pub fn new_from_set(cx: Context, set: StackRoot<Self>) -> AllocResult<HeapPtr<Self>> {
         Ok(BsIndexMap::<T, ()>::new_from_map(cx, set.cast())?.cast())
     }
 
@@ -72,7 +72,7 @@ impl<T: Eq + Hash + Clone> BsIndexSet<T> {
     }
 }
 
-impl<T: Eq + Hash + Clone> Handle<BsIndexSet<T>> {
+impl<T: Eq + Hash + Clone> StackRoot<BsIndexSet<T>> {
     /// Return iterator through the entries of the set. Iterator is GC-safe so it is safe to live
     /// across allocations.
     pub fn iter_gc_safe(&self) -> GcSafeEntriesIter<T, ()> {
@@ -121,7 +121,7 @@ impl<T: Eq + Hash + Clone> HeapItem for HeapPtr<BsIndexSet<T>> {
     }
 
     /// Visit pointers intrinsic to all IndexSets. Do not visit entries as they could be of any type.
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.cast_mut::<BsIndexMap<T, ()>>()
             .visit_pointers_impl(visitor, |_, _| ())
     }
@@ -129,7 +129,7 @@ impl<T: Eq + Hash + Clone> HeapItem for HeapPtr<BsIndexSet<T>> {
 
 impl<T: Eq + Hash + Clone> HeapPtr<BsIndexSet<T>> {
     #[inline]
-    pub fn visit_pointers_impl<H: HeapVisitor>(
+    pub fn visit_pointers_impl<H: GcVisitorExt>(
         &mut self,
         visitor: &mut H,
         mut entries_visitor: impl FnMut(&mut Self, &mut H),

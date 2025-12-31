@@ -2,7 +2,7 @@ use crate::runtime::{
     abstract_operations::call_object, alloc_error::AllocResult, builtin_function::BuiltinFunction,
     error::type_error, eval_result::EvalResult, function::get_argument, get,
     intrinsics::set_object::SetObject, iterator::iter_iterator_values, object_value::ObjectValue,
-    realm::Realm, type_utilities::is_callable, Context, Handle, Value,
+    realm::Realm, type_utilities::is_callable, Context, StackRoot, Value,
 };
 
 use super::{intrinsics::Intrinsic, rust_runtime::return_this};
@@ -11,7 +11,7 @@ pub struct SetConstructor;
 
 impl SetConstructor {
     /// The Set Constructor (https://tc39.es/ecma262/#sec-set-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -37,9 +37,9 @@ impl SetConstructor {
     /// Set (https://tc39.es/ecma262/#sec-set-iterable)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let new_target = if let Some(new_target) = cx.current_new_target() {
             new_target
         } else {

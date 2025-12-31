@@ -22,7 +22,7 @@ use crate::{
         type_utilities::{
             ordinary_to_primitive, to_number, to_object, to_primitive, ToPrimitivePreferredType,
         },
-        Context, EvalResult, Handle, PropertyKey, Realm, Value,
+        Context, EvalResult, StackRoot, PropertyKey, Realm, Value,
     },
 };
 use alloc::string::String;
@@ -33,7 +33,7 @@ pub struct DatePrototype;
 
 impl DatePrototype {
     /// Properties of the Date Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-date-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -197,9 +197,9 @@ impl DatePrototype {
 
     /// Additional Properties of the Date.prototype Object (https://tc39.es/ecma262/#sec-additional-properties-of-the-date.prototype-object)
     pub fn init_annex_b_methods(
-        mut date_prototype: Handle<ObjectValue>,
+        mut date_prototype: StackRoot<ObjectValue>,
         mut cx: Context,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
     ) -> AllocResult<()> {
         let get_year_name = cx.alloc_string("getYear")?.as_string();
         let get_year_key = PropertyKey::string_not_array_index_handle(cx, get_year_name)?;
@@ -222,9 +222,9 @@ impl DatePrototype {
     /// Date.prototype.getDate (https://tc39.es/ecma262/#sec-date.prototype.getdate)
     pub fn get_date(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -240,15 +240,15 @@ impl DatePrototype {
 
         let date = date_from_time(local_time(date_value));
 
-        Ok(Value::from(date).to_handle(cx))
+        Ok(Value::from(date).to_stack())
     }
 
     /// Date.prototype.getDay (https://tc39.es/ecma262/#sec-date.prototype.getday)
     pub fn get_day(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -264,15 +264,15 @@ impl DatePrototype {
 
         let day = week_day(local_time(date_value));
 
-        Ok(Value::from(day).to_handle(cx))
+        Ok(Value::from(day).to_stack())
     }
 
     /// Date.prototype.getFullYear (https://tc39.es/ecma262/#sec-date.prototype.getfullyear)
     pub fn get_full_year(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -288,15 +288,15 @@ impl DatePrototype {
 
         let year = year_from_time(local_time(date_value));
 
-        Ok(Value::from(year).to_handle(cx))
+        Ok(Value::from(year).to_stack())
     }
 
     /// Date.prototype.getHours (https://tc39.es/ecma262/#sec-date.prototype.gethours)
     pub fn get_hours(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -312,15 +312,15 @@ impl DatePrototype {
 
         let hour = hour_from_time(local_time(date_value));
 
-        Ok(Value::from(hour).to_handle(cx))
+        Ok(Value::from(hour).to_stack())
     }
 
     /// Date.prototype.getMilliseconds (https://tc39.es/ecma262/#sec-date.prototype.getmilliseconds)
     pub fn get_milliseconds(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -336,15 +336,15 @@ impl DatePrototype {
 
         let millisecond = millisecond_from_time(local_time(date_value));
 
-        Ok(Value::from(millisecond).to_handle(cx))
+        Ok(Value::from(millisecond).to_stack())
     }
 
     /// Date.prototype.getMinutes (https://tc39.es/ecma262/#sec-date.prototype.getminutes)
     pub fn get_minutes(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -360,15 +360,15 @@ impl DatePrototype {
 
         let minute = minute_from_time(local_time(date_value));
 
-        Ok(Value::from(minute).to_handle(cx))
+        Ok(Value::from(minute).to_stack())
     }
 
     /// Date.prototype.getMonth (https://tc39.es/ecma262/#sec-date.prototype.getmonth)
     pub fn get_month(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -384,15 +384,15 @@ impl DatePrototype {
 
         let month = month_from_time(local_time(date_value));
 
-        Ok(Value::from(month).to_handle(cx))
+        Ok(Value::from(month).to_stack())
     }
 
     /// Date.prototype.getSeconds (https://tc39.es/ecma262/#sec-date.prototype.getseconds)
     pub fn get_seconds(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -408,17 +408,17 @@ impl DatePrototype {
 
         let second = second_from_time(local_time(date_value));
 
-        Ok(Value::from(second).to_handle(cx))
+        Ok(Value::from(second).to_stack())
     }
 
     /// Date.prototype.getTime (https://tc39.es/ecma262/#sec-date.prototype.gettime)
     pub fn get_time(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if let Some(date_value) = this_date_value(this_value) {
-            Ok(Value::from(date_value).to_handle(cx))
+            Ok(Value::from(date_value).to_stack())
         } else {
             type_error(cx, "getTime method must be called on date object")
         }
@@ -427,9 +427,9 @@ impl DatePrototype {
     /// Date.prototype.getTimezoneOffset (https://tc39.es/ecma262/#sec-date.prototype.gettimezoneoffset)
     pub fn get_timezone_offset(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -442,15 +442,15 @@ impl DatePrototype {
 
         let timezone_offset = (date_value - local_time(date_value)) / MS_PER_MINUTE;
 
-        Ok(Value::from(timezone_offset).to_handle(cx))
+        Ok(Value::from(timezone_offset).to_stack())
     }
 
     /// Date.prototype.getUTCDate (https://tc39.es/ecma262/#sec-date.prototype.getutcdate)
     pub fn get_utc_date(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -466,15 +466,15 @@ impl DatePrototype {
 
         let date = date_from_time(date_value);
 
-        Ok(Value::from(date).to_handle(cx))
+        Ok(Value::from(date).to_stack())
     }
 
     /// Date.prototype.getUTCDay (https://tc39.es/ecma262/#sec-date.prototype.getutcday)
     pub fn get_utc_day(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -487,15 +487,15 @@ impl DatePrototype {
 
         let hour = week_day(date_value);
 
-        Ok(Value::from(hour).to_handle(cx))
+        Ok(Value::from(hour).to_stack())
     }
 
     /// Date.prototype.getUTCFullYear (https://tc39.es/ecma262/#sec-date.prototype.getutcfullyear)
     pub fn get_utc_full_year(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -511,15 +511,15 @@ impl DatePrototype {
 
         let year = year_from_time(date_value);
 
-        Ok(Value::from(year).to_handle(cx))
+        Ok(Value::from(year).to_stack())
     }
 
     /// Date.prototype.getUTCHours (https://tc39.es/ecma262/#sec-date.prototype.getutchours)
     pub fn get_utc_hours(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -535,15 +535,15 @@ impl DatePrototype {
 
         let hour = hour_from_time(date_value);
 
-        Ok(Value::from(hour).to_handle(cx))
+        Ok(Value::from(hour).to_stack())
     }
 
     /// Date.prototype.getUTCMilliseconds (https://tc39.es/ecma262/#sec-date.prototype.getutcmilliseconds)
     pub fn get_utc_milliseconds(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -559,15 +559,15 @@ impl DatePrototype {
 
         let millisecond = millisecond_from_time(date_value);
 
-        Ok(Value::from(millisecond).to_handle(cx))
+        Ok(Value::from(millisecond).to_stack())
     }
 
     /// Date.prototype.getUTCMinutes (https://tc39.es/ecma262/#sec-date.prototype.getutcminutes)
     pub fn get_utc_minutes(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -583,15 +583,15 @@ impl DatePrototype {
 
         let minute = minute_from_time(date_value);
 
-        Ok(Value::from(minute).to_handle(cx))
+        Ok(Value::from(minute).to_stack())
     }
 
     /// Date.prototype.getUTCMonth (https://tc39.es/ecma262/#sec-date.prototype.getutcmonth)
     pub fn get_utc_month(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -607,15 +607,15 @@ impl DatePrototype {
 
         let month = month_from_time(date_value);
 
-        Ok(Value::from(month).to_handle(cx))
+        Ok(Value::from(month).to_stack())
     }
 
     /// Date.prototype.getUTCSeconds (https://tc39.es/ecma262/#sec-date.prototype.getutcseconds)
     pub fn get_utc_seconds(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -631,15 +631,15 @@ impl DatePrototype {
 
         let second = second_from_time(date_value);
 
-        Ok(Value::from(second).to_handle(cx))
+        Ok(Value::from(second).to_stack())
     }
 
     /// Date.prototype.setDate (https://tc39.es/ecma262/#sec-date.prototype.setdate)
     pub fn set_date(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -669,15 +669,15 @@ impl DatePrototype {
 
         set_date_value(this_value, new_date);
 
-        Ok(Value::from(new_date).to_handle(cx))
+        Ok(Value::from(new_date).to_stack())
     }
 
     /// Date.prototype.setFullYear (https://tc39.es/ecma262/#sec-date.prototype.setfullyear)
     pub fn set_full_year(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let mut date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -717,15 +717,15 @@ impl DatePrototype {
 
         set_date_value(this_value, new_date);
 
-        Ok(Value::from(new_date).to_handle(cx))
+        Ok(Value::from(new_date).to_stack())
     }
 
     /// Date.prototype.setHours (https://tc39.es/ecma262/#sec-date.prototype.sethours)
     pub fn set_hours(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -787,15 +787,15 @@ impl DatePrototype {
 
         set_date_value(this_value, new_date);
 
-        Ok(Value::from(new_date).to_handle(cx))
+        Ok(Value::from(new_date).to_stack())
     }
 
     /// Date.prototype.setMilliseconds (https://tc39.es/ecma262/#sec-date.prototype.setmilliseconds)
     pub fn set_milliseconds(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -826,15 +826,15 @@ impl DatePrototype {
 
         set_date_value(this_value, new_date);
 
-        Ok(Value::from(new_date).to_handle(cx))
+        Ok(Value::from(new_date).to_stack())
     }
 
     /// Date.prototype.setMinutes (https://tc39.es/ecma262/#sec-date.prototype.setminutes)
     pub fn set_minutes(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -884,15 +884,15 @@ impl DatePrototype {
 
         set_date_value(this_value, new_date);
 
-        Ok(Value::from(new_date).to_handle(cx))
+        Ok(Value::from(new_date).to_stack())
     }
 
     /// Date.prototype.setMonth (https://tc39.es/ecma262/#sec-date.prototype.setmonth)
     pub fn set_month(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -930,15 +930,15 @@ impl DatePrototype {
 
         set_date_value(this_value, new_date);
 
-        Ok(Value::from(new_date).to_handle(cx))
+        Ok(Value::from(new_date).to_stack())
     }
 
     /// Date.prototype.setSeconds (https://tc39.es/ecma262/#sec-date.prototype.setseconds)
     pub fn set_seconds(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -981,15 +981,15 @@ impl DatePrototype {
 
         set_date_value(this_value, new_date);
 
-        Ok(Value::from(new_date).to_handle(cx))
+        Ok(Value::from(new_date).to_stack())
     }
 
     /// Date.prototype.setTime (https://tc39.es/ecma262/#sec-date.prototype.settime)
     pub fn set_time(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if this_date_value(this_value).is_none() {
             return type_error(
                 cx,
@@ -1002,15 +1002,15 @@ impl DatePrototype {
 
         set_date_value(this_value, time_num);
 
-        Ok(Value::from(time_num).to_handle(cx))
+        Ok(Value::from(time_num).to_stack())
     }
 
     /// Date.prototype.setUTCDate (https://tc39.es/ecma262/#sec-date.prototype.setutcdate)
     pub fn set_utc_date(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1038,15 +1038,15 @@ impl DatePrototype {
 
         set_date_value(this_value, new_date);
 
-        Ok(Value::from(new_date).to_handle(cx))
+        Ok(Value::from(new_date).to_stack())
     }
 
     /// Date.prototype.setUTCFullYear (https://tc39.es/ecma262/#sec-date.prototype.setutcfullyear)
     pub fn set_utc_full_year(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let mut date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1084,15 +1084,15 @@ impl DatePrototype {
 
         set_date_value(this_value, new_date);
 
-        Ok(Value::from(new_date).to_handle(cx))
+        Ok(Value::from(new_date).to_stack())
     }
 
     /// Date.prototype.setUTCHours (https://tc39.es/ecma262/#sec-date.prototype.setutchours)
     pub fn set_utc_hours(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1152,15 +1152,15 @@ impl DatePrototype {
 
         set_date_value(this_value, new_date);
 
-        Ok(Value::from(new_date).to_handle(cx))
+        Ok(Value::from(new_date).to_stack())
     }
 
     /// Date.prototype.setUTCMilliseconds (https://tc39.es/ecma262/#sec-date.prototype.setutcmilliseconds)
     pub fn set_utc_milliseconds(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1189,15 +1189,15 @@ impl DatePrototype {
 
         set_date_value(this_value, new_date);
 
-        Ok(Value::from(new_date).to_handle(cx))
+        Ok(Value::from(new_date).to_stack())
     }
 
     /// Date.prototype.setUTCMinutes (https://tc39.es/ecma262/#sec-date.prototype.setutcminutes)
     pub fn set_utc_minutes(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1245,15 +1245,15 @@ impl DatePrototype {
 
         set_date_value(this_value, new_date);
 
-        Ok(Value::from(new_date).to_handle(cx))
+        Ok(Value::from(new_date).to_stack())
     }
 
     /// Date.prototype.setUTCMonth (https://tc39.es/ecma262/#sec-date.prototype.setutcmonth)
     pub fn set_utc_month(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1289,15 +1289,15 @@ impl DatePrototype {
 
         set_date_value(this_value, new_date);
 
-        Ok(Value::from(new_date).to_handle(cx))
+        Ok(Value::from(new_date).to_stack())
     }
 
     /// Date.prototype.setUTCSeconds (https://tc39.es/ecma262/#sec-date.prototype.setutcseconds)
     pub fn set_utc_seconds(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1338,15 +1338,15 @@ impl DatePrototype {
 
         set_date_value(this_value, new_date);
 
-        Ok(Value::from(new_date).to_handle(cx))
+        Ok(Value::from(new_date).to_stack())
     }
 
     /// Date.prototype.toDateString (https://tc39.es/ecma262/#sec-date.prototype.todatestring)
     pub fn to_date_string(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1359,7 +1359,7 @@ impl DatePrototype {
         Self::to_date_string_shared(cx, date_value)
     }
 
-    fn to_date_string_shared(mut cx: Context, date_value: f64) -> EvalResult<Handle<Value>> {
+    fn to_date_string_shared(mut cx: Context, date_value: f64) -> EvalResult<StackRoot<Value>> {
         if date_value.is_nan() {
             return Ok(cx.alloc_string("Invalid Date")?.as_value());
         }
@@ -1375,9 +1375,9 @@ impl DatePrototype {
     /// Date.prototype.toISOString (https://tc39.es/ecma262/#sec-date.prototype.toisostring)
     pub fn to_iso_string(
         mut cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1417,9 +1417,9 @@ impl DatePrototype {
     /// Date.prototype.toJSON (https://tc39.es/ecma262/#sec-date.prototype.tojson)
     pub fn to_json(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = to_object(cx, this_value)?;
 
         let time_value = to_primitive(cx, object.into(), ToPrimitivePreferredType::Number)?;
@@ -1434,9 +1434,9 @@ impl DatePrototype {
     /// Date.prototype.toLocaleDateString (https://tc39.es/ecma262/#sec-date.prototype.tolocaledatestring)
     pub fn to_locale_date_string(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1452,9 +1452,9 @@ impl DatePrototype {
     /// Date.prototype.toLocaleString (https://tc39.es/ecma262/#sec-date.prototype.tolocalestring)
     pub fn to_locale_string(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1470,9 +1470,9 @@ impl DatePrototype {
     /// Date.prototype.toLocaleTimeString (https://tc39.es/ecma262/#sec-date.prototype.tolocaletimestring)
     pub fn to_locale_time_string(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1488,9 +1488,9 @@ impl DatePrototype {
     /// Date.prototype.toString (https://tc39.es/ecma262/#sec-date.prototype.tostring)
     pub fn to_string(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1506,9 +1506,9 @@ impl DatePrototype {
     /// Date.prototype.toTimeString (https://tc39.es/ecma262/#sec-date.prototype.totimestring)
     pub fn to_time_string(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1521,7 +1521,7 @@ impl DatePrototype {
         Self::to_time_string_shared(cx, date_value)
     }
 
-    fn to_time_string_shared(mut cx: Context, date_value: f64) -> EvalResult<Handle<Value>> {
+    fn to_time_string_shared(mut cx: Context, date_value: f64) -> EvalResult<StackRoot<Value>> {
         if date_value.is_nan() {
             return Ok(cx.alloc_string("Invalid Date")?.as_value());
         }
@@ -1539,9 +1539,9 @@ impl DatePrototype {
     /// Date.prototype.toUTCString (https://tc39.es/ecma262/#sec-date.prototype.toutcstring)
     pub fn to_utc_string(
         mut cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1575,9 +1575,9 @@ impl DatePrototype {
     /// Date.prototype.valueOf (https://tc39.es/ecma262/#sec-date.prototype.valueof)
     pub fn value_of(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1587,15 +1587,15 @@ impl DatePrototype {
             );
         };
 
-        Ok(Value::from(date_value).to_handle(cx))
+        Ok(Value::from(date_value).to_stack())
     }
 
     /// Date.prototype [ @@toPrimitive ] (https://tc39.es/ecma262/#sec-date.prototype-%symbol.toprimitive%)
     pub fn to_primitive(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Date.prototype[@@toPrimitive] must be called on object");
         }
@@ -1626,9 +1626,9 @@ impl DatePrototype {
     /// Date.prototype.getYear (https://tc39.es/ecma262/#sec-date.prototype.getyear)
     pub fn get_year(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1650,9 +1650,9 @@ impl DatePrototype {
     /// Date.prototype.setYear (https://tc39.es/ecma262/#sec-date.prototype.setyear)
     pub fn set_year(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let date_value = if let Some(date_value) = this_date_value(this_value) {
             date_value
         } else {
@@ -1679,7 +1679,7 @@ impl DatePrototype {
 
         set_date_value(this_value, new_date);
 
-        Ok(Value::from(new_date).to_handle(cx))
+        Ok(Value::from(new_date).to_stack())
     }
 }
 
@@ -1741,7 +1741,7 @@ fn month_string(time_value: f64) -> &'static str {
 
 /// TimeZoneString (https://tc39.es/ecma262/#sec-timezoneestring)
 fn time_zone_string(string: &mut String, _time_value: f64) {
-    // TODO: Handle time zones
+    // TODO: StackRoot time zones
     let offset: f64 = 0.0;
 
     let sign = if offset.is_sign_positive() { '+' } else { '-' };
@@ -1755,7 +1755,7 @@ fn time_zone_string(string: &mut String, _time_value: f64) {
 }
 
 /// ToDateString (https://tc39.es/ecma262/#sec-todatestring)
-pub fn to_date_string(mut cx: Context, time_value: f64) -> AllocResult<Handle<StringValue>> {
+pub fn to_date_string(mut cx: Context, time_value: f64) -> AllocResult<StackRoot<StringValue>> {
     if time_value.is_nan() {
         return Ok(cx.alloc_string("Invalid Date")?.as_string());
     }
@@ -1773,7 +1773,7 @@ pub fn to_date_string(mut cx: Context, time_value: f64) -> AllocResult<Handle<St
 }
 
 #[inline]
-pub fn this_date_value(value: Handle<Value>) -> Option<f64> {
+pub fn this_date_value(value: StackRoot<Value>) -> Option<f64> {
     if !value.is_object() {
         return None;
     }
@@ -1785,7 +1785,7 @@ pub fn this_date_value(value: Handle<Value>) -> Option<f64> {
 }
 
 #[inline]
-fn set_date_value(date: Handle<Value>, date_value: f64) {
+fn set_date_value(date: StackRoot<Value>, date_value: f64) {
     date.as_object()
         .cast::<DateObject>()
         .set_date_value(date_value);

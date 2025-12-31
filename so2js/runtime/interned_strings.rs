@@ -9,10 +9,10 @@ use crate::{
 
 use super::{
     collections::{BsHashSet, BsHashSetField},
-    gc::HeapVisitor,
+    gc::GcVisitorExt,
     heap_item_descriptor::HeapItemKind,
     string_value::{FlatString, StringValue},
-    Context, Handle, HeapPtr,
+    Context, StackRoot, HeapPtr,
 };
 
 pub struct InternedStrings {
@@ -72,7 +72,7 @@ impl InternedStrings {
                 string.intern();
 
                 // Preserve string before potentially growing set
-                let string = string.to_handle();
+                let string = string.to_stack();
 
                 cx.interned_strings
                     .strings_field()
@@ -84,17 +84,17 @@ impl InternedStrings {
         }
     }
 
-    pub fn alloc_wtf8_str(mut cx: Context, str: &Wtf8Str) -> AllocResult<Handle<FlatString>> {
+    pub fn alloc_wtf8_str(mut cx: Context, str: &Wtf8Str) -> AllocResult<StackRoot<FlatString>> {
         let string_value = cx.alloc_wtf8_str_ptr(str)?;
-        Ok(InternedStrings::get(cx, string_value)?.to_handle())
+        Ok(InternedStrings::get(cx, string_value)?.to_stack())
     }
 
-    pub fn get_generator_cache_str(mut cx: Context, str: &str) -> AllocResult<Handle<StringValue>> {
+    pub fn get_generator_cache_str(mut cx: Context, str: &str) -> AllocResult<StackRoot<StringValue>> {
         match cx.interned_strings.generator_cache.get(str.as_bytes()) {
-            Some(interned_string) => Ok(interned_string.as_string().to_handle()),
+            Some(interned_string) => Ok(interned_string.as_string().to_stack()),
             None => {
                 let string_value = cx.alloc_string_ptr(str)?;
-                let interned_string = InternedStrings::get(cx, string_value)?.to_handle();
+                let interned_string = InternedStrings::get(cx, string_value)?.to_stack();
 
                 cx.interned_strings
                     .generator_cache
@@ -108,12 +108,12 @@ impl InternedStrings {
     pub fn get_generator_cache_wtf8_str(
         mut cx: Context,
         str: &Wtf8Str,
-    ) -> AllocResult<Handle<StringValue>> {
+    ) -> AllocResult<StackRoot<StringValue>> {
         match cx.interned_strings.generator_cache.get(str) {
-            Some(interned_string) => Ok(interned_string.as_string().to_handle()),
+            Some(interned_string) => Ok(interned_string.as_string().to_stack()),
             None => {
                 let string_value = cx.alloc_wtf8_str_ptr(str)?;
-                let interned_string = InternedStrings::get(cx, string_value)?.to_handle();
+                let interned_string = InternedStrings::get(cx, string_value)?.to_stack();
 
                 cx.interned_strings
                     .generator_cache
@@ -124,7 +124,7 @@ impl InternedStrings {
         }
     }
 
-    pub fn visit_roots(&mut self, visitor: &mut impl HeapVisitor) {
+    pub fn visit_roots(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.strings);
 
         // Interned strings are weak references
@@ -156,7 +156,7 @@ impl InternedStringsSetField {
         InternedStringsSet::calculate_size_in_bytes(set.capacity())
     }
 
-    pub fn visit_pointers(set: &mut HeapPtr<InternedStringsSet>, visitor: &mut impl HeapVisitor) {
+    pub fn visit_pointers(set: &mut HeapPtr<InternedStringsSet>, visitor: &mut impl GcVisitorExt) {
         set.visit_pointers(visitor);
 
         // Interned strings are weak references

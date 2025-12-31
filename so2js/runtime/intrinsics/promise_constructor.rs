@@ -18,7 +18,7 @@ use crate::{
         promise_object::{promise_resolve, resolve, PromiseCapability, PromiseObject},
         realm::Realm,
         type_utilities::is_callable,
-        Context, Handle, PropertyKey, Value,
+        Context, StackRoot, PropertyKey, Value,
     },
 };
 
@@ -49,7 +49,7 @@ pub struct PromiseConstructor;
 
 impl PromiseConstructor {
     /// Properties of the Promise Constructor (https://tc39.es/ecma262/#sec-properties-of-the-promise-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -90,9 +90,9 @@ impl PromiseConstructor {
     //// Promise (https://tc39.es/ecma262/#sec-promise-executor)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let new_target = if let Some(target) = cx.current_new_target() {
             target
         } else {
@@ -113,16 +113,16 @@ impl PromiseConstructor {
 
     fn collect_iterable_promises(
         cx: Context,
-        constructor: Handle<Value>,
-        iterable: Handle<Value>,
+        constructor: StackRoot<Value>,
+        iterable: StackRoot<Value>,
         mut f: impl FnMut(
             Context,
             &mut Iterator,
-            Handle<ObjectValue>,
-            Handle<PromiseCapability>,
-            Handle<ObjectValue>,
-        ) -> EvalResult<Handle<Value>>,
-    ) -> EvalResult<Handle<Value>> {
+            StackRoot<ObjectValue>,
+            StackRoot<PromiseCapability>,
+            StackRoot<ObjectValue>,
+        ) -> EvalResult<StackRoot<Value>>,
+    ) -> EvalResult<StackRoot<Value>> {
         let capability = PromiseCapability::new(cx, constructor)?;
         let constructor = constructor.as_object();
 
@@ -145,7 +145,7 @@ impl PromiseConstructor {
         completion
     }
 
-    fn get_already_called_or_false(cx: Context, function: Handle<ObjectValue>) -> bool {
+    fn get_already_called_or_false(cx: Context, function: StackRoot<ObjectValue>) -> bool {
         if let Some(property) =
             function.private_element_find(cx, cx.well_known_symbols.already_called().cast())
         {
@@ -157,8 +157,8 @@ impl PromiseConstructor {
 
     fn get_already_called_object(
         cx: Context,
-        function: Handle<ObjectValue>,
-    ) -> Handle<BooleanObject> {
+        function: StackRoot<ObjectValue>,
+    ) -> StackRoot<BooleanObject> {
         function
             .private_element_find(cx, cx.well_known_symbols.already_called().cast())
             .unwrap()
@@ -168,28 +168,28 @@ impl PromiseConstructor {
 
     fn set_already_called(
         cx: Context,
-        mut function: Handle<ObjectValue>,
-        value: Handle<Value>,
+        mut function: StackRoot<ObjectValue>,
+        value: StackRoot<Value>,
     ) -> AllocResult<()> {
         function.private_element_set(cx, cx.well_known_symbols.already_called().cast(), value)
     }
 
-    fn get_index(cx: Context, function: Handle<ObjectValue>) -> Handle<Value> {
+    fn get_index(cx: Context, function: StackRoot<ObjectValue>) -> StackRoot<Value> {
         function
             .private_element_find(cx, cx.well_known_symbols.index().cast())
             .unwrap()
             .value()
     }
 
-    fn set_index(cx: Context, mut function: Handle<ObjectValue>, value: Value) -> AllocResult<()> {
+    fn set_index(cx: Context, mut function: StackRoot<ObjectValue>, value: Value) -> AllocResult<()> {
         function.private_element_set(
             cx,
             cx.well_known_symbols.index().cast(),
-            value.to_handle(cx),
+            value.to_stack(),
         )
     }
 
-    fn get_values(cx: Context, function: Handle<ObjectValue>) -> Handle<ArrayObject> {
+    fn get_values(cx: Context, function: StackRoot<ObjectValue>) -> StackRoot<ArrayObject> {
         function
             .private_element_find(cx, cx.well_known_symbols.values().cast())
             .unwrap()
@@ -200,13 +200,13 @@ impl PromiseConstructor {
 
     fn set_values(
         cx: Context,
-        mut function: Handle<ObjectValue>,
-        value: Handle<ArrayObject>,
+        mut function: StackRoot<ObjectValue>,
+        value: StackRoot<ArrayObject>,
     ) -> AllocResult<()> {
         function.private_element_set(cx, cx.well_known_symbols.values().cast(), value.into())
     }
 
-    fn get_capability(cx: Context, function: Handle<ObjectValue>) -> Handle<PromiseCapability> {
+    fn get_capability(cx: Context, function: StackRoot<ObjectValue>) -> StackRoot<PromiseCapability> {
         function
             .private_element_find(cx, cx.well_known_symbols.capability().cast())
             .unwrap()
@@ -217,13 +217,13 @@ impl PromiseConstructor {
 
     fn set_capability(
         cx: Context,
-        mut function: Handle<ObjectValue>,
-        value: Handle<PromiseCapability>,
+        mut function: StackRoot<ObjectValue>,
+        value: StackRoot<PromiseCapability>,
     ) -> AllocResult<()> {
         function.private_element_set(cx, cx.well_known_symbols.capability().cast(), value.into())
     }
 
-    fn get_remaining_elements(cx: Context, function: Handle<ObjectValue>) -> Handle<NumberObject> {
+    fn get_remaining_elements(cx: Context, function: StackRoot<ObjectValue>) -> StackRoot<NumberObject> {
         function
             .private_element_find(cx, cx.well_known_symbols.remaining_elements().cast())
             .unwrap()
@@ -234,8 +234,8 @@ impl PromiseConstructor {
 
     fn set_remaining_elements(
         cx: Context,
-        mut function: Handle<ObjectValue>,
-        value: Handle<NumberObject>,
+        mut function: StackRoot<ObjectValue>,
+        value: StackRoot<NumberObject>,
     ) -> AllocResult<()> {
         function.private_element_set(
             cx,
@@ -247,9 +247,9 @@ impl PromiseConstructor {
     /// Promise.all (https://tc39.es/ecma262/#sec-promise.all)
     pub fn all(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let iterable = get_argument(cx, arguments, 0);
         Self::collect_iterable_promises(cx, this_value, iterable, Self::perform_promise_all)
     }
@@ -258,10 +258,10 @@ impl PromiseConstructor {
     fn perform_promise_all(
         cx: Context,
         iterator: &mut Iterator,
-        constructor: Handle<ObjectValue>,
-        capability: Handle<PromiseCapability>,
-        resolve: Handle<ObjectValue>,
-    ) -> EvalResult<Handle<Value>> {
+        constructor: StackRoot<ObjectValue>,
+        capability: StackRoot<PromiseCapability>,
+        resolve: StackRoot<ObjectValue>,
+    ) -> EvalResult<StackRoot<Value>> {
         let values = must!(array_create(cx, 0, None));
         let mut remaining_elements = NumberObject::new(cx, 1.0)?;
         let mut index = 0;
@@ -317,9 +317,9 @@ impl PromiseConstructor {
     /// Promise.all Resolve (https://tc39.es/ecma262/#sec-promise.all-resolve-element-functions)
     pub fn promise_all_resolve(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let function = cx.current_function();
 
         // Check if already called and mark as called
@@ -334,7 +334,7 @@ impl PromiseConstructor {
         let index = Self::get_index(cx, function);
         let values = Self::get_values(cx, function);
 
-        let key = PropertyKey::from_value(cx, index)?.to_handle(cx);
+        let key = PropertyKey::from_value(cx, index)?.to_stack();
         must!(create_data_property_or_throw(
             cx,
             values.into(),
@@ -359,9 +359,9 @@ impl PromiseConstructor {
     /// Promise.allSettled (https://tc39.es/ecma262/#sec-promise.allsettled)
     pub fn all_settled(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let iterable = get_argument(cx, arguments, 0);
         Self::collect_iterable_promises(cx, this_value, iterable, Self::perform_promise_all_settled)
     }
@@ -370,10 +370,10 @@ impl PromiseConstructor {
     fn perform_promise_all_settled(
         cx: Context,
         iterator: &mut Iterator,
-        constructor: Handle<ObjectValue>,
-        capability: Handle<PromiseCapability>,
-        resolve: Handle<ObjectValue>,
-    ) -> EvalResult<Handle<Value>> {
+        constructor: StackRoot<ObjectValue>,
+        capability: StackRoot<PromiseCapability>,
+        resolve: StackRoot<ObjectValue>,
+    ) -> EvalResult<StackRoot<Value>> {
         let values = must!(array_create(cx, 0, None));
         let mut remaining_elements = NumberObject::new(cx, 1.0)?;
         let mut index = 0;
@@ -453,9 +453,9 @@ impl PromiseConstructor {
     /// Promise.allSettled Resolve (https://tc39.es/ecma262/#sec-promise.allsettled-resolve-element-functions)
     pub fn promise_all_settled_resolve(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let function = cx.current_function();
 
         // Check if already called and mark as called
@@ -486,7 +486,7 @@ impl PromiseConstructor {
         let index = Self::get_index(cx, function);
         let values = Self::get_values(cx, function);
 
-        let key = PropertyKey::from_value(cx, index)?.to_handle(cx);
+        let key = PropertyKey::from_value(cx, index)?.to_stack();
         must!(create_data_property_or_throw(
             cx,
             values.into(),
@@ -511,9 +511,9 @@ impl PromiseConstructor {
     /// Promise.allSettled Reject (https://tc39.es/ecma262/#sec-promise.allsettled-reject-element-functions)
     pub fn promise_all_settled_reject(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let function = cx.current_function();
 
         // Check if already called and mark as called
@@ -544,7 +544,7 @@ impl PromiseConstructor {
         let index = Self::get_index(cx, function);
         let values = Self::get_values(cx, function);
 
-        let key = PropertyKey::from_value(cx, index)?.to_handle(cx);
+        let key = PropertyKey::from_value(cx, index)?.to_stack();
         must!(create_data_property_or_throw(
             cx,
             values.into(),
@@ -569,9 +569,9 @@ impl PromiseConstructor {
     /// Promise.any (https://tc39.es/ecma262/#sec-promise.any)
     pub fn any(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let iterable = get_argument(cx, arguments, 0);
         Self::collect_iterable_promises(cx, this_value, iterable, Self::perform_promise_any)
     }
@@ -580,10 +580,10 @@ impl PromiseConstructor {
     fn perform_promise_any(
         cx: Context,
         iterator: &mut Iterator,
-        constructor: Handle<ObjectValue>,
-        capability: Handle<PromiseCapability>,
-        resolve: Handle<ObjectValue>,
-    ) -> EvalResult<Handle<Value>> {
+        constructor: StackRoot<ObjectValue>,
+        capability: StackRoot<PromiseCapability>,
+        resolve: StackRoot<ObjectValue>,
+    ) -> EvalResult<StackRoot<Value>> {
         let errors = must!(array_create(cx, 0, None));
         let mut remaining_elements = NumberObject::new(cx, 1.0)?;
         let mut index = 0;
@@ -641,9 +641,9 @@ impl PromiseConstructor {
     /// Promise.any Reject (https://tc39.es/ecma262/#sec-promise.any-reject-element-functions)
     pub fn promise_any_reject(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let function = cx.current_function();
 
         // Check if already called and mark as called
@@ -658,7 +658,7 @@ impl PromiseConstructor {
         let index = Self::get_index(cx, function);
         let errors = Self::get_values(cx, function);
 
-        let key = PropertyKey::from_value(cx, index)?.to_handle(cx);
+        let key = PropertyKey::from_value(cx, index)?.to_stack();
         must!(create_data_property_or_throw(
             cx,
             errors.into(),
@@ -684,9 +684,9 @@ impl PromiseConstructor {
     /// Promise.race (https://tc39.es/ecma262/#sec-promise.race)
     pub fn race(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let iterable = get_argument(cx, arguments, 0);
         Self::collect_iterable_promises(cx, this_value, iterable, Self::perform_promise_race)
     }
@@ -695,10 +695,10 @@ impl PromiseConstructor {
     fn perform_promise_race(
         cx: Context,
         iterator: &mut Iterator,
-        constructor: Handle<ObjectValue>,
-        capability: Handle<PromiseCapability>,
-        resolve: Handle<ObjectValue>,
-    ) -> EvalResult<Handle<Value>> {
+        constructor: StackRoot<ObjectValue>,
+        capability: StackRoot<PromiseCapability>,
+        resolve: StackRoot<ObjectValue>,
+    ) -> EvalResult<StackRoot<Value>> {
         loop {
             let next_value = iterator_step_value(cx, iterator)?;
             match next_value {
@@ -716,9 +716,9 @@ impl PromiseConstructor {
     /// Promise.reject (https://tc39.es/ecma262/#sec-promise.reject)
     pub fn reject(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let result = get_argument(cx, arguments, 0);
 
         // Create a new promise and immediately reject it
@@ -731,9 +731,9 @@ impl PromiseConstructor {
     /// Promise.resolve (https://tc39.es/ecma262/#sec-promise.resolve)
     pub fn resolve(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Promise.resolve called on non-object");
         }
@@ -745,9 +745,9 @@ impl PromiseConstructor {
     /// Promise.try (https://tc39.es/ecma262/#sec-promise.try)
     pub fn try_(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Promise.try called on non-object");
         }
@@ -768,9 +768,9 @@ impl PromiseConstructor {
     /// Promise.withResolvers (https://tc39.es/ecma262/#sec-promise.withResolvers)
     pub fn with_resolvers(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let capability = PromiseCapability::new(cx, this_value)?;
 
         let object = ordinary_object_create(cx)?;
@@ -800,10 +800,10 @@ impl PromiseConstructor {
 
 pub fn execute_then(
     cx: Context,
-    executor: Handle<ObjectValue>,
-    this_value: Handle<Value>,
-    mut promise: Handle<PromiseObject>,
-) -> EvalResult<Handle<Value>> {
+    executor: StackRoot<ObjectValue>,
+    this_value: StackRoot<Value>,
+    mut promise: StackRoot<PromiseObject>,
+) -> EvalResult<StackRoot<Value>> {
     // Create resolve and reject functions, passing into the executor
     let resolve_function = create_resolve_function(cx, promise)?;
     let reject_function = create_reject_function(cx, promise)?;
@@ -827,23 +827,23 @@ pub fn execute_then(
 
 fn create_resolve_function(
     cx: Context,
-    promise: Handle<PromiseObject>,
-) -> AllocResult<Handle<ObjectValue>> {
+    promise: StackRoot<PromiseObject>,
+) -> AllocResult<StackRoot<ObjectValue>> {
     create_settle_function(cx, promise, resolve_builtin_function)
 }
 
 fn create_reject_function(
     cx: Context,
-    promise: Handle<PromiseObject>,
-) -> AllocResult<Handle<ObjectValue>> {
+    promise: StackRoot<PromiseObject>,
+) -> AllocResult<StackRoot<ObjectValue>> {
     create_settle_function(cx, promise, reject_builtin_function)
 }
 
 fn create_settle_function(
     cx: Context,
-    promise: Handle<PromiseObject>,
+    promise: StackRoot<PromiseObject>,
     func: RustRuntimeFunction,
-) -> AllocResult<Handle<ObjectValue>> {
+) -> AllocResult<StackRoot<ObjectValue>> {
     let mut function = BuiltinFunction::create(
         cx,
         func,
@@ -858,7 +858,7 @@ fn create_settle_function(
     Ok(function)
 }
 
-fn get_promise(cx: Context, settle_function: Handle<ObjectValue>) -> Handle<PromiseObject> {
+fn get_promise(cx: Context, settle_function: StackRoot<ObjectValue>) -> StackRoot<PromiseObject> {
     settle_function
         .private_element_find(cx, cx.well_known_symbols.promise().cast())
         .unwrap()
@@ -870,9 +870,9 @@ fn get_promise(cx: Context, settle_function: Handle<ObjectValue>) -> Handle<Prom
 /// Promise Resolve Functions (https://tc39.es/ecma262/#sec-promise-resolve-functions)
 pub fn resolve_builtin_function(
     mut cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let resolution = get_argument(cx, arguments, 0);
 
     let function = cx.current_function();
@@ -886,9 +886,9 @@ pub fn resolve_builtin_function(
 /// Promise Reject Functions (https://tc39.es/ecma262/#sec-promise-reject-functions)
 pub fn reject_builtin_function(
     mut cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let resolution = get_argument(cx, arguments, 0);
 
     let function = cx.current_function();
@@ -905,8 +905,8 @@ pub fn reject_builtin_function(
 /// GetPromiseResolve (https://tc39.es/ecma262/#sec-getpromiseresolve)
 fn get_promise_resolve(
     cx: Context,
-    constructor: Handle<ObjectValue>,
-) -> EvalResult<Handle<ObjectValue>> {
+    constructor: StackRoot<ObjectValue>,
+) -> EvalResult<StackRoot<ObjectValue>> {
     let resolve = get(cx, constructor, cx.names.resolve())?;
     if !is_callable(resolve) {
         return type_error(cx, "resolve property must be a function");

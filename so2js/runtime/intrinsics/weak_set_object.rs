@@ -6,12 +6,12 @@ use crate::{
         alloc_error::AllocResult,
         collections::{BsHashSet, BsHashSetField},
         eval_result::EvalResult,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         object_value::ObjectValue,
         ordinary_object::object_create_from_constructor,
-        value::{ValueCollectionKey, ValueCollectionKeyHandle},
-        Context, Handle, HeapPtr, Value,
+        value::{ValueCollectionKey, ValueCollectionKeyStackRoot},
+        Context, StackRoot, HeapPtr, Value,
     },
     set_uninit,
 };
@@ -34,10 +34,10 @@ type WeakValueSet = BsHashSet<ValueCollectionKey>;
 impl WeakSetObject {
     pub fn new_from_constructor(
         cx: Context,
-        constructor: Handle<ObjectValue>,
-    ) -> EvalResult<Handle<WeakSetObject>> {
+        constructor: StackRoot<ObjectValue>,
+    ) -> EvalResult<StackRoot<WeakSetObject>> {
         let weak_set_data =
-            WeakValueSet::new_initial(cx, HeapItemKind::WeakSetObjectWeakValueSet)?.to_handle();
+            WeakValueSet::new_initial(cx, HeapItemKind::WeakSetObjectWeakValueSet)?.to_stack();
 
         let mut object = object_create_from_constructor::<WeakSetObject>(
             cx,
@@ -48,7 +48,7 @@ impl WeakSetObject {
 
         set_uninit!(object.weak_set_data, *weak_set_data);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     pub fn weak_set_data(&self) -> HeapPtr<WeakValueSet> {
@@ -64,13 +64,13 @@ impl WeakSetObject {
     }
 }
 
-impl Handle<WeakSetObject> {
+impl StackRoot<WeakSetObject> {
     pub fn weak_set_data_field(&self) -> WeakSetObjectSetField {
         WeakSetObjectSetField(*self)
     }
 
-    pub fn insert(&self, cx: Context, item: Handle<Value>) -> AllocResult<bool> {
-        let item_handle = ValueCollectionKeyHandle::new(item)?;
+    pub fn insert(&self, cx: Context, item: StackRoot<Value>) -> AllocResult<bool> {
+        let item_handle = ValueCollectionKeyStackRoot::new(item)?;
 
         Ok(self
             .weak_set_data_field()
@@ -80,7 +80,7 @@ impl Handle<WeakSetObject> {
 }
 
 #[derive(Clone)]
-pub struct WeakSetObjectSetField(Handle<WeakSetObject>);
+pub struct WeakSetObjectSetField(StackRoot<WeakSetObject>);
 
 impl BsHashSetField<ValueCollectionKey> for WeakSetObjectSetField {
     fn new(cx: Context, capacity: usize) -> AllocResult<HeapPtr<WeakValueSet>> {
@@ -101,7 +101,7 @@ impl HeapItem for HeapPtr<WeakSetObject> {
         size_of::<WeakSetObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.weak_set_data);
 
@@ -114,7 +114,7 @@ impl WeakSetObjectSetField {
         WeakValueSet::calculate_size_in_bytes(map.capacity())
     }
 
-    pub fn visit_pointers(set: &mut HeapPtr<WeakValueSet>, visitor: &mut impl HeapVisitor) {
+    pub fn visit_pointers(set: &mut HeapPtr<WeakValueSet>, visitor: &mut impl GcVisitorExt) {
         set.visit_pointers(visitor);
 
         for value in set.iter_mut_gc_unsafe() {

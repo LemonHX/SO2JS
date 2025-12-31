@@ -9,11 +9,11 @@ use crate::{
 
 use super::{
     collections::InlineArray,
-    gc::{HeapItem, HeapVisitor},
+    gc::{HeapItem, GcVisitorExt},
     heap_item_descriptor::HeapItemDescriptor,
     object_value::ObjectValue,
     string_value::StringValue,
-    Context, EvalResult, Handle, HeapPtr, PropertyKey, Value,
+    Context, EvalResult, StackRoot, HeapPtr, PropertyKey, Value,
 };
 
 /// An iterator over the keys of an object, used in for-in loops.
@@ -40,8 +40,8 @@ pub struct ForInIterator {
 impl ForInIterator {
     fn new(
         cx: Context,
-        object: Handle<ObjectValue>,
-        keys: &[Handle<StringValue>],
+        object: StackRoot<ObjectValue>,
+        keys: &[StackRoot<StringValue>],
     ) -> AllocResult<HeapPtr<ForInIterator>> {
         let size = Self::calculate_size_in_bytes(keys.len());
         let mut iterator = cx.alloc_uninit_with_size::<ForInIterator>(size)?;
@@ -65,7 +65,7 @@ impl ForInIterator {
     /// up front and stores them in the iterator.
     pub fn new_for_object(
         cx: Context,
-        object: Handle<ObjectValue>,
+        object: StackRoot<ObjectValue>,
     ) -> EvalResult<HeapPtr<ForInIterator>> {
         // Walk prototype chain, collecting property keys that haven't already been visited
         let mut keys = vec![];
@@ -113,10 +113,10 @@ impl ForInIterator {
     }
 }
 
-impl Handle<ForInIterator> {
+impl StackRoot<ForInIterator> {
     /// Return the next string key in the iteration, or undefined if there are no more keys.
     pub fn next(&mut self, cx: Context) -> EvalResult<Value> {
-        let object = self.object.to_handle();
+        let object = self.object.to_stack();
 
         // Find the next property that has not been deleted
         loop {
@@ -124,7 +124,7 @@ impl Handle<ForInIterator> {
                 return Ok(Value::undefined());
             }
 
-            let key = self.keys.get_unchecked(self.index).to_handle();
+            let key = self.keys.get_unchecked(self.index).to_stack();
             let property_key = PropertyKey::string_handle(cx, key)?;
 
             self.index += 1;
@@ -142,7 +142,7 @@ impl HeapItem for HeapPtr<ForInIterator> {
         ForInIterator::calculate_size_in_bytes(self.keys.len())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
         visitor.visit_pointer(&mut self.object);
 

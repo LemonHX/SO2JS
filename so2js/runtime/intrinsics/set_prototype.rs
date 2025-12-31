@@ -19,7 +19,7 @@ use crate::{
         realm::Realm,
         type_utilities::{is_callable, to_integer_or_infinity, to_number},
         value::{Value, ValueCollectionKey},
-        Context, Handle,
+        Context, StackRoot,
     },
 };
 
@@ -33,7 +33,7 @@ pub struct SetPrototype;
 
 impl SetPrototype {
     /// Properties of the Set Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-set-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -102,9 +102,9 @@ impl SetPrototype {
     /// Set.prototype.add (https://tc39.es/ecma262/#sec-set.prototype.add)
     pub fn add(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let set = if let Some(set) = this_set_value(this_value) {
             set
         } else {
@@ -123,9 +123,9 @@ impl SetPrototype {
     /// Set.prototype.clear (https://tc39.es/ecma262/#sec-set.prototype.clear)
     pub fn clear(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let set = if let Some(set) = this_set_value(this_value) {
             set
         } else {
@@ -140,9 +140,9 @@ impl SetPrototype {
     /// Set.prototype.delete (https://tc39.es/ecma262/#sec-set.prototype.delete)
     pub fn delete(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let set = if let Some(set) = this_set_value(this_value) {
             set
         } else {
@@ -162,9 +162,9 @@ impl SetPrototype {
     /// Set.prototype.difference (https://tc39.es/ecma262/#sec-set.prototype.difference)
     pub fn difference(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let this_set = if let Some(set) = this_set_value(this_value) {
             set
         } else {
@@ -175,7 +175,7 @@ impl SetPrototype {
         let other_set_record = get_set_record(cx, other)?;
 
         // Create a copy of this set
-        let new_set_data = ValueSet::new_from_set(cx, this_set.set_data())?.to_handle();
+        let new_set_data = ValueSet::new_from_set(cx, this_set.set_data())?.to_stack();
         let new_set = SetObject::new_from_set(cx, new_set_data)?;
 
         if this_set.set_data_ptr().num_entries_occupied() as f64 <= other_set_record.size {
@@ -183,8 +183,8 @@ impl SetPrototype {
             // determine if they are in the other set by calling the other set's `has` method. Then
             // remove the key from the new set if it is in the other set.
 
-            // Handle is shared between iterations
-            let mut item_handle = Handle::<Value>::empty(cx);
+            // StackRoot is shared between iterations
+            let mut item_handle = StackRoot::<Value>::empty(cx);
 
             for (item, _) in new_set.set_data().iter_gc_safe() {
                 item_handle.replace(item.get());
@@ -231,9 +231,9 @@ impl SetPrototype {
     /// Set.prototype.entries (https://tc39.es/ecma262/#sec-set.prototype.entries)
     pub fn entries(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let set = if let Some(set) = this_set_value(this_value) {
             set
         } else {
@@ -246,9 +246,9 @@ impl SetPrototype {
     /// Set.prototype.forEach (https://tc39.es/ecma262/#sec-set.prototype.foreach)
     pub fn for_each(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let set = if let Some(set) = this_set_value(this_value) {
             set
         } else {
@@ -264,7 +264,7 @@ impl SetPrototype {
         let this_arg = get_argument(cx, arguments, 1);
 
         // Share handle across iterations
-        let mut value_handle = Handle::<Value>::empty(cx);
+        let mut value_handle = StackRoot::<Value>::empty(cx);
 
         // Must use gc and invalidation safe iteration since arbitrary code can be executed between
         // iterations.
@@ -281,9 +281,9 @@ impl SetPrototype {
     /// Set.prototype.has (https://tc39.es/ecma262/#sec-set.prototype.has)
     pub fn has(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let set = if let Some(set) = this_set_value(this_value) {
             set
         } else {
@@ -301,9 +301,9 @@ impl SetPrototype {
     /// Set.prototype.intersection (https://tc39.es/ecma262/#sec-set.prototype.intersection)
     pub fn intersection(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let this_set = if let Some(set) = this_set_value(this_value) {
             set
         } else {
@@ -314,7 +314,7 @@ impl SetPrototype {
         let other_set_record = get_set_record(cx, other)?;
 
         // Create an empty set
-        let new_set_data = SetObjectSetField::new(cx, ValueSet::MIN_CAPACITY)?.to_handle();
+        let new_set_data = SetObjectSetField::new(cx, ValueSet::MIN_CAPACITY)?.to_stack();
         let new_set = SetObject::new_from_set(cx, new_set_data)?;
 
         if this_set.set_data_ptr().num_entries_occupied() as f64 <= other_set_record.size {
@@ -322,8 +322,8 @@ impl SetPrototype {
             // determine if they are in the other set by calling the other set's `has` method. Then
             // add the key to the new set if it is in the other set.
 
-            // Handle is shared between iterations
-            let mut item_handle = Handle::<Value>::empty(cx);
+            // StackRoot is shared between iterations
+            let mut item_handle = StackRoot::<Value>::empty(cx);
 
             for (item, _) in this_set.set_data().iter_gc_safe() {
                 item_handle.replace(item.get());
@@ -373,9 +373,9 @@ impl SetPrototype {
     /// Set.prototype.isDisjointFrom (https://tc39.es/ecma262/#sec-set.prototype.isdisjointfrom)
     pub fn is_disjoint_from(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let this_set = if let Some(set) = this_set_value(this_value) {
             set
         } else {
@@ -389,8 +389,8 @@ impl SetPrototype {
             // If this set is smaller or equal to the other set, iterate through this set's keys and
             // determine if they are in the other set by calling the other set's `has` method.
 
-            // Handle is shared between iterations
-            let mut item_handle = Handle::<Value>::empty(cx);
+            // StackRoot is shared between iterations
+            let mut item_handle = StackRoot::<Value>::empty(cx);
 
             for (item, _) in this_set.set_data().iter_gc_safe() {
                 item_handle.replace(item.get());
@@ -438,9 +438,9 @@ impl SetPrototype {
     /// Set.prototype.isSubsetOf (https://tc39.es/ecma262/#sec-set.prototype.issubsetof)
     pub fn is_subset_of(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let this_set = if let Some(set) = this_set_value(this_value) {
             set
         } else {
@@ -458,8 +458,8 @@ impl SetPrototype {
         // If this set is smaller or equal to the other set, iterate through this set's keys and
         // determine if they are in the other set by calling the other set's `has` method.
 
-        // Handle is shared between iterations
-        let mut item_handle = Handle::<Value>::empty(cx);
+        // StackRoot is shared between iterations
+        let mut item_handle = StackRoot::<Value>::empty(cx);
 
         for (item, _) in this_set.set_data().iter_gc_safe() {
             item_handle.replace(item.get());
@@ -482,9 +482,9 @@ impl SetPrototype {
     /// Set.prototype.isSupersetOf (https://tc39.es/ecma262/#sec-set.prototype.issupersetof)
     pub fn is_superset_of(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let this_set = if let Some(set) = this_set_value(this_value) {
             set
         } else {
@@ -528,24 +528,24 @@ impl SetPrototype {
     /// get Set.prototype.size (https://tc39.es/ecma262/#sec-get-set.prototype.size)
     pub fn size(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let set = if let Some(set) = this_set_value(this_value) {
             set
         } else {
             return type_error(cx, "size accessor must be called on set");
         };
 
-        Ok(Value::from(set.set_data_ptr().num_entries_occupied()).to_handle(cx))
+        Ok(Value::from(set.set_data_ptr().num_entries_occupied()).to_stack())
     }
 
     /// Set.prototype.symmetricDifference (https://tc39.es/ecma262/#sec-set.prototype.symmetricdifference)
     pub fn symmetric_difference(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let this_set = if let Some(set) = this_set_value(this_value) {
             set
         } else {
@@ -556,7 +556,7 @@ impl SetPrototype {
         let other_set_record = get_set_record(cx, other)?;
 
         // Create a copy of this set
-        let new_set_data = ValueSet::new_from_set(cx, this_set.set_data())?.to_handle();
+        let new_set_data = ValueSet::new_from_set(cx, this_set.set_data())?.to_stack();
         let new_set = SetObject::new_from_set(cx, new_set_data)?;
 
         // Iterate through keys of other set and add or remove them from the new set to ensure that
@@ -595,9 +595,9 @@ impl SetPrototype {
     /// Set.prototype.union (https://tc39.es/ecma262/#sec-set.prototype.union)
     pub fn union(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let this_set = if let Some(set) = this_set_value(this_value) {
             set
         } else {
@@ -608,7 +608,7 @@ impl SetPrototype {
         let other_set_record = get_set_record(cx, other)?;
 
         // Create a copy of this set
-        let new_set_data = ValueSet::new_from_set(cx, this_set.set_data())?.to_handle();
+        let new_set_data = ValueSet::new_from_set(cx, this_set.set_data())?.to_stack();
         let new_set = SetObject::new_from_set(cx, new_set_data)?;
 
         // Iterate through keys of other set and add them to the new set
@@ -633,9 +633,9 @@ impl SetPrototype {
     /// Set.prototype.values (https://tc39.es/ecma262/#sec-set.prototype.values)
     pub fn values(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let set = if let Some(set) = this_set_value(this_value) {
             set
         } else {
@@ -646,7 +646,7 @@ impl SetPrototype {
     }
 }
 
-fn this_set_value(value: Handle<Value>) -> Option<Handle<SetObject>> {
+fn this_set_value(value: StackRoot<Value>) -> Option<StackRoot<SetObject>> {
     if !value.is_object() {
         return None;
     }
@@ -655,14 +655,14 @@ fn this_set_value(value: Handle<Value>) -> Option<Handle<SetObject>> {
 }
 
 struct SetRecord {
-    set_object: Handle<ObjectValue>,
+    set_object: StackRoot<ObjectValue>,
     size: f64,
-    has_method: Handle<ObjectValue>,
-    keys_method: Handle<ObjectValue>,
+    has_method: StackRoot<ObjectValue>,
+    keys_method: StackRoot<ObjectValue>,
 }
 
 /// GetSetRecord (https://tc39.es/ecma262/#sec-getsetrecord)
-fn get_set_record(cx: Context, value: Handle<Value>) -> EvalResult<SetRecord> {
+fn get_set_record(cx: Context, value: StackRoot<Value>) -> EvalResult<SetRecord> {
     if !value.is_object() {
         return type_error(cx, "value is not an object");
     }

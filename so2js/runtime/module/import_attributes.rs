@@ -3,10 +3,10 @@ use crate::{
     runtime::{
         alloc_error::AllocResult,
         collections::InlineArray,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
         string_value::FlatString,
-        Context, Handle, HeapPtr,
+        Context, StackRoot, HeapPtr,
     },
     set_uninit,
 };
@@ -26,8 +26,8 @@ impl ImportAttributes {
 
     pub fn new(
         cx: Context,
-        attribute_pairs: &[(Handle<FlatString>, Handle<FlatString>)],
-    ) -> AllocResult<Handle<ImportAttributes>> {
+        attribute_pairs: &[(StackRoot<FlatString>, StackRoot<FlatString>)],
+    ) -> AllocResult<StackRoot<ImportAttributes>> {
         let num_entries = attribute_pairs.len() * 2;
         let size = Self::calculate_size_in_bytes(num_entries);
         let mut object = cx.alloc_uninit_with_size::<ImportAttributes>(size)?;
@@ -43,7 +43,7 @@ impl ImportAttributes {
             object.attribute_pairs.as_mut_slice()[i * 2 + 1] = **value;
         }
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     #[inline]
@@ -87,7 +87,7 @@ impl HeapItem for HeapPtr<ImportAttributes> {
         ImportAttributes::calculate_size_in_bytes(self.attribute_pairs.len())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
 
         for entry in self.attribute_pairs.as_mut_slice() {

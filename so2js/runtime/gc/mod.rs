@@ -1,4 +1,3 @@
-mod garbage_collector;
 mod handle;
 mod heap;
 mod heap_item;
@@ -6,12 +5,15 @@ mod heap_trait_object;
 mod heap_visitor;
 mod pointer;
 
-pub use garbage_collector::{GarbageCollector, GcType};
+// Re-export GcVisitor from so2js_gc, and our own GcVisitorExt extension
+pub use heap_visitor::GcVisitorExt;
+pub use so2js_gc::GcVisitor;
+
 pub use handle::{
-    Escapable, Handle, HandleContents, HandleScope, HandleScopeGuard, ToHandleContents,
+    Escapable, StackRoot, StackRootContents, StackRootContext, StackRootScope, StackRootScopeGuard,
+    ToStackRootContents,
 };
-pub use heap::{Heap, HeapInfo};
+pub use heap::Heap;
 pub use heap_item::{AnyHeapItem, HeapItem, IsHeapItem};
-#[allow(unused)]
-pub use heap_visitor::HeapVisitor;
+// HeapPtr is our own wrapper around so2js_gc::GcPtr
 pub use pointer::HeapPtr;

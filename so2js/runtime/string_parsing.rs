@@ -22,7 +22,7 @@ use super::{
         MS_PER_MINUTE, MS_PER_SECOND,
     },
     string_value::{StringValue, UnsafeCodeUnitIterator},
-    Handle,
+    StackRoot,
 };
 
 pub struct StringLexer {
@@ -35,7 +35,7 @@ pub struct StringLexer {
 impl StringLexer {
     // Returns None if the lexer could not be primed, meaning the string starts with invalid
     // unicode.
-    pub fn new(string: Handle<StringValue>) -> AllocResult<StringLexer> {
+    pub fn new(string: StackRoot<StringValue>) -> AllocResult<StringLexer> {
         let iter = string.iter_code_units()?;
         let prev_ptr = iter.ptr();
         let mut lexer = StringLexer {
@@ -696,7 +696,7 @@ fn parse_decimal_digits(lexer: &mut StringLexer, num_digits: i32) -> Option<i64>
 /// - Date.prototype.toISOString
 /// - Date.prototype.toString
 /// - Date.prototype.toUTCString
-pub fn parse_string_to_date(string: Handle<StringValue>) -> AllocResult<Option<f64>> {
+pub fn parse_string_to_date(string: StackRoot<StringValue>) -> AllocResult<Option<f64>> {
     let lexer = StringLexer::new(string)?;
     if let Some(date) = parse_string_to_iso_date(lexer) {
         return Ok(Some(date));

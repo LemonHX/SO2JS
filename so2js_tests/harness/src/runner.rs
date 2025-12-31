@@ -29,7 +29,7 @@ use so2js::{
     runtime::{
         bytecode::generator::BytecodeProgramGenerator, eval_result::EvalError, get,
         test_262_object::Test262Object, to_console_string, to_string, Context, ContextBuilder,
-        EvalResult, Handle, Value,
+        EvalResult, StackRoot, Value,
     },
 };
 
@@ -324,7 +324,7 @@ fn run_single_test(
     }));
 
     #[cfg(feature = "handle_stats")]
-    println!("{:?}", cx.heap.info().handle_context().handle_stats());
+    println!("{:?}", cx.handle_context.handle_stats());
 
     cx.drop();
 
@@ -435,7 +435,7 @@ fn load_harness_test_file(cx: Context, test262_root: &str, file: &str) {
 fn execute_script_as_bytecode<'a>(
     mut cx: Context,
     analyzed_result: &'a parser::analyze::AnalyzedProgramResult<'a>,
-) -> EvalResult<Handle<Value>> {
+) -> EvalResult<StackRoot<Value>> {
     let realm = cx.initial_realm();
     let generate_result =
         BytecodeProgramGenerator::generate_from_parse_script_result(cx, analyzed_result, realm);
@@ -453,7 +453,7 @@ fn execute_script_as_bytecode<'a>(
 fn execute_module_as_bytecode<'a>(
     mut cx: Context,
     analyzed_result: &'a parser::analyze::AnalyzedProgramResult<'a>,
-) -> EvalResult<Handle<Value>> {
+) -> EvalResult<StackRoot<Value>> {
     let realm = cx.initial_realm();
     let generate_result =
         BytecodeProgramGenerator::generate_from_parse_module_result(cx, analyzed_result, realm);
@@ -605,7 +605,7 @@ fn is_error_in_expected_phase(cx: Context, test: &Test, expected_phase: TestPhas
     }
 }
 
-fn to_console_string_test262(cx: Context, value: Handle<Value>) -> String {
+fn to_console_string_test262(cx: Context, value: StackRoot<Value>) -> String {
     // Extract message for Test262Error, otherwise print to console normally
     if value.is_object() {
         if let Ok(message_value) = to_string(cx, value) {

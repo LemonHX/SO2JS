@@ -8,7 +8,7 @@ use crate::{
         collections::index_map::GcSafeEntriesIter,
         error::type_error,
         eval_result::EvalResult,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         iterator::create_iter_result_object,
         object_value::ObjectValue,
@@ -16,7 +16,7 @@ use crate::{
         property::Property,
         realm::Realm,
         value::{Value, ValueCollectionKey},
-        Context, Handle, HeapPtr,
+        Context, StackRoot, HeapPtr,
     },
     set_uninit,
 };
@@ -46,9 +46,9 @@ pub enum MapIteratorKind {
 impl MapIterator {
     pub fn new(
         cx: Context,
-        map: Handle<MapObject>,
+        map: StackRoot<MapObject>,
         kind: MapIteratorKind,
-    ) -> AllocResult<Handle<MapIterator>> {
+    ) -> AllocResult<StackRoot<MapIterator>> {
         let mut object = object_create::<MapIterator>(
             cx,
             HeapItemKind::MapIterator,
@@ -60,14 +60,14 @@ impl MapIterator {
         set_uninit!(object.kind, kind);
         set_uninit!(object.is_done, false);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     cast_from_value_fn!(MapIterator, "Map Iterator");
 
     fn get_iter(&self) -> GcSafeEntriesIter<ValueCollectionKey, Value> {
         GcSafeEntriesIter::<ValueCollectionKey, Value>::from_parts(
-            self.map.to_handle(),
+            self.map.to_stack(),
             self.next_entry_index,
         )
     }
@@ -83,7 +83,7 @@ impl MapIterator {
 pub struct MapIteratorPrototype;
 
 impl MapIteratorPrototype {
-    pub fn new(mut cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(mut cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::IteratorPrototype)),
@@ -108,9 +108,9 @@ impl MapIteratorPrototype {
     /// Adapted from the abstract closure in CreateMapIterator (https://tc39.es/ecma262/#sec-createmapiterator)
     pub fn next(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let mut map_iterator = MapIterator::cast_from_value(cx, this_value)?;
 
         // Check if iterator is already done
@@ -140,19 +140,19 @@ impl MapIteratorPrototype {
             Some((key, value)) => match map_iterator.kind {
                 MapIteratorKind::Key => {
                     let key_value: Value = key.into();
-                    let key_handle = key_value.to_handle(cx);
+                    let key_handle = key_value.to_stack();
 
                     Ok(create_iter_result_object(cx, key_handle, false)?)
                 }
                 MapIteratorKind::Value => {
-                    let value_handle = value.to_handle(cx);
+                    let value_handle = value.to_stack();
 
                     Ok(create_iter_result_object(cx, value_handle, false)?)
                 }
                 MapIteratorKind::KeyAndValue => {
                     let key_value: Value = key.into();
-                    let key_handle = key_value.to_handle(cx);
-                    let value_handle = value.to_handle(cx);
+                    let key_handle = key_value.to_stack();
+                    let value_handle = value.to_stack();
                     let result_pair = create_array_from_list(cx, &[key_handle, value_handle])?;
 
                     Ok(create_iter_result_object(cx, result_pair.into(), false)?)
@@ -167,7 +167,7 @@ impl HeapItem for HeapPtr<MapIterator> {
         size_of::<MapIterator>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.map);
     }

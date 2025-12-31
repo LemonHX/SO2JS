@@ -6,12 +6,12 @@ use crate::{
         alloc_error::AllocResult,
         collections::InlineArray,
         eval_result::EvalResult,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
         object_value::ObjectValue,
         ordinary_object::object_create_from_constructor,
         type_utilities::same_value_non_numeric_non_allocating,
-        Context, Handle, HeapPtr, Value,
+        Context, StackRoot, HeapPtr, Value,
     },
     set_uninit,
 };
@@ -34,11 +34,11 @@ extend_object! {
 impl FinalizationRegistryObject {
     pub fn new_from_constructor(
         cx: Context,
-        constructor: Handle<ObjectValue>,
-        cleanup_callback: Handle<ObjectValue>,
-    ) -> EvalResult<Handle<FinalizationRegistryObject>> {
+        constructor: StackRoot<ObjectValue>,
+        cleanup_callback: StackRoot<ObjectValue>,
+    ) -> EvalResult<StackRoot<FinalizationRegistryObject>> {
         let cells = FinalizationRegistryCells::new(cx, FinalizationRegistryCells::MIN_CAPACITY)?
-            .to_handle();
+            .to_stack();
         let mut object = object_create_from_constructor::<FinalizationRegistryObject>(
             cx,
             constructor,
@@ -49,7 +49,7 @@ impl FinalizationRegistryObject {
         set_uninit!(object.cells, *cells);
         set_uninit!(object.cleanup_callback, *cleanup_callback);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     pub fn cells(&self) -> HeapPtr<FinalizationRegistryCells> {
@@ -137,7 +137,7 @@ impl FinalizationRegistryCells {
     /// point to new array if there is no room to insert another cell in the array.
     pub fn maybe_grow_for_insertion(
         cx: Context,
-        mut registry: Handle<FinalizationRegistryObject>,
+        mut registry: StackRoot<FinalizationRegistryObject>,
     ) -> AllocResult<HeapPtr<FinalizationRegistryCells>> {
         let old_cells = registry.cells;
         let capacity = old_cells.capacity();
@@ -157,7 +157,7 @@ impl FinalizationRegistryCells {
         }
 
         // Save old cells pointer behind handle across allcation
-        let old_cells = old_cells.to_handle();
+        let old_cells = old_cells.to_stack();
         let mut new_cells = FinalizationRegistryCells::new(cx, new_capacity)?;
         let old_cells = *old_cells;
 
@@ -222,7 +222,7 @@ impl HeapItem for HeapPtr<FinalizationRegistryObject> {
         size_of::<FinalizationRegistryObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.cells);
         visitor.visit_pointer(&mut self.cleanup_callback);
@@ -236,7 +236,7 @@ impl HeapItem for HeapPtr<FinalizationRegistryCells> {
         FinalizationRegistryCells::calculate_size_in_bytes(self.capacity())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
 
         for i in 0..self.num_cells_used() {

@@ -7,7 +7,7 @@ use crate::{
     runtime::{
         alloc_error::AllocResult, boxed_value::BoxedValue, gc::AnyHeapItem,
         promise_object::PromiseObject, rust_vtables::extract_module_vtable,
-        string_value::FlatString, Context, EvalResult, Handle, HeapPtr,
+        string_value::FlatString, Context, EvalResult, StackRoot, HeapPtr,
     },
 };
 
@@ -20,16 +20,16 @@ use super::{
 pub trait Module {
     fn as_enum(&self) -> ModuleEnum;
 
-    fn as_source_text_module(&self) -> Option<Handle<SourceTextModule>> {
+    fn as_source_text_module(&self) -> Option<StackRoot<SourceTextModule>> {
         None
     }
 
-    fn load_requested_modules(&self, cx: Context) -> AllocResult<Handle<PromiseObject>>;
+    fn load_requested_modules(&self, cx: Context) -> AllocResult<StackRoot<PromiseObject>>;
 
     fn get_exported_names(
         &self,
         cx: Context,
-        exported_names: &mut HashSet<Handle<FlatString>>,
+        exported_names: &mut HashSet<StackRoot<FlatString>>,
         visited_set: &mut HashSet<ModuleId>,
     );
 
@@ -42,14 +42,14 @@ pub trait Module {
 
     fn link(&self, cx: Context) -> EvalResult<()>;
 
-    fn evaluate(&self, cx: Context) -> AllocResult<Handle<PromiseObject>>;
+    fn evaluate(&self, cx: Context) -> AllocResult<StackRoot<PromiseObject>>;
 
     fn get_namespace_object(&mut self, cx: Context) -> AllocResult<HeapPtr<ModuleNamespaceObject>>;
 }
 
 pub enum ModuleEnum {
-    SourceText(Handle<SourceTextModule>),
-    Synthetic(Handle<SyntheticModule>),
+    SourceText(StackRoot<SourceTextModule>),
+    Synthetic(StackRoot<SyntheticModule>),
 }
 
 #[derive(Clone, Copy)]
@@ -83,7 +83,7 @@ heap_trait_object!(
 );
 
 impl DynModule {
-    pub fn as_heap_item(self) -> Handle<AnyHeapItem> {
+    pub fn as_heap_item(self) -> StackRoot<AnyHeapItem> {
         self.data.cast()
     }
 }

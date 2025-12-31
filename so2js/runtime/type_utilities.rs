@@ -14,7 +14,7 @@ use super::{
     bytecode::function::Closure,
     error::{range_error, syntax_error, type_error},
     eval_result::EvalResult,
-    gc::{Handle, HeapPtr},
+    gc::{HeapPtr, StackRoot},
     heap_item_descriptor::HeapItemKind,
     intrinsics::{
         bigint_constructor::BigIntObject, boolean_constructor::BooleanObject,
@@ -42,9 +42,9 @@ pub enum ToPrimitivePreferredType {
 #[inline]
 pub fn to_primitive(
     mut cx: Context,
-    value: Handle<Value>,
+    value: StackRoot<Value>,
     mut preferred_type: ToPrimitivePreferredType,
-) -> EvalResult<Handle<Value>> {
+) -> EvalResult<StackRoot<Value>> {
     if !value.is_object() {
         return Ok(value);
     }
@@ -58,7 +58,7 @@ pub fn to_primitive(
                 ToPrimitivePreferredType::Number => "number",
                 ToPrimitivePreferredType::String => "string",
             };
-            let hint_value: Handle<Value> = cx.alloc_string(hint_str)?.into();
+            let hint_value: StackRoot<Value> = cx.alloc_string(hint_str)?.into();
 
             let result = call_object(cx, exotic_prim, value, &[hint_value])?;
             if result.is_object() {
@@ -80,10 +80,10 @@ pub fn to_primitive(
 /// OrdinaryToPrimitive (https://tc39.es/ecma262/#sec-ordinarytoprimitive)
 pub fn ordinary_to_primitive(
     cx: Context,
-    object: Handle<ObjectValue>,
+    object: StackRoot<ObjectValue>,
     preferred_type: ToPrimitivePreferredType,
-) -> EvalResult<Handle<Value>> {
-    let object_value: Handle<Value> = object.into();
+) -> EvalResult<StackRoot<Value>> {
+    let object_value: StackRoot<Value> = object.into();
 
     macro_rules! call_method {
         ($method_name:expr) => {
@@ -135,7 +135,7 @@ pub fn to_boolean(value: Value) -> bool {
 }
 
 /// ToNumeric (https://tc39.es/ecma262/#sec-tonumeric)
-pub fn to_numeric(cx: Context, value: Handle<Value>) -> EvalResult<Handle<Value>> {
+pub fn to_numeric(cx: Context, value: StackRoot<Value>) -> EvalResult<StackRoot<Value>> {
     let prim_value = to_primitive(cx, value, ToPrimitivePreferredType::Number)?;
     if prim_value.is_bigint() {
         return Ok(prim_value);
@@ -145,7 +145,7 @@ pub fn to_numeric(cx: Context, value: Handle<Value>) -> EvalResult<Handle<Value>
 }
 
 /// ToNumber (https://tc39.es/ecma262/#sec-tonumber)
-pub fn to_number(cx: Context, value_handle: Handle<Value>) -> EvalResult<Handle<Value>> {
+pub fn to_number(cx: Context, value_handle: StackRoot<Value>) -> EvalResult<StackRoot<Value>> {
     // Safe since value is never referenced after allocation
     let value = *value_handle;
 
@@ -161,9 +161,7 @@ pub fn to_number(cx: Context, value_handle: Handle<Value>) -> EvalResult<Handle<
         } else {
             match value.as_pointer().descriptor().kind() {
                 // May allocate
-                HeapItemKind::String => {
-                    Ok(string_to_number(value_handle.as_string())?.to_handle(cx))
-                }
+                HeapItemKind::String => Ok(string_to_number(value_handle.as_string())?.to_stack()),
                 HeapItemKind::Symbol => type_error(cx, "symbol cannot be converted to number"),
                 HeapItemKind::BigInt => type_error(cx, "BigInt cannot be converted to number"),
                 _ => unreachable!(),
@@ -186,7 +184,7 @@ pub fn to_number(cx: Context, value_handle: Handle<Value>) -> EvalResult<Handle<
 }
 
 /// StringToNumber (https://tc39.es/ecma262/#sec-stringtonumber)
-fn string_to_number(value: Handle<StringValue>) -> AllocResult<Value> {
+fn string_to_number(value: StackRoot<StringValue>) -> AllocResult<Value> {
     let lexer = StringLexer::new(value)?;
     Ok(match parse_string_to_number(lexer) {
         None => Value::nan(),
@@ -195,7 +193,7 @@ fn string_to_number(value: Handle<StringValue>) -> AllocResult<Value> {
 }
 
 /// ToIntegerOrInfinity (https://tc39.es/ecma262/#sec-tointegerorinfinity)
-pub fn to_integer_or_infinity(cx: Context, value: Handle<Value>) -> EvalResult<f64> {
+pub fn to_integer_or_infinity(cx: Context, value: StackRoot<Value>) -> EvalResult<f64> {
     let number_handle = to_number(cx, value)?;
     let number = *number_handle;
 
@@ -221,7 +219,7 @@ pub fn to_integer_or_infinity_f64(number_f64: f64) -> f64 {
 }
 
 /// ToInt32 (https://tc39.es/ecma262/#sec-toint32)
-pub fn to_int32(cx: Context, value_handle: Handle<Value>) -> EvalResult<i32> {
+pub fn to_int32(cx: Context, value_handle: StackRoot<Value>) -> EvalResult<i32> {
     // Fast pass if the value is a smi
     let value = *value_handle;
     if value.is_smi() {
@@ -255,7 +253,7 @@ pub fn to_int32(cx: Context, value_handle: Handle<Value>) -> EvalResult<i32> {
 }
 
 /// ToUint32 (https://tc39.es/ecma262/#sec-touint32)
-pub fn to_uint32(cx: Context, value_handle: Handle<Value>) -> EvalResult<u32> {
+pub fn to_uint32(cx: Context, value_handle: StackRoot<Value>) -> EvalResult<u32> {
     // Fast pass if the value is a non-negative smi
     let value = *value_handle;
     if value.is_smi() {
@@ -287,7 +285,7 @@ pub fn to_uint32(cx: Context, value_handle: Handle<Value>) -> EvalResult<u32> {
 }
 
 /// ToInt16 (https://tc39.es/ecma262/#sec-toint16)
-pub fn to_int16(cx: Context, value_handle: Handle<Value>) -> EvalResult<i16> {
+pub fn to_int16(cx: Context, value_handle: StackRoot<Value>) -> EvalResult<i16> {
     // Fast path if the value is a smi
     let value = *value_handle;
     if value.is_smi() {
@@ -321,7 +319,7 @@ pub fn to_int16(cx: Context, value_handle: Handle<Value>) -> EvalResult<i16> {
 }
 
 /// ToUint16 (https://tc39.es/ecma262/#sec-touint16)
-pub fn to_uint16(cx: Context, value_handle: Handle<Value>) -> EvalResult<u16> {
+pub fn to_uint16(cx: Context, value_handle: StackRoot<Value>) -> EvalResult<u16> {
     // Fast path if the value is a non-negative smi
     let value = *value_handle;
     if value.is_smi() {
@@ -353,7 +351,7 @@ pub fn to_uint16(cx: Context, value_handle: Handle<Value>) -> EvalResult<u16> {
 }
 
 /// ToInt8 (https://tc39.es/ecma262/#sec-toint8)
-pub fn to_int8(cx: Context, value_handle: Handle<Value>) -> EvalResult<i8> {
+pub fn to_int8(cx: Context, value_handle: StackRoot<Value>) -> EvalResult<i8> {
     // Fast path if the value is a smi
     let value = *value_handle;
     if value.is_smi() {
@@ -387,7 +385,7 @@ pub fn to_int8(cx: Context, value_handle: Handle<Value>) -> EvalResult<i8> {
 }
 
 /// ToUint8 (https://tc39.es/ecma262/#sec-touint8)
-pub fn to_uint8(cx: Context, value_handle: Handle<Value>) -> EvalResult<u8> {
+pub fn to_uint8(cx: Context, value_handle: StackRoot<Value>) -> EvalResult<u8> {
     // Fast path if the value is a non-negative smi
     let value = *value_handle;
     if value.is_smi() {
@@ -419,7 +417,7 @@ pub fn to_uint8(cx: Context, value_handle: Handle<Value>) -> EvalResult<u8> {
 }
 
 /// ToUint8Clamp (https://tc39.es/ecma262/#sec-touint8clamp)
-pub fn to_uint8_clamp(cx: Context, value_handle: Handle<Value>) -> EvalResult<u8> {
+pub fn to_uint8_clamp(cx: Context, value_handle: StackRoot<Value>) -> EvalResult<u8> {
     // Fast path if the value is a smi
     let value = *value_handle;
     if value.is_smi() {
@@ -464,7 +462,7 @@ pub fn to_uint8_clamp(cx: Context, value_handle: Handle<Value>) -> EvalResult<u8
 }
 
 /// ToBigInt (https://tc39.es/ecma262/#sec-tobigint)
-pub fn to_bigint(cx: Context, value: Handle<Value>) -> EvalResult<Handle<BigIntValue>> {
+pub fn to_bigint(cx: Context, value: StackRoot<Value>) -> EvalResult<StackRoot<BigIntValue>> {
     let primitive_handle = to_primitive(cx, value, ToPrimitivePreferredType::Number)?;
     let primitive = *primitive_handle;
 
@@ -493,7 +491,7 @@ pub fn to_bigint(cx: Context, value: Handle<Value>) -> EvalResult<Handle<BigIntV
 }
 
 /// ToBigInt64 (https://tc39.es/ecma262/#sec-tobigint64)
-pub fn to_big_int64(cx: Context, value: Handle<Value>) -> EvalResult<BigInt> {
+pub fn to_big_int64(cx: Context, value: StackRoot<Value>) -> EvalResult<BigInt> {
     let bigint = to_bigint(cx, value)?.bigint();
 
     // Compute modulus according to spec
@@ -509,7 +507,7 @@ pub fn to_big_int64(cx: Context, value: Handle<Value>) -> EvalResult<BigInt> {
 }
 
 /// ToBigUint64 (https://tc39.es/ecma262/#sec-tobiguint64)
-pub fn to_big_uint64(cx: Context, value: Handle<Value>) -> EvalResult<BigInt> {
+pub fn to_big_uint64(cx: Context, value: StackRoot<Value>) -> EvalResult<BigInt> {
     let bigint = to_bigint(cx, value)?.bigint();
 
     // Compute modulus according to spec
@@ -520,7 +518,10 @@ pub fn to_big_uint64(cx: Context, value: Handle<Value>) -> EvalResult<BigInt> {
 }
 
 /// ToString (https://tc39.es/ecma262/#sec-tostring)
-pub fn to_string(mut cx: Context, value_handle: Handle<Value>) -> EvalResult<Handle<StringValue>> {
+pub fn to_string(
+    mut cx: Context,
+    value_handle: StackRoot<Value>,
+) -> EvalResult<StackRoot<StringValue>> {
     // Safe since value is never referenced after allocation
     let value = *value_handle;
 
@@ -565,7 +566,10 @@ pub fn to_string(mut cx: Context, value_handle: Handle<Value>) -> EvalResult<Han
 }
 
 /// ToObject (https://tc39.es/ecma262/#sec-toobject)
-pub fn to_object(cx: Context, value_handle: Handle<Value>) -> EvalResult<Handle<ObjectValue>> {
+pub fn to_object(
+    cx: Context,
+    value_handle: StackRoot<Value>,
+) -> EvalResult<StackRoot<ObjectValue>> {
     // Safe since pointer value is never referenced after allocation
     let value = *value_handle;
 
@@ -599,7 +603,7 @@ pub fn to_object(cx: Context, value_handle: Handle<Value>) -> EvalResult<Handle<
 }
 
 /// ToLength (https://tc39.es/ecma262/#sec-tolength)
-pub fn to_length(cx: Context, value: Handle<Value>) -> EvalResult<u64> {
+pub fn to_length(cx: Context, value: StackRoot<Value>) -> EvalResult<u64> {
     let len = to_integer_or_infinity(cx, value)?;
     if len <= 0.0 {
         return Ok(0);
@@ -616,7 +620,7 @@ pub fn to_length(cx: Context, value: Handle<Value>) -> EvalResult<u64> {
 /// Identical to CanonicalNumericIndexString, but for u32 string indices
 pub fn canonical_numeric_string_index_string(
     cx: Context,
-    key: Handle<PropertyKey>,
+    key: StackRoot<PropertyKey>,
     string_length: u32,
 ) -> AllocResult<Option<u32>> {
     if key.is_array_index() {
@@ -665,7 +669,7 @@ pub fn canonical_numeric_string_index_string(
 }
 
 /// ToIndex (https://tc39.es/ecma262/#sec-toindex)
-pub fn to_index(cx: Context, value_handle: Handle<Value>) -> EvalResult<usize> {
+pub fn to_index(cx: Context, value_handle: StackRoot<Value>) -> EvalResult<usize> {
     let value = *value_handle;
     if value.is_smi() {
         let smi = value.as_smi();
@@ -693,7 +697,10 @@ pub fn to_index(cx: Context, value_handle: Handle<Value>) -> EvalResult<usize> {
 }
 
 /// RequireObjectCoercible (https://tc39.es/ecma262/#sec-requireobjectcoercible)
-pub fn require_object_coercible(cx: Context, value: Handle<Value>) -> EvalResult<Handle<Value>> {
+pub fn require_object_coercible(
+    cx: Context,
+    value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     if value.is_nullish() {
         if value.is_null() {
             return type_error(cx, "can't convert null to object");
@@ -706,7 +713,7 @@ pub fn require_object_coercible(cx: Context, value: Handle<Value>) -> EvalResult
 }
 
 /// IsArray (https://tc39.es/ecma262/#sec-isarray)
-pub fn is_array(cx: Context, value: Handle<Value>) -> EvalResult<bool> {
+pub fn is_array(cx: Context, value: StackRoot<Value>) -> EvalResult<bool> {
     if !value.is_object() {
         return Ok(false);
     }
@@ -728,7 +735,7 @@ pub fn is_array(cx: Context, value: Handle<Value>) -> EvalResult<bool> {
 }
 
 /// IsCallable (https://tc39.es/ecma262/#sec-iscallable)
-pub fn is_callable(value: Handle<Value>) -> bool {
+pub fn is_callable(value: StackRoot<Value>) -> bool {
     if !value.is_object() {
         return false;
     }
@@ -736,7 +743,7 @@ pub fn is_callable(value: Handle<Value>) -> bool {
     is_callable_object(value.as_object())
 }
 
-pub fn is_callable_object(value: Handle<ObjectValue>) -> bool {
+pub fn is_callable_object(value: StackRoot<ObjectValue>) -> bool {
     let kind = value.descriptor().kind();
     if kind == HeapItemKind::Closure {
         true
@@ -748,7 +755,7 @@ pub fn is_callable_object(value: Handle<ObjectValue>) -> bool {
 }
 
 /// IsConstructor (https://tc39.es/ecma262/#sec-isconstructor)
-pub fn is_constructor_value(value: Handle<Value>) -> bool {
+pub fn is_constructor_value(value: StackRoot<Value>) -> bool {
     if !value.is_object() {
         return false;
     }
@@ -756,7 +763,7 @@ pub fn is_constructor_value(value: Handle<Value>) -> bool {
     is_constructor_object_value(value.as_object())
 }
 
-pub fn is_constructor_object_value(value: Handle<ObjectValue>) -> bool {
+pub fn is_constructor_object_value(value: StackRoot<ObjectValue>) -> bool {
     let kind = value.descriptor().kind();
     if kind == HeapItemKind::Closure {
         value.cast::<Closure>().function_ptr().is_constructor()
@@ -782,7 +789,7 @@ pub fn is_integral_number(value: Value) -> bool {
 /// IsRegExp (https://tc39.es/ecma262/#sec-isregexp)
 ///
 /// If this returns true the value must be an object.
-pub fn is_regexp(cx: Context, value: Handle<Value>) -> EvalResult<bool> {
+pub fn is_regexp(cx: Context, value: StackRoot<Value>) -> EvalResult<bool> {
     if !value.is_object() {
         return Ok(false);
     }
@@ -799,7 +806,7 @@ pub fn is_regexp(cx: Context, value: Handle<Value>) -> EvalResult<bool> {
 }
 
 /// SameValue (https://tc39.es/ecma262/#sec-samevalue)
-pub fn same_value(v1_handle: Handle<Value>, v2_handle: Handle<Value>) -> AllocResult<bool> {
+pub fn same_value(v1_handle: StackRoot<Value>, v2_handle: StackRoot<Value>) -> AllocResult<bool> {
     let v1 = v1_handle;
     let v2 = v2_handle;
 
@@ -827,7 +834,10 @@ pub fn same_value(v1_handle: Handle<Value>, v2_handle: Handle<Value>) -> AllocRe
 }
 
 /// SameValueZero (https://tc39.es/ecma262/#sec-samevaluezero)
-pub fn same_value_zero(v1_handle: Handle<Value>, v2_handle: Handle<Value>) -> AllocResult<bool> {
+pub fn same_value_zero(
+    v1_handle: StackRoot<Value>,
+    v2_handle: StackRoot<Value>,
+) -> AllocResult<bool> {
     let v1 = *v1_handle;
     let v2 = *v2_handle;
 
@@ -870,7 +880,10 @@ pub fn same_value_zero_non_allocating(v1: Value, v2: Value) -> bool {
 ///
 /// Also includes BigInt handling
 #[inline]
-fn same_value_non_numeric(v1_handle: Handle<Value>, v2_handle: Handle<Value>) -> AllocResult<bool> {
+fn same_value_non_numeric(
+    v1_handle: StackRoot<Value>,
+    v2_handle: StackRoot<Value>,
+) -> AllocResult<bool> {
     let v1 = *v1_handle;
     let v2 = *v2_handle;
 
@@ -938,7 +951,7 @@ pub fn same_value_non_numeric_non_allocating(v1: Value, v2: Value) -> bool {
 }
 
 /// StringToBigInt (https://tc39.es/ecma262/#sec-stringtobigint)
-fn string_to_bigint(value: Handle<StringValue>) -> AllocResult<Option<BigInt>> {
+fn string_to_bigint(value: StackRoot<StringValue>) -> AllocResult<Option<BigInt>> {
     let lexer = StringLexer::new(value)?;
     Ok(parse_string_to_bigint(lexer))
 }
@@ -946,8 +959,8 @@ fn string_to_bigint(value: Handle<StringValue>) -> AllocResult<Option<BigInt>> {
 /// ToPropertyKey (https://tc39.es/ecma262/#sec-topropertykey)
 pub fn to_property_key(
     cx: Context,
-    value_handle: Handle<Value>,
-) -> EvalResult<Handle<PropertyKey>> {
+    value_handle: StackRoot<Value>,
+) -> EvalResult<StackRoot<PropertyKey>> {
     let value = *value_handle;
     if value.is_smi() {
         let smi_value = value.as_smi();
@@ -973,8 +986,8 @@ pub fn to_property_key(
 /// Returns either a bool or undefined if values cannot be compared.
 pub fn is_less_than(
     cx: Context,
-    x_handle: Handle<Value>,
-    y_handle: Handle<Value>,
+    x_handle: StackRoot<Value>,
+    y_handle: StackRoot<Value>,
 ) -> EvalResult<Value> {
     // Safe since allocation can only occur during to_numeric, and direct values are not held
     // across the to_numeric calls.
@@ -1108,8 +1121,8 @@ pub fn is_less_than(
 /// IsLooselyEqual (https://tc39.es/ecma262/#sec-islooselyequal)
 pub fn is_loosely_equal(
     cx: Context,
-    v1_handle: Handle<Value>,
-    v2_handle: Handle<Value>,
+    v1_handle: StackRoot<Value>,
+    v2_handle: StackRoot<Value>,
 ) -> EvalResult<bool> {
     // Safe since allocation can only occur during to_number, to_primitive, and recursive calls to
     // is_loosely_equal, and direct values are not held across these calls.
@@ -1173,7 +1186,7 @@ pub fn is_loosely_equal(
     let tag1 = v1.get_tag();
     let tag2 = v2.get_tag();
 
-    // Handle comparisons of the same type
+    // StackRoot comparisons of the same type
     if tag1 == tag2 {
         if tag1 == POINTER_TAG {
             let kind1 = v1.as_pointer().descriptor().kind();
@@ -1201,7 +1214,7 @@ pub fn is_loosely_equal(
         }
     }
 
-    // Handle comparisons that implicitly convert between types
+    // StackRoot comparisons that implicitly convert between types
 
     // Nullish values are loosely equal
     if (tag1 == NULL_TAG && tag2 == UNDEFINED_TAG) || (tag1 == UNDEFINED_TAG && tag2 == NULL_TAG) {
@@ -1299,7 +1312,10 @@ pub fn is_loosely_equal(
 }
 
 /// IsStrictlyEqual (https://tc39.es/ecma262/#sec-isstrictlyequal)
-pub fn is_strictly_equal(v1_handle: Handle<Value>, v2_handle: Handle<Value>) -> AllocResult<bool> {
+pub fn is_strictly_equal(
+    v1_handle: StackRoot<Value>,
+    v2_handle: StackRoot<Value>,
+) -> AllocResult<bool> {
     let v1 = *v1_handle;
     let v2 = *v2_handle;
 
@@ -1321,7 +1337,10 @@ pub fn same_object_value(value1: HeapPtr<ObjectValue>, value2: HeapPtr<ObjectVal
 }
 
 #[inline]
-pub fn same_object_value_handles(value1: Handle<ObjectValue>, value2: Handle<ObjectValue>) -> bool {
+pub fn same_object_value_handles(
+    value1: StackRoot<ObjectValue>,
+    value2: StackRoot<ObjectValue>,
+) -> bool {
     same_object_value(*value1, *value2)
 }
 
@@ -1340,8 +1359,8 @@ pub fn same_opt_object_value(
 
 #[inline]
 pub fn same_opt_object_value_handles(
-    value1: Option<Handle<ObjectValue>>,
-    value2: Option<Handle<ObjectValue>>,
+    value1: Option<StackRoot<ObjectValue>>,
+    value2: Option<StackRoot<ObjectValue>>,
 ) -> bool {
     match (value1, value2) {
         (None, None) => true,

@@ -13,7 +13,7 @@ use crate::{
         string_object::StringObject,
         string_value::{FlatString, StringValue},
         type_utilities::{to_number, to_object, to_string, to_uint16},
-        Context, Handle, PropertyKey, Value,
+        Context, StackRoot, PropertyKey, Value,
     },
 };
 use alloc::vec;
@@ -25,7 +25,7 @@ pub struct StringConstructor;
 
 impl StringConstructor {
     /// Properties of the String Constructor (https://tc39.es/ecma262/#sec-properties-of-the-string-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -63,9 +63,9 @@ impl StringConstructor {
     /// String (https://tc39.es/ecma262/#sec-string-constructor-string-value)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let new_target = cx.current_new_target();
 
         let string_value = if arguments.is_empty() {
@@ -92,9 +92,9 @@ impl StringConstructor {
     /// String.fromCharCode (https://tc39.es/ecma262/#sec-string.fromcharcode)
     pub fn from_char_code(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         // Common case, return a single code unit string
         if arguments.len() == 1 {
             let code_unit = to_uint16(cx, arguments[0])?;
@@ -113,9 +113,9 @@ impl StringConstructor {
     /// String.fromCodePoint (https://tc39.es/ecma262/#sec-string.fromcodepoint)
     pub fn from_code_point(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         macro_rules! get_code_point {
             ($arg:expr) => {{
                 let arg = $arg;
@@ -156,9 +156,9 @@ impl StringConstructor {
     /// String.raw (https://tc39.es/ecma262/#sec-string.raw)
     pub fn raw(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let substitution_count = arguments.len() - 1;
 
         let template_arg = get_argument(cx, arguments, 0);
@@ -172,11 +172,11 @@ impl StringConstructor {
             return Ok(cx.names.empty_string().as_string().as_value());
         }
 
-        let mut result = cx.names.empty_string.as_string().to_handle();
+        let mut result = cx.names.empty_string.as_string().to_stack();
         let mut next_index = 0;
 
         // Key is shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         loop {
             key.replace(PropertyKey::from_u64(cx, next_index)?);

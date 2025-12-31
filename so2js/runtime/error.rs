@@ -14,7 +14,7 @@ use super::{
     eval_result::EvalResult,
     intrinsics::native_error::{RangeError, ReferenceError, SyntaxError, TypeError, URIError},
     string_value::{FlatString, StringValue},
-    to_console_string, Context, Handle, HeapPtr, Value,
+    to_console_string, Context, StackRoot, HeapPtr, Value,
 };
 
 /// Top level error type for the JS engine. Encapsulates all possible errors types that can occur
@@ -86,23 +86,23 @@ impl BsError {
 /// Generic result type from the JS engine.
 pub type BsResult<T> = Result<T, BsError>;
 
-pub fn syntax_error_value(cx: Context, message: &str) -> AllocResult<Handle<Value>> {
+pub fn syntax_error_value(cx: Context, message: &str) -> AllocResult<StackRoot<Value>> {
     Ok(SyntaxError::new_with_message(cx, message.to_owned())?.into())
 }
 
-pub fn type_error_value(cx: Context, message: &str) -> AllocResult<Handle<Value>> {
+pub fn type_error_value(cx: Context, message: &str) -> AllocResult<StackRoot<Value>> {
     Ok(TypeError::new_with_message(cx, message.to_owned())?.into())
 }
 
-fn reference_error_value(cx: Context, message: &str) -> AllocResult<Handle<Value>> {
+fn reference_error_value(cx: Context, message: &str) -> AllocResult<StackRoot<Value>> {
     Ok(ReferenceError::new_with_message(cx, message.to_owned())?.into())
 }
 
-pub fn range_error_value(cx: Context, message: &str) -> AllocResult<Handle<Value>> {
+pub fn range_error_value(cx: Context, message: &str) -> AllocResult<StackRoot<Value>> {
     Ok(RangeError::new_with_message(cx, message.to_owned())?.into())
 }
 
-fn uri_error_value(cx: Context, message: &str) -> AllocResult<Handle<Value>> {
+fn uri_error_value(cx: Context, message: &str) -> AllocResult<StackRoot<Value>> {
     Ok(URIError::new_with_message(cx, message.to_owned())?.into())
 }
 
@@ -126,7 +126,7 @@ pub fn uri_error<T>(cx: Context, message: &str) -> EvalResult<T> {
     eval_err!(uri_error_value(cx, message)?)
 }
 
-pub fn err_not_defined<T>(cx: Context, name: Handle<StringValue>) -> EvalResult<T> {
+pub fn err_not_defined<T>(cx: Context, name: StackRoot<StringValue>) -> EvalResult<T> {
     reference_error(cx, &format!("{} is not defined", name.format()?))
 }
 

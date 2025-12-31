@@ -22,7 +22,7 @@ use crate::{
         LexerStream, SavedLexerStreamState,
     },
     runtime::{
-        alloc_error::AllocResult, regexp::instruction::OpCode, string_value::StringValue, Handle,
+        alloc_error::AllocResult, regexp::instruction::OpCode, string_value::StringValue, StackRoot,
         HeapPtr,
     },
 };
@@ -734,8 +734,8 @@ fn match_lexer_stream(
 }
 
 pub fn run_matcher(
-    regexp: Handle<CompiledRegExpObject>,
-    target_string: Handle<StringValue>,
+    regexp: StackRoot<CompiledRegExpObject>,
+    target_string: StackRoot<StringValue>,
     start_index: u32,
 ) -> AllocResult<Option<Match>> {
     // May allocate, after this point no more allocations can occur

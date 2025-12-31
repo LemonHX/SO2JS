@@ -12,7 +12,7 @@ use crate::{
 use super::{
     abstract_operations::{construct, create_data_property_or_throw, get_function_realm},
     error::{range_error, type_error},
-    gc::{HeapItem, HeapVisitor},
+    gc::{HeapItem, GcVisitorExt},
     get,
     heap_item_descriptor::HeapItemKind,
     intrinsics::intrinsics::Intrinsic,
@@ -26,7 +26,7 @@ use super::{
     property_key::PropertyKey,
     rust_vtables::extract_virtual_object_vtable,
     type_utilities::{is_constructor_value, same_object_value, to_number, to_uint32},
-    Context, EvalResult, Handle, HeapPtr, Realm, Value,
+    Context, EvalResult, StackRoot, HeapPtr, Realm, Value,
 };
 
 // Array Exotic Objects (https://tc39.es/ecma262/#sec-array-exotic-objects)
@@ -41,23 +41,23 @@ extend_object! {
 impl ArrayObject {
     pub const VIRTUAL_OBJECT_VTABLE: *const () = extract_virtual_object_vtable::<Self>();
 
-    pub fn new(cx: Context, proto: Handle<ObjectValue>) -> AllocResult<Handle<ArrayObject>> {
+    pub fn new(cx: Context, proto: StackRoot<ObjectValue>) -> AllocResult<StackRoot<ArrayObject>> {
         let mut array =
             object_create_with_proto::<ArrayObject>(cx, HeapItemKind::ArrayObject, proto)?;
 
         set_uninit!(array.is_length_writable, true);
 
-        Ok(array.to_handle())
+        Ok(array.to_stack())
     }
 }
 
 #[wrap_ordinary_object]
-impl VirtualObject for Handle<ArrayObject> {
+impl VirtualObject for StackRoot<ArrayObject> {
     /// [[DefineOwnProperty]] (https://tc39.es/ecma262/#sec-array-exotic-objects-defineownproperty-p-desc)
     fn define_own_property(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
         desc: PropertyDescriptor,
     ) -> EvalResult<bool> {
         if key.is_array_index() {
@@ -88,11 +88,11 @@ impl VirtualObject for Handle<ArrayObject> {
     fn get_own_property(
         &self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
     ) -> EvalResult<Option<PropertyDescriptor>> {
         if key.is_string() && key.as_string().equals(&cx.names.length().as_string())? {
             let length_value =
-                Value::from(self.as_object().array_properties_length()).to_handle(cx);
+                Value::from(self.as_object().array_properties_length()).to_stack();
             return Ok(Some(PropertyDescriptor::data(
                 length_value,
                 self.is_length_writable,
@@ -105,7 +105,7 @@ impl VirtualObject for Handle<ArrayObject> {
     }
 
     // Not part of spec, but needed to handle attempts to delete custom length property
-    fn delete(&mut self, cx: Context, key: Handle<PropertyKey>) -> EvalResult<bool> {
+    fn delete(&mut self, cx: Context, key: StackRoot<PropertyKey>) -> EvalResult<bool> {
         if key.is_string() && key.as_string().equals(&cx.names.length().as_string())? {
             return Ok(false);
         }
@@ -114,8 +114,8 @@ impl VirtualObject for Handle<ArrayObject> {
     }
 
     // Not part of spec, but needed to add custom length property
-    fn own_property_keys(&self, cx: Context) -> EvalResult<Vec<Handle<Value>>> {
-        let mut keys: Vec<Handle<Value>> = vec![];
+    fn own_property_keys(&self, cx: Context) -> EvalResult<Vec<StackRoot<Value>>> {
+        let mut keys: Vec<StackRoot<Value>> = vec![];
 
         ordinary_filtered_own_indexed_property_keys(cx, self.as_object(), &mut keys, |_| true)?;
 
@@ -132,18 +132,18 @@ impl VirtualObject for Handle<ArrayObject> {
 pub fn array_create(
     cx: Context,
     length: u64,
-    proto: Option<Handle<ObjectValue>>,
-) -> EvalResult<Handle<ArrayObject>> {
+    proto: Option<StackRoot<ObjectValue>>,
+) -> EvalResult<StackRoot<ArrayObject>> {
     let realm = cx.current_realm();
     array_create_in_realm(cx, realm, length, proto)
 }
 
 pub fn array_create_in_realm(
     cx: Context,
-    realm: Handle<Realm>,
+    realm: StackRoot<Realm>,
     length: u64,
-    proto: Option<Handle<ObjectValue>>,
-) -> EvalResult<Handle<ArrayObject>> {
+    proto: Option<StackRoot<ObjectValue>>,
+) -> EvalResult<StackRoot<ArrayObject>> {
     if length > (u32::MAX as u64) {
         return range_error(cx, "array length out of range");
     }
@@ -152,7 +152,7 @@ pub fn array_create_in_realm(
 
     let mut array_object = ArrayObject::new(cx, proto)?;
 
-    let length_value = Value::from(length as u32).to_handle(cx);
+    let length_value = Value::from(length as u32).to_stack();
     let length_desc = PropertyDescriptor::data(length_value, true, false, false);
     must!(array_object.define_own_property(cx, cx.names.length(), length_desc));
 
@@ -162,9 +162,9 @@ pub fn array_create_in_realm(
 /// ArraySpeciesCreate (https://tc39.es/ecma262/#sec-arrayspeciescreate)
 pub fn array_species_create(
     cx: Context,
-    original_array: Handle<ObjectValue>,
+    original_array: StackRoot<ObjectValue>,
     length: u64,
-) -> EvalResult<Handle<ObjectValue>> {
+) -> EvalResult<StackRoot<ObjectValue>> {
     if !is_array(cx, original_array.into())? {
         let array_object = array_create(cx, length, None)?.as_object();
         return Ok(array_object);
@@ -203,7 +203,7 @@ pub fn array_species_create(
         return type_error(cx, "expected array constructor");
     }
 
-    let length_value = Value::from(length).to_handle(cx);
+    let length_value = Value::from(length).to_stack();
     construct(cx, constructor.as_object(), &[length_value], None)
 }
 
@@ -211,7 +211,7 @@ pub fn array_species_create(
 // Modified from spec to use custom length property.
 fn array_set_length(
     cx: Context,
-    mut array: Handle<ArrayObject>,
+    mut array: StackRoot<ArrayObject>,
     desc: PropertyDescriptor,
 ) -> EvalResult<bool> {
     let mut new_len = array.as_object().array_properties_length();
@@ -253,15 +253,15 @@ fn array_set_length(
 /// CreateArrayFromList (https://tc39.es/ecma262/#sec-createarrayfromlist)
 pub fn create_array_from_list(
     cx: Context,
-    elements: &[Handle<Value>],
-) -> AllocResult<Handle<ArrayObject>> {
+    elements: &[StackRoot<Value>],
+) -> AllocResult<StackRoot<ArrayObject>> {
     let array = must_a!(array_create(cx, 0, None));
 
     // Property key is shared between iterations
-    let mut key = PropertyKey::uninit().to_handle(cx);
+    let mut key = PropertyKey::uninit().to_stack();
 
     for (index, element) in elements.iter().enumerate() {
-        // TODO: Handle keys out of u32 range
+        // TODO: StackRoot keys out of u32 range
         key.replace(PropertyKey::array_index(cx, index as u32)?);
         must_a!(create_data_property_or_throw(
             cx,
@@ -279,7 +279,7 @@ impl HeapItem for HeapPtr<ArrayObject> {
         size_of::<ArrayObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
     }
 }

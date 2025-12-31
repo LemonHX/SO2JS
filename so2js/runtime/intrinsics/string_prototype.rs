@@ -34,7 +34,7 @@ use crate::{
             to_number, to_uint32,
         },
         value::Value,
-        Context, Handle, HeapPtr, PropertyKey,
+        Context, StackRoot, HeapPtr, PropertyKey,
     },
 };
 use alloc::string::ToString;
@@ -48,7 +48,7 @@ pub struct StringPrototype;
 
 impl StringPrototype {
     /// Properties of the String Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-string-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let object_proto = realm.get_intrinsic(Intrinsic::ObjectPrototype);
         let empty_string = cx.names.empty_string().as_string();
         let mut object = StringObject::new_with_proto(cx, object_proto, empty_string)?.as_object();
@@ -128,9 +128,9 @@ impl StringPrototype {
 
     /// Additional Properties of the String.prototype Object (https://tc39.es/ecma262/#sec-additional-properties-of-the-string.prototype-object)
     pub fn init_annex_b_methods(
-        mut string_prototype: Handle<ObjectValue>,
+        mut string_prototype: StackRoot<ObjectValue>,
         mut cx: Context,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
     ) -> AllocResult<()> {
         let substr_name = cx.alloc_string("substr")?.as_string();
         let substr = PropertyKey::string_not_array_index_handle(cx, substr_name)?;
@@ -182,9 +182,9 @@ impl StringPrototype {
     /// String.prototype.at (https://tc39.es/ecma262/#sec-string.prototype.at)
     pub fn at(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -214,9 +214,9 @@ impl StringPrototype {
     /// String.prototype.charAt (https://tc39.es/ecma262/#sec-string.prototype.charat)
     pub fn char_at(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -235,9 +235,9 @@ impl StringPrototype {
     /// String.prototype.charCodeAt (https://tc39.es/ecma262/#sec-string.prototype.charcodeat)
     pub fn char_code_at(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -255,9 +255,9 @@ impl StringPrototype {
     /// String.prototype.codePointAt (https://tc39.es/ecma262/#sec-string.prototype.codepointat)
     pub fn code_point_at(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -275,9 +275,9 @@ impl StringPrototype {
     /// String.prototype.concat (https://tc39.es/ecma262/#sec-string.prototype.concat)
     pub fn concat(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let mut concat_string = to_string(cx, object)?;
 
@@ -292,9 +292,9 @@ impl StringPrototype {
     /// String.prototype.endsWith (https://tc39.es/ecma262/#sec-string.prototype.endswith)
     pub fn ends_with(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
         let length = string.len();
@@ -332,9 +332,9 @@ impl StringPrototype {
     /// String.prototype.includes (https://tc39.es/ecma262/#sec-string.prototype.includes)
     pub fn includes(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -363,9 +363,9 @@ impl StringPrototype {
     /// String.prototype.indexOf (https://tc39.es/ecma262/#sec-string.prototype.indexof)
     pub fn index_of(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -382,16 +382,16 @@ impl StringPrototype {
 
         match string.find(search_string, pos)? {
             None => Ok(cx.negative_one()),
-            Some(index) => Ok(Value::from(index).to_handle(cx)),
+            Some(index) => Ok(Value::from(index).to_stack()),
         }
     }
 
     /// String.prototype.isWellFormed (https://tc39.es/ecma262/#sec-string.prototype.iswellformed)
     pub fn is_well_formed(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -401,9 +401,9 @@ impl StringPrototype {
     /// String.prototype.lastIndexOf (https://tc39.es/ecma262/#sec-string.prototype.lastindexof)
     pub fn last_index_of(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -423,16 +423,16 @@ impl StringPrototype {
 
         match string.rfind(search_string, string_end)? {
             None => Ok(cx.negative_one()),
-            Some(index) => Ok(Value::from(index).to_handle(cx)),
+            Some(index) => Ok(Value::from(index).to_stack()),
         }
     }
 
     /// String.prototype.localeCompare (https://tc39.es/ecma262/#sec-string.prototype.localecompare)
     pub fn locale_compare(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -458,9 +458,9 @@ impl StringPrototype {
     /// String.prototype.match (https://tc39.es/ecma262/#sec-string.prototype.match)
     pub fn match_(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let this_object = require_object_coercible(cx, this_value)?;
 
         let regexp_arg = get_argument(cx, arguments, 0);
@@ -491,9 +491,9 @@ impl StringPrototype {
     /// String.prototype.matchAll (https://tc39.es/ecma262/#sec-string.prototype.matchall)
     pub fn match_all(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let this_object = require_object_coercible(cx, this_value)?;
 
         let regexp_arg = get_argument(cx, arguments, 0);
@@ -547,9 +547,9 @@ impl StringPrototype {
     /// String.prototype.normalize (https://tc39.es/ecma262/#sec-string.prototype.normalize)
     pub fn normalize(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -595,9 +595,9 @@ impl StringPrototype {
     /// String.prototype.padEnd (https://tc39.es/ecma262/#sec-string.prototype.padend)
     pub fn pad_end(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let max_length_arg = get_argument(cx, arguments, 0);
         let fill_string_arg = get_argument(cx, arguments, 1);
 
@@ -607,9 +607,9 @@ impl StringPrototype {
     /// String.prototype.padStart (https://tc39.es/ecma262/#sec-string.prototype.padstart)
     pub fn pad_start(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let max_length_arg = get_argument(cx, arguments, 0);
         let fill_string_arg = get_argument(cx, arguments, 1);
 
@@ -618,11 +618,11 @@ impl StringPrototype {
 
     pub fn pad_string(
         cx: Context,
-        this_value: Handle<Value>,
-        max_length_arg: Handle<Value>,
-        fill_string_arg: Handle<Value>,
+        this_value: StackRoot<Value>,
+        max_length_arg: StackRoot<Value>,
+        fill_string_arg: StackRoot<Value>,
         is_start: bool,
-    ) -> EvalResult<Handle<Value>> {
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -673,9 +673,9 @@ impl StringPrototype {
     /// String.prototype.repeat (https://tc39.es/ecma262/#sec-string.prototype.repeat)
     pub fn repeat(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -693,9 +693,9 @@ impl StringPrototype {
     /// String.prototype.replace (https://tc39.es/ecma262/#sec-string.prototype.replace)
     pub fn replace(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
 
         let search_arg = get_argument(cx, arguments, 0);
@@ -729,7 +729,7 @@ impl StringPrototype {
         let replacement_string = match replace_value {
             // If replace argument is a function, replacement is the result of calling that function
             ReplaceValue::Function(replace_function) => {
-                let matched_position_value = Value::from(matched_position).to_handle(cx);
+                let matched_position_value = Value::from(matched_position).to_stack();
                 let replacement = call_object(
                     cx,
                     replace_function,
@@ -781,9 +781,9 @@ impl StringPrototype {
     /// String.prototype.replaceAll (https://tc39.es/ecma262/#sec-string.prototype.replaceall)
     pub fn replace_all(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
 
         let search_arg = get_argument(cx, arguments, 0);
@@ -847,7 +847,7 @@ impl StringPrototype {
             let replacement_string = match replace_value {
                 // If replace argument is a function, replacement is the result of calling that function
                 ReplaceValue::Function(replace_function) => {
-                    let matched_position_value = Value::from(matched_position).to_handle(cx);
+                    let matched_position_value = Value::from(matched_position).to_stack();
                     let replacement = call_object(
                         cx,
                         replace_function,
@@ -895,9 +895,9 @@ impl StringPrototype {
     /// String.prototype.search (https://tc39.es/ecma262/#sec-string.prototype.search)
     pub fn search(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
 
         // Use the @@search method of the argument if one exists
@@ -930,9 +930,9 @@ impl StringPrototype {
     /// String.prototype.slice (https://tc39.es/ecma262/#sec-string.prototype.slice)
     pub fn slice(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
         let length = string.len();
@@ -976,9 +976,9 @@ impl StringPrototype {
     /// String.prototype.split (https://tc39.es/ecma262/#sec-string.prototype.split)
     pub fn split(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
 
         let separator_argument = get_argument(cx, arguments, 0);
@@ -1070,9 +1070,9 @@ impl StringPrototype {
     /// String.prototype.startsWith (https://tc39.es/ecma262/#sec-string.prototype.startswith)
     pub fn starts_with(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
         let length = string.len();
@@ -1117,9 +1117,9 @@ impl StringPrototype {
     /// String.prototype.substring (https://tc39.es/ecma262/#sec-string.prototype.substring)
     pub fn substring(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
         let length = string.len();
@@ -1146,9 +1146,9 @@ impl StringPrototype {
     /// String.prototype.toLowerCase (https://tc39.es/ecma262/#sec-string.prototype.tolowercase)
     pub fn to_lower_case(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -1158,18 +1158,18 @@ impl StringPrototype {
     /// String.prototype.toString (https://tc39.es/ecma262/#sec-string.prototype.tostring)
     pub fn to_string(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         this_string_value(cx, this_value)
     }
 
     /// String.prototype.toUpperCase (https://tc39.es/ecma262/#sec-string.prototype.touppercase)
     pub fn to_upper_case(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -1179,21 +1179,21 @@ impl StringPrototype {
     /// String.prototype.toWellFormed (https://tc39.es/ecma262/#sec-string.prototype.towellformed)
     pub fn to_well_formed(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
-        Ok(string.to_well_formed(cx)?.to_handle().as_value())
+        Ok(string.to_well_formed(cx)?.to_stack().as_value())
     }
 
     /// String.prototype.trim (https://tc39.es/ecma262/#sec-string.prototype.trim)
     pub fn trim(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -1203,9 +1203,9 @@ impl StringPrototype {
     /// String.prototype.trimEnd (https://tc39.es/ecma262/#sec-string.prototype.trimend)
     pub fn trim_end(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -1215,9 +1215,9 @@ impl StringPrototype {
     /// String.prototype.trimStart (https://tc39.es/ecma262/#sec-string.prototype.trimstart)
     pub fn trim_start(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -1227,9 +1227,9 @@ impl StringPrototype {
     /// String.prototype [ @@iterator ] (https://tc39.es/ecma262/#sec-string.prototype-%symbol.iterator%)
     pub fn iterator(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -1241,9 +1241,9 @@ impl StringPrototype {
     /// String.prototype.substr (https://tc39.es/ecma262/#sec-string.prototype.substr)
     pub fn substr(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let object = require_object_coercible(cx, this_value)?;
         let string = to_string(cx, object)?;
 
@@ -1285,10 +1285,10 @@ impl StringPrototype {
     /// CreateHTML (https://tc39.es/ecma262/#sec-createhtml)
     fn create_html(
         mut cx: Context,
-        value: Handle<Value>,
+        value: StackRoot<Value>,
         tag: &str,
-        attribute_and_value: Option<(&str, Handle<Value>)>,
-    ) -> EvalResult<Handle<StringValue>> {
+        attribute_and_value: Option<(&str, StackRoot<Value>)>,
+    ) -> EvalResult<StackRoot<StringValue>> {
         let object = require_object_coercible(cx, value)?;
         let string = to_string(cx, object)?.to_wtf8_string()?;
 
@@ -1328,9 +1328,9 @@ impl StringPrototype {
     /// String.prototype.anchor (https://tc39.es/ecma262/#sec-string.prototype.anchor)
     pub fn anchor(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let name_arg = get_argument(cx, arguments, 0);
         let html_string = Self::create_html(cx, this_value, "a", Some(("name", name_arg)))?;
         Ok(html_string.as_value())
@@ -1339,9 +1339,9 @@ impl StringPrototype {
     /// String.prototype.big (https://tc39.es/ecma262/#sec-string.prototype.big)
     pub fn big(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let html_string = Self::create_html(cx, this_value, "big", None)?;
         Ok(html_string.as_value())
     }
@@ -1349,9 +1349,9 @@ impl StringPrototype {
     /// String.prototype.blink (https://tc39.es/ecma262/#sec-string.prototype.blink)
     pub fn blink(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let html_string = Self::create_html(cx, this_value, "blink", None)?;
         Ok(html_string.as_value())
     }
@@ -1359,9 +1359,9 @@ impl StringPrototype {
     /// String.prototype.bold (https://tc39.es/ecma262/#sec-string.prototype.bold)
     pub fn bold(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let html_string = Self::create_html(cx, this_value, "b", None)?;
         Ok(html_string.as_value())
     }
@@ -1369,9 +1369,9 @@ impl StringPrototype {
     /// String.prototype.fixed (https://tc39.es/ecma262/#sec-string.prototype.fixed)
     pub fn fixed(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let html_string = Self::create_html(cx, this_value, "tt", None)?;
         Ok(html_string.as_value())
     }
@@ -1379,9 +1379,9 @@ impl StringPrototype {
     /// String.prototype.fontcolor (https://tc39.es/ecma262/#sec-string.prototype.fontcolor)
     pub fn font_color(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let color_arg = get_argument(cx, arguments, 0);
         let html_string = Self::create_html(cx, this_value, "font", Some(("color", color_arg)))?;
         Ok(html_string.as_value())
@@ -1390,9 +1390,9 @@ impl StringPrototype {
     /// String.prototype.fontsize (https://tc39.es/ecma262/#sec-string.prototype.fontsize)
     pub fn font_size(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let size_arg = get_argument(cx, arguments, 0);
         let html_string = Self::create_html(cx, this_value, "font", Some(("size", size_arg)))?;
         Ok(html_string.as_value())
@@ -1401,9 +1401,9 @@ impl StringPrototype {
     /// String.prototype.italics (https://tc39.es/ecma262/#sec-string.prototype.italics)
     pub fn italics(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let html_string = Self::create_html(cx, this_value, "i", None)?;
         Ok(html_string.as_value())
     }
@@ -1411,9 +1411,9 @@ impl StringPrototype {
     /// String.prototype.link (https://tc39.es/ecma262/#sec-string.prototype.link)
     pub fn link(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let url_arg = get_argument(cx, arguments, 0);
         let html_string = Self::create_html(cx, this_value, "a", Some(("href", url_arg)))?;
         Ok(html_string.as_value())
@@ -1422,9 +1422,9 @@ impl StringPrototype {
     /// String.prototype.small (https://tc39.es/ecma262/#sec-string.prototype.small)
     pub fn small(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let html_string = Self::create_html(cx, this_value, "small", None)?;
         Ok(html_string.as_value())
     }
@@ -1432,9 +1432,9 @@ impl StringPrototype {
     /// String.prototype.strike (https://tc39.es/ecma262/#sec-string.prototype.strike)
     pub fn strike(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let html_string = Self::create_html(cx, this_value, "strike", None)?;
         Ok(html_string.as_value())
     }
@@ -1442,9 +1442,9 @@ impl StringPrototype {
     /// String.prototype.sub (https://tc39.es/ecma262/#sec-string.prototype.sub)
     pub fn sub(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let html_string = Self::create_html(cx, this_value, "sub", None)?;
         Ok(html_string.as_value())
     }
@@ -1452,15 +1452,15 @@ impl StringPrototype {
     /// String.prototype.sup (https://tc39.es/ecma262/#sec-string.prototype.sup)
     pub fn sup(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let html_string = Self::create_html(cx, this_value, "sup", None)?;
         Ok(html_string.as_value())
     }
 }
 
-fn this_string_value(cx: Context, value: Handle<Value>) -> EvalResult<Handle<Value>> {
+fn this_string_value(cx: Context, value: StackRoot<Value>) -> EvalResult<StackRoot<Value>> {
     if value.is_string() {
         return Ok(value);
     }
@@ -1515,7 +1515,7 @@ fn to_valid_string_parts(string: HeapPtr<FlatString>) -> Vec<StringPart> {
                     continue;
                 }
 
-                // Handle an unpaired high or low surrogate
+                // StackRoot an unpaired high or low surrogate
 
                 // First flush the valid range up until this unpaired surrogate, if there was such
                 // a range.
@@ -1568,9 +1568,9 @@ impl Iterator for CharIterator {
 /// an iterator over valid code points.
 fn normalize_string<I: Iterator<Item = char>>(
     cx: Context,
-    string: Handle<StringValue>,
+    string: StackRoot<StringValue>,
     f: impl Fn(CharIterator) -> I,
-) -> AllocResult<Handle<StringValue>> {
+) -> AllocResult<StackRoot<StringValue>> {
     let parts = to_valid_string_parts(*string.flatten()?);
 
     let mut normalized_string = Wtf8String::new();
@@ -1591,17 +1591,17 @@ fn normalize_string<I: Iterator<Item = char>>(
 
     Ok(FlatString::from_wtf8(cx, normalized_string.as_bytes())?
         .as_string()
-        .to_handle())
+        .to_stack())
 }
 
 /// Replace argument may be either a function or string
 pub enum ReplaceValue {
-    Function(Handle<ObjectValue>),
-    String(Handle<StringValue>),
+    Function(StackRoot<ObjectValue>),
+    String(StackRoot<StringValue>),
 }
 
 pub struct SubstitutionTemplate {
-    template: Handle<FlatString>,
+    template: StackRoot<FlatString>,
     parts: Vec<SubstitutionPart>,
 }
 
@@ -1618,7 +1618,7 @@ enum SubstitutionPart {
     /// full $NN portion of the original string.
     IndexedCapture(u8, u32, u32),
     /// The named capture group with the given name
-    NamedCapture(Handle<StringValue>),
+    NamedCapture(StackRoot<StringValue>),
 }
 
 pub struct SubstitutionTemplateParser {
@@ -1655,7 +1655,7 @@ impl SubstitutionTemplateParser {
     pub fn parse(
         mut self,
         cx: Context,
-        template: Handle<StringValue>,
+        template: StackRoot<StringValue>,
     ) -> AllocResult<SubstitutionTemplate> {
         let template = template.flatten()?;
         let template_length = template.len();
@@ -1760,12 +1760,12 @@ impl SubstitutionTemplate {
     pub fn get_substitution(
         &self,
         cx: Context,
-        target_string: Handle<StringValue>,
-        matched_string: Handle<StringValue>,
+        target_string: StackRoot<StringValue>,
+        matched_string: StackRoot<StringValue>,
         matched_position: u32,
-        indexed_captures: &[Option<Handle<StringValue>>],
-        named_captures: Option<Handle<ObjectValue>>,
-    ) -> EvalResult<Handle<StringValue>> {
+        indexed_captures: &[Option<StackRoot<StringValue>>],
+        named_captures: Option<StackRoot<ObjectValue>>,
+    ) -> EvalResult<StackRoot<StringValue>> {
         let mut string_parts = vec![];
 
         for template_part in &self.parts {
@@ -1823,7 +1823,7 @@ impl SubstitutionTemplate {
                             let second_digit_char = (index % 10) as u32 + '0' as u32;
                             let second_digit_string =
                                 FlatString::from_code_point(cx, second_digit_char)?;
-                            string_parts.push(second_digit_string.as_string().to_handle());
+                            string_parts.push(second_digit_string.as_string().to_stack());
 
                             continue;
                         }

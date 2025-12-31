@@ -17,7 +17,7 @@ use crate::{
         property_descriptor::PropertyDescriptor,
         realm::Realm,
         type_utilities::to_string,
-        Context, Handle, Value,
+        Context, StackRoot, Value,
     },
 };
 use alloc::vec;
@@ -26,7 +26,7 @@ use alloc::vec;
 pub struct AggregateErrorObject;
 
 impl AggregateErrorObject {
-    pub fn new(cx: Context, errors: Handle<Value>) -> AllocResult<Handle<ErrorObject>> {
+    pub fn new(cx: Context, errors: StackRoot<Value>) -> AllocResult<StackRoot<ErrorObject>> {
         let object = ErrorObject::new(
             cx,
             Intrinsic::AggregateErrorPrototype,
@@ -48,7 +48,7 @@ pub struct AggregateErrorConstructor;
 
 impl AggregateErrorConstructor {
     /// Properties of the AggregateError Constructor (https://tc39.es/ecma262/#sec-properties-of-the-aggregate-error-constructors)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -72,9 +72,9 @@ impl AggregateErrorConstructor {
     /// AggregateError (https://tc39.es/ecma262/#sec-aggregate-error)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let new_target = if let Some(new_target) = cx.current_new_target() {
             new_target
         } else {

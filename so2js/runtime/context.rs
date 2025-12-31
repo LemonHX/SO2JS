@@ -19,7 +19,7 @@ use crate::{
     },
     eval_err, handle_scope,
     parser::{analyze::analyze, parse_module, parse_script, source::Source, ParseContext},
-    runtime::{alloc_error::AllocResult, annex_b::init_annex_b_methods, gc::GarbageCollector},
+    runtime::{alloc_error::AllocResult, annex_b::init_annex_b_methods},
 };
 
 use super::{
@@ -31,7 +31,7 @@ use super::{
     },
     collections::{BsHashMap, BsHashMapField},
     error::BsResult,
-    gc::{Heap, HeapVisitor},
+    gc::{GcVisitorExt, Heap, StackRootContext},
     heap_item_descriptor::{BaseDescriptors, HeapItemKind},
     interned_strings::InternedStrings,
     intrinsics::{intrinsics::Intrinsic, rust_runtime::RustRuntimeFunctionRegistry},
@@ -46,7 +46,7 @@ use super::{
     string_value::FlatString,
     tasks::TaskQueue,
     value::SymbolValue,
-    EvalResult, Handle, HeapPtr, Value,
+    EvalResult, HeapPtr, StackRoot, Value,
 };
 
 /// Top level context for the JS runtime. Contains the heap, execution contexts, etc.
@@ -70,6 +70,8 @@ pub struct Context {
 pub struct ContextCell {
     pub sys: Option<Box<dyn crate::sys::Sys>>,
     pub heap: Heap,
+    /// StackRoot context for managing stack handles
+    pub handle_context: StackRootContext,
     global_symbol_registry: HeapPtr<GlobalSymbolRegistry>,
     pub names: BuiltinNames,
     pub well_known_symbols: BuiltinSymbols,
@@ -128,10 +130,29 @@ pub struct ContextCell {
 type GlobalSymbolRegistry = BsHashMap<HeapPtr<FlatString>, HeapPtr<SymbolValue>>;
 
 impl Context {
+    /// Get the raw pointer to the context cell.
+    /// Used by GC to store context pointer in object headers.
+    #[inline]
+    pub fn as_ptr(&self) -> *mut ContextCell {
+        self.ptr.as_ptr()
+    }
+
+    /// Construct a Context from a raw ContextCell pointer.
+    ///
+    /// # Safety
+    /// The pointer must be a valid, non-null pointer to a ContextCell.
+    #[inline]
+    pub unsafe fn from_context_cell_ptr(ptr: *mut ContextCell) -> Context {
+        Context {
+            ptr: NonNull::new_unchecked(ptr),
+        }
+    }
+
     fn new(options: Rc<Options>, sys: Option<Box<dyn crate::sys::Sys>>) -> AllocResult<Context> {
         let cx_cell = Box::new(ContextCell {
             sys,
             heap: Heap::new(options.heap_size),
+            handle_context: StackRootContext::new(),
             global_symbol_registry: HeapPtr::uninit(),
             names: BuiltinNames::uninit(),
             well_known_symbols: BuiltinSymbols::uninit(),
@@ -167,7 +188,6 @@ impl Context {
         let mut cx = unsafe { Context::from_ptr(NonNull::new_unchecked(Box::leak(cx_cell))) };
         // pass it here
         cx.rust_runtime_functions.cx_ptr = cx.ptr.as_ptr();
-        cx.heap.info().set_context(cx);
         cx.vm = Some(Box::new(VM::new(cx)));
         cx.init_heap_allocated_context_fields()?;
 
@@ -204,9 +224,6 @@ impl Context {
             Ok(())
         })?;
 
-        // Stop allocating into the permanent heap
-        cx.heap.mark_current_semispace_as_permanent();
-
         Ok(())
     }
 
@@ -239,11 +256,11 @@ impl Context {
     }
 
     #[inline]
-    pub fn initial_realm(&self) -> Handle<Realm> {
-        self.initial_realm_ptr().to_handle()
+    pub fn initial_realm(&self) -> StackRoot<Realm> {
+        self.initial_realm_ptr().to_stack()
     }
 
-    pub fn evaluate_script(&mut self, source: Rc<Source>) -> BsResult<Handle<Value>> {
+    pub fn evaluate_script(&mut self, source: Rc<Source>) -> BsResult<StackRoot<Value>> {
         // Parse script and perform semantic analysis
         let pcx = ParseContext::new(source);
         let parse_result = parse_script(&pcx, self.options.clone())?;
@@ -269,7 +286,7 @@ impl Context {
         Ok(self.run_script(bytecode_script)?)
     }
 
-    pub fn evaluate_module(&mut self, source: Rc<Source>) -> BsResult<Handle<Value>> {
+    pub fn evaluate_module(&mut self, source: Rc<Source>) -> BsResult<StackRoot<Value>> {
         // Parse module and perform semantic analysis
         let pcx = ParseContext::new(source);
         let parse_result = parse_module(&pcx, self.options.clone())?;
@@ -296,7 +313,7 @@ impl Context {
     }
 
     /// Execute a program, running until the task queue is empty.
-    pub fn run_script(&mut self, bytecode_script: BytecodeScript) -> EvalResult<Handle<Value>> {
+    pub fn run_script(&mut self, bytecode_script: BytecodeScript) -> EvalResult<StackRoot<Value>> {
         let value = self.with_initial_realm_stack_frame(self.initial_realm_ptr(), |mut cx| {
             cx.vm().execute_script(bytecode_script)
         })?;
@@ -307,7 +324,10 @@ impl Context {
     }
 
     /// Execute a module, loading and executing all dependencies. Run until the task queue is empty.
-    pub fn run_module(&mut self, module: Handle<SourceTextModule>) -> EvalResult<Handle<Value>> {
+    pub fn run_module(
+        &mut self,
+        module: StackRoot<SourceTextModule>,
+    ) -> EvalResult<StackRoot<Value>> {
         // Loading, linking, and evaluation should all have a current realm set as some objects
         // needing a realm will be created.
         let promise = self
@@ -320,10 +340,10 @@ impl Context {
         debug_assert!(!promise.is_pending());
 
         if let Some(value) = promise.rejected_value() {
-            return eval_err!(value.to_handle(*self));
+            return eval_err!(value.to_stack());
         }
         if let Some(value) = promise.fulfilled_value() {
-            return Ok(value.to_handle(*self));
+            return Ok(value.to_stack());
         } else {
             unreachable!()
         }
@@ -383,8 +403,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn current_realm(&self) -> Handle<Realm> {
-        self.current_realm_ptr().to_handle()
+    pub fn current_realm(&self) -> StackRoot<Realm> {
+        self.current_realm_ptr().to_stack()
     }
 
     /// Return an intrinsic for the current realm.
@@ -394,15 +414,15 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_intrinsic(&self, intrinsic: Intrinsic) -> Handle<ObjectValue> {
+    pub fn get_intrinsic(&self, intrinsic: Intrinsic) -> StackRoot<ObjectValue> {
         self.current_realm().get_intrinsic(intrinsic)
     }
 
-    pub fn current_function(&mut self) -> Handle<ObjectValue> {
-        self.vm().closure().to_handle().into()
+    pub fn current_function(&mut self) -> StackRoot<ObjectValue> {
+        self.vm().closure().to_stack().into()
     }
 
-    pub fn current_new_target(&mut self) -> Option<Handle<ObjectValue>> {
+    pub fn current_new_target(&mut self) -> Option<StackRoot<ObjectValue>> {
         let new_target_index = self.vm().closure().function().new_target_index();
         if let Some(index) = new_target_index {
             let new_target = self.vm().get_register_at_index(index);
@@ -411,7 +431,7 @@ impl Context {
             }
 
             debug_assert!(new_target.is_object());
-            Some(new_target.as_object().to_handle())
+            Some(new_target.as_object().to_stack())
         } else {
             None
         }
@@ -453,90 +473,90 @@ impl Context {
     }
 
     #[inline]
-    pub fn alloc_string(&mut self, str: &str) -> AllocResult<Handle<FlatString>> {
-        Ok(self.alloc_string_ptr(str)?.to_handle())
+    pub fn alloc_string(&mut self, str: &str) -> AllocResult<StackRoot<FlatString>> {
+        Ok(self.alloc_string_ptr(str)?.to_stack())
     }
 
     #[inline]
-    pub fn alloc_wtf8_string(&mut self, str: &Wtf8String) -> AllocResult<Handle<FlatString>> {
-        Ok(self.alloc_wtf8_string_ptr(str)?.to_handle())
+    pub fn alloc_wtf8_string(&mut self, str: &Wtf8String) -> AllocResult<StackRoot<FlatString>> {
+        Ok(self.alloc_wtf8_string_ptr(str)?.to_stack())
     }
 
     #[inline]
-    pub fn alloc_wtf8_str(&mut self, str: &Wtf8Str) -> AllocResult<Handle<FlatString>> {
-        Ok(self.alloc_wtf8_str_ptr(str)?.to_handle())
+    pub fn alloc_wtf8_str(&mut self, str: &Wtf8Str) -> AllocResult<StackRoot<FlatString>> {
+        Ok(self.alloc_wtf8_str_ptr(str)?.to_stack())
     }
 
     #[inline]
-    pub fn undefined(&self) -> Handle<Value> {
-        Handle::<Value>::from_fixed_non_heap_ptr(&self.undefined)
+    pub fn undefined(&self) -> StackRoot<Value> {
+        StackRoot::<Value>::from_fixed_non_heap_ptr(&self.undefined)
     }
 
     #[inline]
-    pub fn null(&self) -> Handle<Value> {
-        Handle::<Value>::from_fixed_non_heap_ptr(&self.null)
+    pub fn null(&self) -> StackRoot<Value> {
+        StackRoot::<Value>::from_fixed_non_heap_ptr(&self.null)
     }
 
     #[inline]
-    pub fn empty(&self) -> Handle<Value> {
-        Handle::<Value>::from_fixed_non_heap_ptr(&self.empty)
+    pub fn empty(&self) -> StackRoot<Value> {
+        StackRoot::<Value>::from_fixed_non_heap_ptr(&self.empty)
     }
 
     #[inline]
-    pub fn bool(&self, value: bool) -> Handle<Value> {
+    pub fn bool(&self, value: bool) -> StackRoot<Value> {
         if value {
-            Handle::<Value>::from_fixed_non_heap_ptr(&self.true_)
+            StackRoot::<Value>::from_fixed_non_heap_ptr(&self.true_)
         } else {
-            Handle::<Value>::from_fixed_non_heap_ptr(&self.false_)
+            StackRoot::<Value>::from_fixed_non_heap_ptr(&self.false_)
         }
     }
 
     #[inline]
-    pub fn zero(&self) -> Handle<Value> {
-        Handle::<Value>::from_fixed_non_heap_ptr(&self.zero)
+    pub fn zero(&self) -> StackRoot<Value> {
+        StackRoot::<Value>::from_fixed_non_heap_ptr(&self.zero)
     }
 
     #[inline]
-    pub fn one(&self) -> Handle<Value> {
-        Handle::<Value>::from_fixed_non_heap_ptr(&self.one)
+    pub fn one(&self) -> StackRoot<Value> {
+        StackRoot::<Value>::from_fixed_non_heap_ptr(&self.one)
     }
 
     #[inline]
-    pub fn negative_one(&self) -> Handle<Value> {
-        Handle::<Value>::from_fixed_non_heap_ptr(&self.negative_one)
+    pub fn negative_one(&self) -> StackRoot<Value> {
+        StackRoot::<Value>::from_fixed_non_heap_ptr(&self.negative_one)
     }
 
     #[inline]
-    pub fn nan(&self) -> Handle<Value> {
-        Handle::<Value>::from_fixed_non_heap_ptr(&self.nan)
+    pub fn nan(&self) -> StackRoot<Value> {
+        StackRoot::<Value>::from_fixed_non_heap_ptr(&self.nan)
     }
 
     #[inline]
-    pub fn smi(&self, value: i32) -> Handle<Value> {
-        Value::smi(value).to_handle(*self)
+    pub fn smi(&self, value: i32) -> StackRoot<Value> {
+        Value::smi(value).to_stack()
     }
 
     #[inline]
-    pub fn number(&self, value: f64) -> Handle<Value> {
-        Value::number(value).to_handle(*self)
+    pub fn number(&self, value: f64) -> StackRoot<Value> {
+        Value::number(value).to_stack()
     }
 
     /// Visit all heap roots for a garbage collection. This optionally visits pointers that are
     /// guaranteed to be in the permanent semispace.
-    pub fn visit_roots_for_gc(&mut self, gc: &mut GarbageCollector) {
-        self.visit_common_roots(gc);
-        self.visit_post_initialization_roots(gc);
+    pub fn visit_roots_for_gc(&mut self, visitor: &mut impl GcVisitorExt) {
+        self.visit_common_roots(visitor);
+        self.visit_post_initialization_roots(visitor);
 
         // Only need to visit permanent roots if growing the heap, otherwise permanent space is
         // guaranteed to not move and .
-        if gc.is_resizing() {
-            self.visit_permanent_roots(gc);
+        if false {
+            self.visit_permanent_roots(visitor);
         }
     }
 
     /// Visit all heap roots that are needed for heap serialization. This includes all pointers to
     /// the permanent semispace.
-    pub fn visit_roots_for_serialization(&mut self, visitor: &mut impl HeapVisitor) {
+    pub fn visit_roots_for_serialization(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_common_roots(visitor);
         self.visit_permanent_roots(visitor);
 
@@ -544,14 +564,14 @@ impl Context {
     }
 
     /// Visit all heap roots that should always be visited.
-    fn visit_common_roots(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_common_roots(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.global_symbol_registry);
         self.interned_strings.visit_roots(visitor);
         visitor.visit_pointer(&mut self.modules);
     }
 
     /// Visit all heap roots that are guaranteed to point to the permanent semispace.
-    fn visit_permanent_roots(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_permanent_roots(&mut self, visitor: &mut impl GcVisitorExt) {
         self.names.visit_roots(visitor);
         self.well_known_symbols.visit_roots(visitor);
         self.base_descriptors.visit_roots(visitor);
@@ -563,8 +583,8 @@ impl Context {
 
     /// Visit all heap roots that can only actually contain roots after the context has been
     /// initialized.
-    fn visit_post_initialization_roots(&mut self, visitor: &mut impl HeapVisitor) {
-        self.heap.visit_roots(visitor);
+    fn visit_post_initialization_roots(&mut self, visitor: &mut impl GcVisitorExt) {
+        self.handle_context.visit_roots(visitor);
         self.task_queue.visit_roots(visitor);
 
         if let Some(vm) = &mut self.vm {
@@ -633,11 +653,11 @@ pub struct HeapModuleCacheKey {
 
 pub struct ModuleCacheKey {
     pub path: String,
-    pub attributes: Option<Handle<ImportAttributes>>,
+    pub attributes: Option<StackRoot<ImportAttributes>>,
 }
 
 impl ModuleCacheKey {
-    pub fn new(path: String, attributes: Option<Handle<ImportAttributes>>) -> Self {
+    pub fn new(path: String, attributes: Option<StackRoot<ImportAttributes>>) -> Self {
         Self { path, attributes }
     }
 
@@ -682,7 +702,7 @@ impl ModuleCacheField {
         ModuleCache::calculate_size_in_bytes(map.capacity())
     }
 
-    pub fn visit_pointers(map: &mut HeapPtr<ModuleCache>, visitor: &mut impl HeapVisitor) {
+    pub fn visit_pointers(map: &mut HeapPtr<ModuleCache>, visitor: &mut impl GcVisitorExt) {
         map.visit_pointers(visitor);
 
         for (cache_key, module) in map.iter_mut_gc_unsafe() {
@@ -713,7 +733,10 @@ impl GlobalSymbolRegistryField {
         GlobalSymbolRegistry::calculate_size_in_bytes(map.capacity())
     }
 
-    pub fn visit_pointers(map: &mut HeapPtr<GlobalSymbolRegistry>, visitor: &mut impl HeapVisitor) {
+    pub fn visit_pointers(
+        map: &mut HeapPtr<GlobalSymbolRegistry>,
+        visitor: &mut impl GcVisitorExt,
+    ) {
         map.visit_pointers(visitor);
 
         for (key, value) in map.iter_mut_gc_unsafe() {

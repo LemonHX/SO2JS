@@ -4,9 +4,9 @@ use crate::{
 };
 
 use super::{
-    gc::{HeapItem, HeapVisitor},
+    gc::{HeapItem, GcVisitorExt},
     heap_item_descriptor::HeapItemDescriptor,
-    Context, Handle, HeapPtr, Value,
+    Context, StackRoot, HeapPtr, Value,
 };
 
 /// A value that is allocated on the heap.
@@ -17,7 +17,7 @@ pub struct BoxedValue {
 }
 
 impl BoxedValue {
-    pub fn new(cx: Context, value: Handle<Value>) -> AllocResult<HeapPtr<BoxedValue>> {
+    pub fn new(cx: Context, value: StackRoot<Value>) -> AllocResult<HeapPtr<BoxedValue>> {
         let mut scope = cx.alloc_uninit::<BoxedValue>()?;
 
         set_uninit!(
@@ -43,7 +43,7 @@ impl HeapItem for HeapPtr<BoxedValue> {
         core::mem::size_of::<BoxedValue>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
         visitor.visit_value(&mut self.value);
     }

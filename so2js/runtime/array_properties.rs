@@ -6,11 +6,11 @@ use crate::{field_offset, runtime::alloc_error::AllocResult, set_uninit};
 
 use super::{
     collections::{BsHashMap, BsHashMapField, InlineArray},
-    gc::{HeapItem, HeapVisitor},
+    gc::{HeapItem, GcVisitorExt},
     heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
     object_value::ObjectValue,
     property::{HeapProperty, Property},
-    Context, Handle, HeapPtr, Value,
+    Context, StackRoot, HeapPtr, Value,
 };
 
 // Properties keyed by array index. Back by dense array when possible, otherwise transition to
@@ -68,7 +68,7 @@ impl HeapPtr<ArrayProperties> {
                 return None;
             }
 
-            Some(Property::data(value.to_handle(cx), true, true, true))
+            Some(Property::data(value.to_stack(), true, true, true))
         } else {
             let sparse_properties = self.as_sparse();
             sparse_properties
@@ -93,7 +93,7 @@ impl ArrayProperties {
     #[inline]
     fn grow_dense_properties(
         cx: Context,
-        mut object: Handle<ObjectValue>,
+        mut object: StackRoot<ObjectValue>,
         new_length: u32,
     ) -> AllocResult<()> {
         let mut dense_properties = object.array_properties().as_dense();
@@ -112,7 +112,7 @@ impl ArrayProperties {
         let new_capacity = u32::max(old_capacity.saturating_mul(2), new_length);
 
         // Save old dense properties before allocation
-        let dense_properties = dense_properties.to_handle();
+        let dense_properties = dense_properties.to_stack();
 
         // Create new dense array properties, ensure that no allocation happens after this point
         // otherwise we could try to GC a partially initialized array.
@@ -139,7 +139,7 @@ impl ArrayProperties {
     #[inline]
     fn shrink_dense_properties(
         cx: Context,
-        mut object: Handle<ObjectValue>,
+        mut object: StackRoot<ObjectValue>,
         new_length: u32,
     ) -> AllocResult<()> {
         let mut dense_properties = object.array_properties().as_dense();
@@ -151,7 +151,7 @@ impl ArrayProperties {
         }
 
         // Save old dense properties before allocation
-        let dense_properties = dense_properties.to_handle();
+        let dense_properties = dense_properties.to_stack();
 
         // Create new dense array properties, ensure that no allocation happens after this point
         // otherwise we could try to GC a partially initialized array.
@@ -174,9 +174,9 @@ impl ArrayProperties {
 
     fn transition_to_sparse_properties(
         cx: Context,
-        mut object: Handle<ObjectValue>,
+        mut object: StackRoot<ObjectValue>,
     ) -> AllocResult<()> {
-        let dense_properties = object.array_properties().as_dense().to_handle();
+        let dense_properties = object.array_properties().as_dense().to_stack();
 
         // Initial sparse map size is the number of non-empty properties
         let num_non_empty_properties = dense_properties
@@ -188,7 +188,7 @@ impl ArrayProperties {
             SparseArrayProperties::new(cx, new_capacity, dense_properties.len())?;
 
         // Share handle across iterations
-        let mut value_handle = Handle::<Value>::empty(cx);
+        let mut value_handle = StackRoot::<Value>::empty(cx);
 
         // Can reference internal pointer to map since loop does not allocate on managed heap,
         // map was initialized with the capacity to fit all elements.
@@ -217,7 +217,7 @@ impl ArrayProperties {
     // Returns return true on success.
     pub fn set_len(
         cx: Context,
-        mut object: Handle<ObjectValue>,
+        mut object: StackRoot<ObjectValue>,
         new_length: u32,
     ) -> AllocResult<bool> {
         let array_properties = object.array_properties();
@@ -251,7 +251,7 @@ impl ArrayProperties {
             }
 
             // Save behind handle before allocating
-            let sparse_properties = sparse_properties.to_handle();
+            let sparse_properties = sparse_properties.to_stack();
 
             // In sparse removal case we must first find the last non-configurable property.
             // Can use stored property directly since loop does not allocate.
@@ -302,7 +302,7 @@ impl ArrayProperties {
 
     pub fn set_property(
         cx: Context,
-        object: Handle<ObjectValue>,
+        object: StackRoot<ObjectValue>,
         array_index: u32,
         property: Property,
     ) -> AllocResult<()> {
@@ -425,7 +425,7 @@ impl DenseArrayProperties {
     }
 }
 
-impl Handle<DenseArrayProperties> {
+impl StackRoot<DenseArrayProperties> {
     #[inline]
     pub fn iter(&self) -> DenseArrayPropertiesIter {
         DenseArrayPropertiesIter {
@@ -437,7 +437,7 @@ impl Handle<DenseArrayProperties> {
 }
 
 pub struct DenseArrayPropertiesIter {
-    dense_array_properties: Handle<DenseArrayProperties>,
+    dense_array_properties: StackRoot<DenseArrayProperties>,
     current: u32,
     len: u32,
 }
@@ -552,7 +552,7 @@ impl HeapPtr<SparseArrayProperties> {
     }
 }
 
-struct SparseMapField(Handle<ObjectValue>);
+struct SparseMapField(StackRoot<ObjectValue>);
 
 impl BsHashMapField<u32, HeapProperty> for SparseMapField {
     fn new_map(&self, cx: Context, capacity: usize) -> AllocResult<HeapPtr<SparseMap>> {
@@ -580,7 +580,7 @@ impl HeapItem for HeapPtr<ArrayProperties> {
         }
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         if let Some(mut dense_array) = self.as_dense_opt() {
             dense_array.visit_pointers(visitor)
         } else {
@@ -594,7 +594,7 @@ impl HeapItem for HeapPtr<DenseArrayProperties> {
         DenseArrayProperties::calculate_size_in_bytes(self.capacity() as usize)
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
 
         let len = self.len() as usize;
@@ -609,7 +609,7 @@ impl HeapItem for HeapPtr<SparseArrayProperties> {
         SparseArrayProperties::calculate_size_in_bytes(self.sparse_map.capacity())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.sparse_map.visit_pointers(visitor);
 
         for (_, property) in self.sparse_map.iter_mut_gc_unsafe() {

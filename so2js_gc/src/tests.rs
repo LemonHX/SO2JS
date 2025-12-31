@@ -72,11 +72,11 @@ impl GcContext for TestContext {
         }
         for weak_ref in &mut self.weak_refs {
             // WeakRefObject itself is a root, but its target is weak
-            let mut ptr: GcPtr<u8> = unsafe { GcPtr::from_ptr(weak_ref.as_ptr() as *mut u8) };
+            let mut ptr: GcPtr<u8> = GcPtr::from_ptr(weak_ref.as_ptr() as *mut u8);
             visitor.visit(&mut ptr);
         }
         for entry in &mut self.weak_map_entries {
-            let mut ptr: GcPtr<u8> = unsafe { GcPtr::from_ptr(entry.as_ptr() as *mut u8) };
+            let mut ptr: GcPtr<u8> = GcPtr::from_ptr(entry.as_ptr() as *mut u8);
             visitor.visit(&mut ptr);
         }
     }
@@ -140,6 +140,10 @@ impl GcContext for TestContext {
                 }
             }
         }
+    }
+
+    fn as_context_ptr(&mut self) -> *mut () {
+        self as *mut TestContext as *mut ()
     }
 }
 

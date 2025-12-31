@@ -1,11 +1,11 @@
 use super::{
     bytecode::{function::BytecodeFunction, source_map::BytecodeSourceMap},
     collections::BsArray,
-    gc::{HeapItem, HeapVisitor},
+    gc::{HeapItem, GcVisitorExt},
     heap_item_descriptor::HeapItemKind,
     intrinsics::{error_constructor::CachedStackTraceInfo, rust_runtime::return_undefined},
     source_file::SourceFile,
-    Context, Handle, HeapPtr,
+    Context, StackRoot, HeapPtr,
 };
 use crate::{
     handle_scope_guard, parser::loc::find_line_col_for_pos, runtime::alloc_error::AllocResult,
@@ -31,7 +31,7 @@ pub struct HeapStackFrameInfo {
 }
 
 struct StackFrameInfo {
-    function: Handle<BytecodeFunction>,
+    function: StackRoot<BytecodeFunction>,
     bytecode_offset: usize,
 }
 
@@ -121,7 +121,7 @@ pub fn create_current_stack_frame_info(
 /// cached from the time that the error was created.
 pub fn create_stack_trace(
     mut cx: Context,
-    stack_frame_info: Handle<StackFrameInfoArray>,
+    stack_frame_info: StackRoot<StackFrameInfoArray>,
 ) -> AllocResult<CachedStackTraceInfo> {
     // Do any preparatory work that may allocate
     prepare_for_stack_trace(cx, stack_frame_info)?;
@@ -169,7 +169,7 @@ pub fn create_stack_trace(
 
                 // Save the first source position that is found
                 if first_source_file_line_col.is_none() {
-                    let source_file = func.source_file_ptr().unwrap().to_handle();
+                    let source_file = func.source_file_ptr().unwrap().to_stack();
                     first_source_file_line_col = Some((source_file, line, column));
                 }
             }
@@ -196,10 +196,10 @@ pub fn create_stack_trace(
 /// calculating line offsets for all source files.
 fn prepare_for_stack_trace(
     cx: Context,
-    stack_frame_info: Handle<StackFrameInfoArray>,
+    stack_frame_info: StackRoot<StackFrameInfoArray>,
 ) -> AllocResult<()> {
-    // Handle is shared between iterations
-    let mut source_file_handle: Handle<SourceFile> = Handle::empty(cx);
+    // StackRoot is shared between iterations
+    let mut source_file_handle: StackRoot<SourceFile> = StackRoot::empty(cx);
 
     // Generate the line offsets for all source files referenced in the stack trace. This may
     // allocate if line offsets have not been generated yet.
@@ -219,7 +219,7 @@ pub fn stack_frame_info_array_byte_size(stack_frame_array: HeapPtr<StackFrameInf
 
 pub fn stack_frame_info_array_visit_pointers(
     stack_frame_array: &mut HeapPtr<StackFrameInfoArray>,
-    visitor: &mut impl HeapVisitor,
+    visitor: &mut impl GcVisitorExt,
 ) {
     stack_frame_array.visit_pointers(visitor);
 

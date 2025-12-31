@@ -5,7 +5,7 @@ use crate::runtime::{
     iterator::{create_iter_result_object, iterator_close},
     object_value::ObjectValue,
     property::Property,
-    Context, EvalResult, Handle, Realm, Value,
+    Context, EvalResult, StackRoot, Realm, Value,
 };
 
 use super::{intrinsics::Intrinsic, iterator_helper_object::IteratorHelperObject};
@@ -14,7 +14,7 @@ use super::{intrinsics::Intrinsic, iterator_helper_object::IteratorHelperObject}
 pub struct IteratorHelperPrototype;
 
 impl IteratorHelperPrototype {
-    pub fn new(mut cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(mut cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::IteratorPrototype)),
@@ -39,9 +39,9 @@ impl IteratorHelperPrototype {
     /// %IteratorHelperPrototype%.next (https://tc39.es/ecma262/#sec-%iteratorhelperprototype%.next)
     pub fn next(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         // GenerateResume adapted for Iterator Helper Objects
         let mut object = match validate_iterator_helper_object(this_value) {
             None => {
@@ -88,9 +88,9 @@ impl IteratorHelperPrototype {
     /// %IteratorHelperPrototype%.return (https://tc39.es/ecma262/#sec-%iteratorhelperprototype%.return)
     pub fn return_(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let mut object = match validate_iterator_helper_object(this_value) {
             None => {
                 return type_error(
@@ -127,7 +127,7 @@ impl IteratorHelperPrototype {
     }
 }
 
-fn validate_iterator_helper_object(value: Handle<Value>) -> Option<Handle<IteratorHelperObject>> {
+fn validate_iterator_helper_object(value: StackRoot<Value>) -> Option<StackRoot<IteratorHelperObject>> {
     if !value.is_object() {
         return None;
     }

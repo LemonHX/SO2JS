@@ -4,7 +4,7 @@ use crate::{
         alloc_error::AllocResult,
         bytecode::function::BytecodeFunction,
         collections::{BsArray, BsHashMap, BsHashMapField, BsVec, BsVecField, InlineArray},
-        gc::{AnyHeapItem, HeapItem, HeapVisitor},
+        gc::{AnyHeapItem, HeapItem, GcVisitorExt},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
         module::{
             execute::module_evaluate, import_attributes::ImportAttributes, module::next_module_id,
@@ -16,7 +16,7 @@ use crate::{
         rust_vtables::extract_module_vtable,
         scope::Scope,
         string_value::FlatString,
-        Context, EvalResult, Handle, HeapPtr, PropertyKey, Value,
+        Context, EvalResult, StackRoot, HeapPtr, PropertyKey, Value,
     },
     set_uninit,
 };
@@ -113,21 +113,21 @@ impl SourceTextModule {
 
     pub fn new(
         cx: Context,
-        program_function: Handle<BytecodeFunction>,
-        module_scope: Handle<Scope>,
+        program_function: StackRoot<BytecodeFunction>,
+        module_scope: StackRoot<Scope>,
         requested_modules: &IndexSet<ModuleRequest>,
         imports: &[ImportEntry],
         local_exports: &[LocalExportEntry],
         named_re_exports: &[NamedReExportEntry],
         direct_re_exports: &[DirectReExportEntry],
         has_top_level_await: bool,
-    ) -> AllocResult<Handle<SourceTextModule>> {
+    ) -> AllocResult<StackRoot<SourceTextModule>> {
         // First create arrays for requested and loaded modules. Requested modules are initialized
         // from arguments, loaded modules are initialized to None.
         let num_module_requests = requested_modules.len();
         let mut heap_requested_modules =
             BsArray::new_uninit(cx, HeapItemKind::ModuleRequestArray, num_module_requests)?
-                .to_handle();
+                .to_stack();
         for (dst, src) in heap_requested_modules
             .as_mut_slice()
             .iter_mut()
@@ -142,7 +142,7 @@ impl SourceTextModule {
             requested_modules.len(),
             None,
         )?
-        .to_handle();
+        .to_stack();
 
         // Then create the uninitialized module object
         let num_entries =
@@ -195,7 +195,7 @@ impl SourceTextModule {
             i += 1;
         }
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     const ENTRIES_OFFSET: usize = field_offset!(SourceTextModule, entries);
@@ -275,8 +275,8 @@ impl SourceTextModule {
     }
 
     #[inline]
-    pub fn cycle_root(&self) -> Option<Handle<SourceTextModule>> {
-        self.cycle_root_ptr().map(|root| root.to_handle())
+    pub fn cycle_root(&self) -> Option<StackRoot<SourceTextModule>> {
+        self.cycle_root_ptr().map(|root| root.to_stack())
     }
 
     #[inline]
@@ -300,8 +300,8 @@ impl SourceTextModule {
     }
 
     #[inline]
-    pub fn evaluation_error(&self, cx: Context) -> Option<Handle<Value>> {
-        self.evaluation_error_ptr().map(|error| error.to_handle(cx))
+    pub fn evaluation_error(&self, cx: Context) -> Option<StackRoot<Value>> {
+        self.evaluation_error_ptr().map(|error| error.to_stack())
     }
 
     #[inline]
@@ -330,9 +330,9 @@ impl SourceTextModule {
     }
 
     #[inline]
-    pub fn async_parent_modules(&self) -> Option<Handle<AsyncParentModulesVec>> {
+    pub fn async_parent_modules(&self) -> Option<StackRoot<AsyncParentModulesVec>> {
         self.async_parent_modules_ptr()
-            .map(|modules| modules.to_handle())
+            .map(|modules| modules.to_stack())
     }
 
     #[inline]
@@ -341,8 +341,8 @@ impl SourceTextModule {
     }
 
     #[inline]
-    pub fn program_function(&self) -> Handle<BytecodeFunction> {
-        self.program_function_ptr().to_handle()
+    pub fn program_function(&self) -> StackRoot<BytecodeFunction> {
+        self.program_function_ptr().to_stack()
     }
 
     #[inline]
@@ -351,8 +351,8 @@ impl SourceTextModule {
     }
 
     #[inline]
-    pub fn module_scope(&self) -> Handle<Scope> {
-        self.module_scope_ptr().to_handle()
+    pub fn module_scope(&self) -> StackRoot<Scope> {
+        self.module_scope_ptr().to_stack()
     }
 
     #[inline]
@@ -361,13 +361,13 @@ impl SourceTextModule {
     }
 
     #[inline]
-    pub fn requested_modules(&self) -> Handle<ModuleRequestArray> {
-        self.requested_modules.to_handle()
+    pub fn requested_modules(&self) -> StackRoot<ModuleRequestArray> {
+        self.requested_modules.to_stack()
     }
 
     #[inline]
-    pub fn loaded_modules(&self) -> Handle<ModuleOptionArray> {
-        self.loaded_modules.to_handle()
+    pub fn loaded_modules(&self) -> StackRoot<ModuleOptionArray> {
+        self.loaded_modules.to_stack()
     }
 
     pub fn lookup_module_request_index(&self, module_request: &HeapModuleRequest) -> Option<usize> {
@@ -394,7 +394,7 @@ impl SourceTextModule {
         self.entries.as_slice()
     }
 
-    pub fn source_file_path(&self) -> Handle<FlatString> {
+    pub fn source_file_path(&self) -> StackRoot<FlatString> {
         let source_file = self.program_function_ptr().source_file_ptr().unwrap();
         source_file.path()
     }
@@ -408,7 +408,7 @@ impl HeapPtr<SourceTextModule> {
     }
 }
 
-impl Handle<SourceTextModule> {
+impl StackRoot<SourceTextModule> {
     #[inline]
     pub fn as_dyn_module(&self) -> DynModule {
         self.into_dyn_module()
@@ -416,7 +416,7 @@ impl Handle<SourceTextModule> {
 
     #[inline]
     fn async_parent_modules_field(&self) -> AsyncParentModulesField {
-        AsyncParentModulesField(self.to_handle())
+        AsyncParentModulesField(self.to_stack())
     }
 
     #[inline]
@@ -427,8 +427,8 @@ impl Handle<SourceTextModule> {
     pub fn insert_export(
         &self,
         cx: Context,
-        export_name: Handle<PropertyKey>,
-        boxed_value_or_module: Handle<AnyHeapItem>,
+        export_name: StackRoot<PropertyKey>,
+        boxed_value_or_module: StackRoot<AnyHeapItem>,
     ) -> AllocResult<bool> {
         Ok(self
             .exports_field()
@@ -439,7 +439,7 @@ impl Handle<SourceTextModule> {
     pub fn push_async_parent_module(
         &mut self,
         cx: Context,
-        parent_module: Handle<SourceTextModule>,
+        parent_module: StackRoot<SourceTextModule>,
     ) -> AllocResult<()> {
         // Lazily initialize the async parent modules vec
         if self.async_parent_modules.is_none() {
@@ -474,16 +474,16 @@ impl Handle<SourceTextModule> {
     }
 }
 
-impl Module for Handle<SourceTextModule> {
+impl Module for StackRoot<SourceTextModule> {
     fn as_enum(&self) -> ModuleEnum {
         ModuleEnum::SourceText(*self)
     }
 
-    fn as_source_text_module(&self) -> Option<Handle<SourceTextModule>> {
+    fn as_source_text_module(&self) -> Option<StackRoot<SourceTextModule>> {
         Some(*self)
     }
 
-    fn load_requested_modules(&self, cx: Context) -> AllocResult<Handle<PromiseObject>> {
+    fn load_requested_modules(&self, cx: Context) -> AllocResult<StackRoot<PromiseObject>> {
         load_requested_modules(cx, *self)
     }
 
@@ -491,7 +491,7 @@ impl Module for Handle<SourceTextModule> {
     fn get_exported_names(
         &self,
         cx: Context,
-        exported_names: &mut HashSet<Handle<FlatString>>,
+        exported_names: &mut HashSet<StackRoot<FlatString>>,
         visited_set: &mut HashSet<ModuleId>,
     ) {
         // Reached a circular import
@@ -504,7 +504,7 @@ impl Module for Handle<SourceTextModule> {
                 // Named exports are added to the set of exported names
                 ModuleEntry::LocalExport(HeapLocalExportEntry { export_name, .. })
                 | ModuleEntry::NamedReExport(HeapNamedReExportEntry { export_name, .. }) => {
-                    exported_names.insert(export_name.to_handle());
+                    exported_names.insert(export_name.to_stack());
                 }
                 ModuleEntry::DirectReExport(named_re_export) => {
                     // Add all names from the requested module to the set of exported names, excluding
@@ -553,7 +553,7 @@ impl Module for Handle<SourceTextModule> {
                             name: entry.local_name,
                             boxed_value,
                         },
-                        module: self.to_handle().as_dyn_module(),
+                        module: self.to_stack().as_dyn_module(),
                     });
                 }
             }
@@ -644,7 +644,7 @@ impl Module for Handle<SourceTextModule> {
         link(cx, *self)
     }
 
-    fn evaluate(&self, cx: Context) -> AllocResult<Handle<PromiseObject>> {
+    fn evaluate(&self, cx: Context) -> AllocResult<StackRoot<PromiseObject>> {
         module_evaluate(cx, *self)
     }
 
@@ -665,8 +665,8 @@ impl Module for Handle<SourceTextModule> {
             self.get_exported_names(cx, &mut exported_names, &mut HashSet::new());
 
             // Share handle between iterations
-            let mut key_handle: Handle<PropertyKey> = Handle::empty(cx);
-            let mut boxed_value_or_module_handle: Handle<AnyHeapItem> = Handle::empty(cx);
+            let mut key_handle: StackRoot<PropertyKey> = StackRoot::empty(cx);
+            let mut boxed_value_or_module_handle: StackRoot<AnyHeapItem> = StackRoot::empty(cx);
 
             for export_name in exported_names {
                 // First convert the export name to a PropertyKey
@@ -705,7 +705,7 @@ impl HeapItem for HeapPtr<SourceTextModule> {
         SourceTextModule::calculate_size_in_bytes(self.entries.len())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
         visitor.visit_pointer(&mut self.program_function);
         visitor.visit_pointer(&mut self.module_scope);
@@ -760,12 +760,12 @@ pub struct HeapModuleRequest {
 
 #[derive(Clone, Copy)]
 pub struct ModuleRequest {
-    pub specifier: Handle<FlatString>,
-    pub attributes: Option<Handle<ImportAttributes>>,
+    pub specifier: StackRoot<FlatString>,
+    pub attributes: Option<StackRoot<ImportAttributes>>,
 }
 
 impl HeapModuleRequest {
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.specifier);
         visitor.visit_pointer_opt(&mut self.attributes);
     }
@@ -774,8 +774,8 @@ impl HeapModuleRequest {
 impl ModuleRequest {
     pub fn from_heap(module_request: &HeapModuleRequest) -> ModuleRequest {
         ModuleRequest {
-            specifier: module_request.specifier.to_handle(),
-            attributes: module_request.attributes.map(|a| a.to_handle()),
+            specifier: module_request.specifier.to_stack(),
+            attributes: module_request.attributes.map(|a| a.to_stack()),
         }
     }
 
@@ -827,8 +827,8 @@ pub struct HeapImportEntry {
 
 pub struct ImportEntry {
     pub module_request: ModuleRequest,
-    pub import_name: Option<Handle<FlatString>>,
-    pub local_name: Handle<FlatString>,
+    pub import_name: Option<StackRoot<FlatString>>,
+    pub local_name: StackRoot<FlatString>,
     pub slot_index: usize,
     pub is_exported: bool,
 }
@@ -837,8 +837,8 @@ impl ImportEntry {
     pub fn from_heap(entry: &HeapImportEntry) -> ImportEntry {
         ImportEntry {
             module_request: ModuleRequest::from_heap(&entry.module_request),
-            import_name: entry.import_name.map(|name| name.to_handle()),
-            local_name: entry.local_name.to_handle(),
+            import_name: entry.import_name.map(|name| name.to_stack()),
+            local_name: entry.local_name.to_stack(),
             slot_index: entry.slot_index,
             is_exported: entry.is_exported,
         }
@@ -869,8 +869,8 @@ pub struct HeapLocalExportEntry {
 }
 
 pub struct LocalExportEntry {
-    pub export_name: Handle<FlatString>,
-    pub local_name: Handle<FlatString>,
+    pub export_name: StackRoot<FlatString>,
+    pub local_name: StackRoot<FlatString>,
     pub slot_index: usize,
 }
 
@@ -900,8 +900,8 @@ pub struct HeapNamedReExportEntry {
 }
 
 pub struct NamedReExportEntry {
-    pub export_name: Handle<FlatString>,
-    pub import_name: Option<Handle<FlatString>>,
+    pub export_name: StackRoot<FlatString>,
+    pub import_name: Option<StackRoot<FlatString>>,
     pub module_request: ModuleRequest,
 }
 
@@ -943,7 +943,7 @@ pub fn module_request_array_byte_size(array: HeapPtr<ModuleRequestArray>) -> usi
 
 pub fn module_request_array_visit_pointers(
     array: &mut HeapPtr<ModuleRequestArray>,
-    visitor: &mut impl HeapVisitor,
+    visitor: &mut impl GcVisitorExt,
 ) {
     array.visit_pointers(visitor);
 
@@ -958,7 +958,7 @@ pub fn module_option_array_byte_size(array: HeapPtr<ModuleOptionArray>) -> usize
 
 pub fn module_option_array_visit_pointers(
     array: &mut HeapPtr<ModuleOptionArray>,
-    visitor: &mut impl HeapVisitor,
+    visitor: &mut impl GcVisitorExt,
 ) {
     array.visit_pointers(visitor);
 
@@ -968,7 +968,7 @@ pub fn module_option_array_visit_pointers(
 }
 
 #[derive(Clone)]
-pub struct ExportMapField(Handle<SourceTextModule>);
+pub struct ExportMapField(StackRoot<SourceTextModule>);
 
 impl BsHashMapField<PropertyKey, HeapPtr<AnyHeapItem>> for ExportMapField {
     fn new_map(&self, cx: Context, capacity: usize) -> AllocResult<HeapPtr<ExportMap>> {
@@ -989,7 +989,7 @@ impl ExportMapField {
         ExportMap::calculate_size_in_bytes(map.capacity())
     }
 
-    pub fn visit_pointers(map: &mut HeapPtr<ExportMap>, visitor: &mut impl HeapVisitor) {
+    pub fn visit_pointers(map: &mut HeapPtr<ExportMap>, visitor: &mut impl GcVisitorExt) {
         map.visit_pointers(visitor);
 
         for (key, value) in map.iter_mut_gc_unsafe() {
@@ -1001,7 +1001,7 @@ impl ExportMapField {
 
 type AsyncParentModulesVec = BsVec<HeapPtr<SourceTextModule>>;
 
-struct AsyncParentModulesField(Handle<SourceTextModule>);
+struct AsyncParentModulesField(StackRoot<SourceTextModule>);
 
 impl BsVecField<HeapPtr<SourceTextModule>> for AsyncParentModulesField {
     fn new_vec(cx: Context, capacity: usize) -> AllocResult<HeapPtr<AsyncParentModulesVec>> {

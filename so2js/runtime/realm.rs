@@ -3,7 +3,7 @@ use super::{
     bytecode::function::Closure,
     collections::{BsHashMap, BsHashMapField, InlineArray},
     error::{err_assign_constant, syntax_error},
-    gc::{Handle, HeapItem, HeapPtr, HeapVisitor},
+    gc::{StackRoot, HeapItem, HeapPtr, GcVisitorExt},
     global_names::has_restricted_global_property,
     heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
     interned_strings::InternedStrings,
@@ -45,7 +45,7 @@ const INTRINSICS_BYTE_OFFSET: usize = field_offset!(Realm, intrinsics);
 
 impl Realm {
     /// InitializeHostDefinedRealm (https://tc39.es/ecma262/#sec-initializehostdefinedrealm)
-    pub fn new(cx: Context) -> AllocResult<Handle<Realm>> {
+    pub fn new(cx: Context) -> AllocResult<StackRoot<Realm>> {
         handle_scope!(cx, {
             let realm = Realm::new_uninit(cx)?;
             must_a!(set_default_global_bindings(cx, realm));
@@ -55,7 +55,7 @@ impl Realm {
 
     /// Realm initializes intrinsics but leaves other properties uninitialized. Must call
     /// `initialize` before using.
-    fn new_uninit(cx: Context) -> AllocResult<Handle<Realm>> {
+    fn new_uninit(cx: Context) -> AllocResult<StackRoot<Realm>> {
         handle_scope!(cx, {
             // Realm record must be created before setting up intrinsics, as realm must be referenced
             // during intrinsic creation.
@@ -71,7 +71,7 @@ impl Realm {
             set_uninit!(realm.lexical_names, HeapPtr::uninit());
             set_uninit!(realm.empty_function, HeapPtr::uninit());
 
-            let realm = realm.to_handle();
+            let realm = realm.to_stack();
 
             // Global object and scope are created here
             Intrinsics::initialize(cx, realm)?;
@@ -91,8 +91,8 @@ impl Realm {
     }
 
     #[inline]
-    pub fn global_object(&self) -> Handle<ObjectValue> {
-        self.global_object_ptr().to_handle()
+    pub fn global_object(&self) -> StackRoot<ObjectValue> {
+        self.global_object_ptr().to_stack()
     }
 
     #[inline]
@@ -101,8 +101,8 @@ impl Realm {
     }
 
     #[inline]
-    pub fn default_global_scope(&self) -> Handle<Scope> {
-        self.global_scopes.get(0).to_handle()
+    pub fn default_global_scope(&self) -> StackRoot<Scope> {
+        self.global_scopes.get(0).to_stack()
     }
 
     #[inline]
@@ -114,7 +114,7 @@ impl Realm {
         self.intrinsics.get_ptr(intrinsic)
     }
 
-    pub fn get_intrinsic(&self, intrinsic: Intrinsic) -> Handle<ObjectValue> {
+    pub fn get_intrinsic(&self, intrinsic: Intrinsic) -> StackRoot<ObjectValue> {
         self.intrinsics.get(intrinsic)
     }
 
@@ -152,7 +152,7 @@ impl Realm {
     }
 }
 
-impl Handle<Realm> {
+impl StackRoot<Realm> {
     fn lexical_names_field(&self) -> LexicalNamesMapField {
         LexicalNamesMapField(*self)
     }
@@ -160,7 +160,7 @@ impl Handle<Realm> {
     pub fn add_lexical_name(
         &mut self,
         cx: Context,
-        name: Handle<FlatString>,
+        name: StackRoot<FlatString>,
         global_scope_index: usize,
         slot_index: u32,
         is_immutable: bool,
@@ -179,12 +179,12 @@ impl Handle<Realm> {
     pub fn can_declare_lexical_names(
         &self,
         cx: Context,
-        names: &[Handle<FlatString>],
+        names: &[StackRoot<FlatString>],
     ) -> EvalResult<()> {
         let global_object = self.global_object();
 
         // Reuse handle between iterations
-        let mut key = Handle::<PropertyKey>::empty(cx);
+        let mut key = StackRoot::<PropertyKey>::empty(cx);
 
         for name in names {
             let name = *name;
@@ -223,8 +223,8 @@ impl Handle<Realm> {
     pub fn new_global_scope(
         &mut self,
         cx: Context,
-        scope_names: Handle<ScopeNames>,
-    ) -> AllocResult<Handle<Scope>> {
+        scope_names: StackRoot<ScopeNames>,
+    ) -> AllocResult<StackRoot<Scope>> {
         let global_object = self.global_object();
         let mut global_scope = Scope::new_global(cx, scope_names, global_object)?;
 
@@ -232,8 +232,8 @@ impl Handle<Realm> {
         let global_scope_index = self.global_scopes.len();
         GlobalScopes::maybe_grow_for_insertion(cx, *self)?.insert_without_growing(*global_scope);
 
-        // Handle is shared between iterations
-        let mut name_handle = Handle::<FlatString>::empty(cx);
+        // StackRoot is shared between iterations
+        let mut name_handle = StackRoot::<FlatString>::empty(cx);
 
         // Statically initialize global scope slots
         for i in 0..scope_names.len() {
@@ -295,7 +295,7 @@ impl HeapItem for HeapPtr<Realm> {
         Realm::calculate_size_in_bytes()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
         visitor.visit_pointer(&mut self.global_object);
         visitor.visit_pointer(&mut self.global_scopes);
@@ -355,7 +355,7 @@ impl GlobalScopes {
     /// and update realm to point to new array if there is no room to insert another scope.
     pub fn maybe_grow_for_insertion(
         cx: Context,
-        mut realm: Handle<Realm>,
+        mut realm: StackRoot<Realm>,
     ) -> AllocResult<HeapPtr<GlobalScopes>> {
         let old_global_scopes = realm.global_scopes;
         let old_len = old_global_scopes.len();
@@ -366,7 +366,7 @@ impl GlobalScopes {
             return Ok(old_global_scopes);
         }
 
-        let old_global_scopes = old_global_scopes.to_handle();
+        let old_global_scopes = old_global_scopes.to_stack();
         let mut new_global_scopes = GlobalScopes::new(cx, old_capacity * 2)?;
         new_global_scopes.len = old_len;
 
@@ -395,7 +395,7 @@ impl HeapItem for HeapPtr<GlobalScopes> {
         GlobalScopes::calculate_size_in_bytes(self.scopes.len())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
 
         let len = self.len();
@@ -433,7 +433,7 @@ impl LexicalNameLocation {
 pub type LexicalNamesMap = BsHashMap<HeapPtr<FlatString>, LexicalNameLocation>;
 
 #[derive(Clone)]
-pub struct LexicalNamesMapField(Handle<Realm>);
+pub struct LexicalNamesMapField(StackRoot<Realm>);
 
 impl BsHashMapField<HeapPtr<FlatString>, LexicalNameLocation> for LexicalNamesMapField {
     fn new_map(&self, cx: Context, capacity: usize) -> AllocResult<HeapPtr<LexicalNamesMap>> {
@@ -454,7 +454,7 @@ impl LexicalNamesMapField {
         LexicalNamesMap::calculate_size_in_bytes(map.capacity())
     }
 
-    pub fn visit_pointers(map: &mut HeapPtr<LexicalNamesMap>, visitor: &mut impl HeapVisitor) {
+    pub fn visit_pointers(map: &mut HeapPtr<LexicalNamesMap>, visitor: &mut impl GcVisitorExt) {
         map.visit_pointers(visitor);
 
         for (name, _) in map.iter_mut_gc_unsafe() {

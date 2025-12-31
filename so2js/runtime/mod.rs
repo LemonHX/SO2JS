@@ -59,7 +59,7 @@ pub use console::to_console_string;
 pub use context::{Context, ContextBuilder};
 pub use error::BsResult;
 pub use eval_result::EvalResult;
-pub use gc::{Handle, HeapPtr};
+pub use gc::{StackRoot, HeapPtr};
 pub use property_descriptor::PropertyDescriptor;
 pub use property_key::PropertyKey;
 pub use realm::Realm;

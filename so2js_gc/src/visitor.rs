@@ -142,4 +142,11 @@ pub trait GcContext {
         // Default: do nothing
         let _ = heap;
     }
+
+    /// Get a pointer to the runtime context
+    ///
+    /// This pointer is stored in each GcHeader to allow finding the
+    /// runtime context from any heap object (used by Handle system).
+    /// The pointer must be 8-byte aligned.
+    fn as_context_ptr(&mut self) -> *mut ();
 }

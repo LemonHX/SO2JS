@@ -8,12 +8,12 @@ use crate::{
         error::type_error,
         eval_result::EvalResult,
         function::get_argument,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         object_value::ObjectValue,
         ordinary_object::object_create_from_constructor,
         realm::Realm,
-        Context, Handle, HeapPtr, Value,
+        Context, StackRoot, HeapPtr, Value,
     },
     set_uninit,
 };
@@ -34,9 +34,9 @@ extend_object! {
 impl WeakRefObject {
     pub fn new_from_constructor(
         cx: Context,
-        constructor: Handle<ObjectValue>,
-        value: Handle<Value>,
-    ) -> EvalResult<Handle<WeakRefObject>> {
+        constructor: StackRoot<ObjectValue>,
+        value: StackRoot<Value>,
+    ) -> EvalResult<StackRoot<WeakRefObject>> {
         let mut object = object_create_from_constructor::<WeakRefObject>(
             cx,
             constructor,
@@ -46,7 +46,7 @@ impl WeakRefObject {
 
         set_uninit!(object.weak_ref_target, *value);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     pub fn weak_ref_target(&self) -> Value {
@@ -70,7 +70,7 @@ pub struct WeakRefConstructor;
 
 impl WeakRefConstructor {
     /// Properties of the WeakRef Constructor (https://tc39.es/ecma262/#sec-properties-of-the-weak-ref-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -92,9 +92,9 @@ impl WeakRefConstructor {
     /// WeakRef (https://tc39.es/ecma262/#sec-weak-ref-target)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let new_target = if let Some(new_target) = cx.current_new_target() {
             new_target
         } else {
@@ -131,7 +131,7 @@ impl HeapItem for HeapPtr<WeakRefObject> {
         size_of::<WeakRefObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_weak_value(&mut self.weak_ref_target);
 

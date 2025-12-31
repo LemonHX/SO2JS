@@ -13,10 +13,10 @@ use crate::{
 use super::{
     bytecode::function::BytecodeFunction,
     collections::InlineArray,
-    gc::{HeapItem, HeapVisitor},
+    gc::{HeapItem, GcVisitorExt},
     heap_item_descriptor::HeapItemDescriptor,
     string_value::FlatString,
-    Context, EvalResult, Handle, HeapPtr, Value,
+    Context, EvalResult, StackRoot, HeapPtr, Value,
 };
 
 /// A collection of information about a class that is used in a NewClass instruction.
@@ -39,7 +39,7 @@ pub struct ClassNames {
 pub struct Method {
     /// Name of this method, if statically known. If no name is provided then the name must be
     /// computed, and will be passed with the methods to a NewClass instruction.
-    pub name: Option<Handle<FlatString>>,
+    pub name: Option<StackRoot<FlatString>>,
     /// Whether this function is static
     pub is_static: bool,
     /// Whether this is a getter function
@@ -73,7 +73,7 @@ impl ClassNames {
         methods: &[Method],
         home_object: Option<HomeObjectLocation>,
         static_home_object: Option<HomeObjectLocation>,
-    ) -> AllocResult<Handle<ClassNames>> {
+    ) -> AllocResult<StackRoot<ClassNames>> {
         let num_methods = methods.len();
         let size = Self::calculate_size_in_bytes(num_methods);
         let mut class_names = cx.alloc_uninit_with_size::<ClassNames>(size)?;
@@ -103,7 +103,7 @@ impl ClassNames {
 
         set_uninit!(class_names.num_arguments, num_arguments);
 
-        Ok(class_names.to_handle())
+        Ok(class_names.to_stack())
     }
 
     const METHODS_OFFSET: usize = field_offset!(ClassNames, methods);
@@ -130,7 +130,7 @@ impl HeapItem for HeapPtr<ClassNames> {
         ClassNames::calculate_size_in_bytes(self.methods.len())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
 
         for method in self.methods.as_mut_slice() {
@@ -154,7 +154,7 @@ impl Method {
     #[inline]
     fn from_heap(heap_method: &HeapMethod) -> Method {
         Method {
-            name: heap_method.name.map(|n| n.to_handle()),
+            name: heap_method.name.map(|n| n.to_stack()),
             is_static: heap_method.is_static,
             is_getter: heap_method.is_getter,
             is_setter: heap_method.is_setter,
@@ -166,11 +166,11 @@ impl Method {
 /// ClassDefinitionEvaluation (https://tc39.es/ecma262/#sec-runtime-semantics-classdefinitionevaluation)
 pub fn new_class(
     mut cx: Context,
-    class_names: Handle<ClassNames>,
-    constructor_function: Handle<BytecodeFunction>,
-    super_class: Option<Handle<Value>>,
-    method_arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Closure>> {
+    class_names: StackRoot<ClassNames>,
+    constructor_function: StackRoot<BytecodeFunction>,
+    super_class: Option<StackRoot<Value>>,
+    method_arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Closure>> {
     let (proto_parent, constructor_parent) = if let Some(super_class) = super_class {
         if super_class.is_null() {
             let constructor_parent = cx.get_intrinsic(Intrinsic::FunctionPrototype);
@@ -201,9 +201,9 @@ pub fn new_class(
         HeapItemKind::OrdinaryObject,
         proto_parent,
     )?
-    .to_handle();
+    .to_stack();
 
-    let scope = cx.vm().scope().to_handle();
+    let scope = cx.vm().scope().to_stack();
     let constructor = Closure::new_with_proto(cx, constructor_function, scope, constructor_parent)?;
 
     // Define a `constructor` property on the prototype
@@ -243,8 +243,8 @@ pub fn new_class(
     for method_index in 0..class_names.num_methods() {
         let method = class_names.get_method(method_index);
 
-        let name: Handle<PropertyKey>;
-        let mut closure: Handle<Closure>;
+        let name: StackRoot<PropertyKey>;
+        let mut closure: StackRoot<Closure>;
 
         if let Some(method_name) = method.name {
             name = PropertyKey::string_handle(cx, method_name.as_string())?;

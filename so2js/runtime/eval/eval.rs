@@ -28,17 +28,17 @@ use crate::{
         property::Property,
         scope::{Scope, ScopeKind},
         string_value::FlatString,
-        Context, EvalResult, Handle, HeapPtr, Value,
+        Context, EvalResult, StackRoot, HeapPtr, Value,
     },
 };
 
 pub fn perform_eval(
     mut cx: Context,
-    code: Handle<Value>,
+    code: StackRoot<Value>,
     is_strict_caller: bool,
-    direct_scope: Option<Handle<Scope>>,
+    direct_scope: Option<StackRoot<Scope>>,
     flags: EvalFlags,
-) -> EvalResult<Handle<Value>> {
+) -> EvalResult<StackRoot<Value>> {
     if !code.is_string() {
         return Ok(code);
     }
@@ -104,9 +104,9 @@ pub fn perform_eval(
     let closure = Closure::new(cx, bytecode_function, eval_scope)?;
 
     // Determine the receiver for the eval function call
-    let receiver: Handle<Value> = if is_direct {
+    let receiver: StackRoot<Value> = if is_direct {
         // Direct evals inherit their receiver from the caller
-        cx.vm().receiver().to_handle(cx)
+        cx.vm().receiver().to_stack()
     } else {
         // For indirect evals receiver is the global object
         closure.global_object().into()
@@ -150,10 +150,10 @@ fn get_private_names_from_scopes(
 // Check if any names conflict with lexical bindings in parent scopes.
 fn check_eval_var_name_conflicts(
     mut cx: Context,
-    eval_var_names: &[Handle<FlatString>],
-    eval_func_names: &[Handle<FlatString>],
+    eval_var_names: &[StackRoot<FlatString>],
+    eval_func_names: &[StackRoot<FlatString>],
 ) -> EvalResult<()> {
-    let mut scope = cx.vm().scope().to_handle();
+    let mut scope = cx.vm().scope().to_stack();
 
     // Special case for an eval in the function params scope
     if scope.scope_names_ptr().is_function_parameters_scope() {
@@ -230,7 +230,7 @@ fn eval_declaration_instantiation(mut cx: Context, program: &ast::Program) -> Ev
     check_eval_var_name_conflicts(cx, &eval_var_names, &eval_func_names)?;
 
     // Find the enclosing var scope
-    let mut var_scope = cx.vm().scope().to_handle();
+    let mut var_scope = cx.vm().scope().to_stack();
     while !var_scope.scope_names_ptr().is_var_scope() {
         var_scope.replace(var_scope.parent().unwrap());
     }
@@ -288,7 +288,7 @@ fn eval_declaration_instantiation(mut cx: Context, program: &ast::Program) -> Ev
     Ok(())
 }
 
-fn error_name_already_declared(cx: Context, name: Handle<FlatString>) -> EvalResult<()> {
+fn error_name_already_declared(cx: Context, name: StackRoot<FlatString>) -> EvalResult<()> {
     syntax_error(
         cx,
         &format!("identifier '{name}' has already been declared"),

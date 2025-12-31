@@ -6,10 +6,10 @@ use crate::{
         alloc_error::AllocResult,
         collections::InlineArray,
         debug_print::{DebugPrint, DebugPrinter},
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
         string_value::{FlatString, StringValue},
-        Context, Handle, HeapPtr,
+        Context, StackRoot, HeapPtr,
     },
     set_uninit,
 };
@@ -49,10 +49,10 @@ impl CompiledRegExpObject {
         mut cx: Context,
         instructions: Vec<u32>,
         regexp: &RegExp,
-        escaped_pattern_source: Handle<StringValue>,
+        escaped_pattern_source: StackRoot<StringValue>,
         num_progress_points: u32,
         num_loop_registers: u32,
-    ) -> AllocResult<Handle<CompiledRegExpObject>> {
+    ) -> AllocResult<StackRoot<CompiledRegExpObject>> {
         let num_capture_groups = regexp.capture_groups.len() as u32;
         let mut has_named_capture_groups = false;
 
@@ -60,7 +60,7 @@ impl CompiledRegExpObject {
         for capture_group in regexp.capture_groups.iter() {
             let handle = if let Some(name_string) = capture_group {
                 has_named_capture_groups = true;
-                Some(cx.alloc_wtf8_str_ptr(name_string)?.to_handle())
+                Some(cx.alloc_wtf8_str_ptr(name_string)?.to_stack())
             } else {
                 None
             };
@@ -97,7 +97,7 @@ impl CompiledRegExpObject {
             .capture_groups_as_slice_mut()
             .copy_from_slice(capture_group_ptrs.as_slice());
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     #[inline]
@@ -116,8 +116,8 @@ impl CompiledRegExpObject {
     }
 
     #[inline]
-    pub fn escaped_pattern_source(&self) -> Handle<StringValue> {
-        self.escaped_pattern_source.to_handle()
+    pub fn escaped_pattern_source(&self) -> StackRoot<StringValue> {
+        self.escaped_pattern_source.to_stack()
     }
 
     #[inline]
@@ -192,7 +192,7 @@ impl HeapItem for HeapPtr<CompiledRegExpObject> {
         )
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
         visitor.visit_pointer(&mut self.escaped_pattern_source);
 

@@ -4,7 +4,7 @@ use crate::{
         abstract_operations::call_object,
         alloc_error::AllocResult,
         boxed_value::BoxedValue,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
         interned_strings::InternedStrings,
         intrinsics::intrinsics::Intrinsic,
@@ -14,7 +14,7 @@ use crate::{
         scope::Scope,
         scope_names::{ScopeFlags, ScopeNameFlags, ScopeNames},
         string_value::FlatString,
-        Context, EvalResult, Handle, HeapPtr, Realm, Value,
+        Context, EvalResult, StackRoot, HeapPtr, Realm, Value,
     },
     set_uninit,
 };
@@ -52,8 +52,8 @@ impl SyntheticModule {
     /// initializing the kind field.
     fn new(
         cx: Context,
-        realm: Handle<Realm>,
-        export_names: &[Handle<FlatString>],
+        realm: StackRoot<Realm>,
+        export_names: &[StackRoot<FlatString>],
     ) -> AllocResult<HeapPtr<SyntheticModule>> {
         // Create module scope for the module, with an entry for each exported name
         let name_flags = export_names
@@ -85,10 +85,10 @@ impl SyntheticModule {
 
     pub fn new_default_export(
         cx: Context,
-        realm: Handle<Realm>,
-        default_export_value: Handle<Value>,
-    ) -> AllocResult<Handle<SyntheticModule>> {
-        let default_export_name = cx.names.default.as_string().as_flat().to_handle();
+        realm: StackRoot<Realm>,
+        default_export_value: StackRoot<Value>,
+    ) -> AllocResult<StackRoot<SyntheticModule>> {
+        let default_export_name = cx.names.default.as_string().as_flat().to_stack();
         let mut module = Self::new(cx, realm, &[default_export_name])?;
 
         set_uninit!(
@@ -96,7 +96,7 @@ impl SyntheticModule {
             SyntheticModuleKind::DefaultExport(*default_export_value)
         );
 
-        Ok(module.to_handle())
+        Ok(module.to_stack())
     }
 
     fn calculate_size_in_bytes() -> usize {
@@ -114,7 +114,7 @@ impl SyntheticModule {
     }
 }
 
-impl Handle<SyntheticModule> {
+impl StackRoot<SyntheticModule> {
     pub fn as_dyn_module(&self) -> DynModule {
         self.into_dyn_module()
     }
@@ -122,8 +122,8 @@ impl Handle<SyntheticModule> {
     fn evaluate_default_export_module(
         &self,
         cx: Context,
-        default_export_value: Handle<Value>,
-    ) -> EvalResult<Handle<Value>> {
+        default_export_value: StackRoot<Value>,
+    ) -> EvalResult<StackRoot<Value>> {
         // Find the default export name in the module scope and then set the default export value
         let default_export_name = cx.names.default.as_string().as_flat();
         let scope_index = self
@@ -139,26 +139,26 @@ impl Handle<SyntheticModule> {
     }
 }
 
-impl Module for Handle<SyntheticModule> {
+impl Module for StackRoot<SyntheticModule> {
     fn as_enum(&self) -> ModuleEnum {
         ModuleEnum::Synthetic(*self)
     }
 
-    fn load_requested_modules(&self, cx: Context) -> AllocResult<Handle<PromiseObject>> {
+    fn load_requested_modules(&self, cx: Context) -> AllocResult<StackRoot<PromiseObject>> {
         Ok(must_a!(coerce_to_ordinary_promise(cx, cx.undefined())))
     }
 
     fn get_exported_names(
         &self,
         _: Context,
-        exported_names: &mut HashSet<Handle<FlatString>>,
+        exported_names: &mut HashSet<StackRoot<FlatString>>,
         visited_set: &mut HashSet<ModuleId>,
     ) {
         visited_set.insert(self.id());
 
         let scope_names = self.module_scope_ptr().scope_names_ptr();
         for name in scope_names.name_ptrs() {
-            exported_names.insert(name.to_handle());
+            exported_names.insert(name.to_stack());
         }
     }
 
@@ -191,10 +191,10 @@ impl Module for Handle<SyntheticModule> {
         Ok(())
     }
 
-    fn evaluate(&self, cx: Context) -> AllocResult<Handle<PromiseObject>> {
+    fn evaluate(&self, cx: Context) -> AllocResult<StackRoot<PromiseObject>> {
         let result = match self.kind {
             SyntheticModuleKind::DefaultExport(default_export_value) => {
-                self.evaluate_default_export_module(cx, default_export_value.to_handle(cx))
+                self.evaluate_default_export_module(cx, default_export_value.to_stack())
             }
         };
 
@@ -244,7 +244,7 @@ impl HeapItem for HeapPtr<SyntheticModule> {
         SyntheticModule::calculate_size_in_bytes()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
 
         match &mut self.kind {

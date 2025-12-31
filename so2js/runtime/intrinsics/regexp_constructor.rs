@@ -30,7 +30,7 @@ use crate::{
         error::{syntax_parse_error, type_error},
         eval_result::EvalResult,
         function::get_argument,
-        gc::{Handle, HeapItem, HeapVisitor},
+        gc::{StackRoot, HeapItem, GcVisitorExt},
         get,
         heap_item_descriptor::HeapItemKind,
         object_value::ObjectValue,
@@ -57,8 +57,8 @@ extend_object! {
 impl RegExpObject {
     pub fn new_from_constructor(
         cx: Context,
-        constructor: Handle<ObjectValue>,
-    ) -> EvalResult<Handle<RegExpObject>> {
+        constructor: StackRoot<ObjectValue>,
+    ) -> EvalResult<StackRoot<RegExpObject>> {
         let mut object = object_create_from_constructor::<RegExpObject>(
             cx,
             constructor,
@@ -70,7 +70,7 @@ impl RegExpObject {
         // we must ensure the RegExpObject is in a valid state.
         set_uninit!(object.compiled_regexp, HeapPtr::uninit());
 
-        let object = object.to_handle();
+        let object = object.to_stack();
 
         Self::define_last_index_property(cx, object)?;
 
@@ -79,8 +79,8 @@ impl RegExpObject {
 
     pub fn new_from_compiled_regexp(
         cx: Context,
-        compiled_regexp: Handle<CompiledRegExpObject>,
-    ) -> EvalResult<Handle<RegExpObject>> {
+        compiled_regexp: StackRoot<CompiledRegExpObject>,
+    ) -> EvalResult<StackRoot<RegExpObject>> {
         let regexp_constructor = cx.get_intrinsic(Intrinsic::RegExpConstructor);
         let mut object = must!(object_create_from_constructor::<RegExpObject>(
             cx,
@@ -91,7 +91,7 @@ impl RegExpObject {
 
         set_uninit!(object.compiled_regexp, *compiled_regexp);
 
-        let object = object.to_handle();
+        let object = object.to_stack();
 
         Self::define_last_index_property(cx, object)?;
 
@@ -110,7 +110,7 @@ impl RegExpObject {
 
     fn define_last_index_property(
         cx: Context,
-        regexp_object: Handle<RegExpObject>,
+        regexp_object: StackRoot<RegExpObject>,
     ) -> AllocResult<()> {
         let last_index_desc = PropertyDescriptor::data(cx.undefined(), true, false, false);
         must_a!(define_property_or_throw(
@@ -124,8 +124,8 @@ impl RegExpObject {
     }
 
     #[inline]
-    pub fn compiled_regexp(&self) -> Handle<CompiledRegExpObject> {
-        self.compiled_regexp.to_handle()
+    pub fn compiled_regexp(&self) -> StackRoot<CompiledRegExpObject> {
+        self.compiled_regexp.to_stack()
     }
 
     #[inline]
@@ -134,7 +134,7 @@ impl RegExpObject {
     }
 
     #[inline]
-    pub fn escaped_pattern_source(&self) -> Handle<StringValue> {
+    pub fn escaped_pattern_source(&self) -> StackRoot<StringValue> {
         self.compiled_regexp.escaped_pattern_source()
     }
 }
@@ -143,7 +143,7 @@ pub struct RegExpConstructor;
 
 impl RegExpConstructor {
     /// Properties of the RegExp Constructor (https://tc39.es/ecma262/#sec-properties-of-the-regexp-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -171,9 +171,9 @@ impl RegExpConstructor {
     /// RegExp (https://tc39.es/ecma262/#sec-regexp-pattern-flags)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let pattern_arg = get_argument(cx, arguments, 0);
         let flags_arg = get_argument(cx, arguments, 1);
 
@@ -230,9 +230,9 @@ impl RegExpConstructor {
     /// RegExp.escape (https://tc39.es/ecma262/#sec-regexp.escape)
     pub fn escape(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let string_arg = get_argument(cx, arguments, 0);
         if !string_arg.is_string() {
             return type_error(cx, "RegExp.escape called with non-string argument");
@@ -293,7 +293,7 @@ impl RegExpConstructor {
 }
 
 #[inline]
-pub fn as_regexp_object(value: Handle<Value>) -> Option<Handle<RegExpObject>> {
+pub fn as_regexp_object(value: StackRoot<Value>) -> Option<StackRoot<RegExpObject>> {
     if value.is_object() {
         value.as_object().as_regexp_object()
     } else {
@@ -304,24 +304,24 @@ pub fn as_regexp_object(value: Handle<Value>) -> Option<Handle<RegExpObject>> {
 // Source used to construct a RegExp
 pub enum RegExpSource {
     // Construct from a pre-existing RegExpObject
-    RegExpObject(Handle<RegExpObject>),
+    RegExpObject(StackRoot<RegExpObject>),
     // Construct from a pair of pattern value and flags
-    PatternAndFlags(Handle<Value>, FlagsSource),
+    PatternAndFlags(StackRoot<Value>, FlagsSource),
 }
 
 pub enum FlagsSource {
     // Construct from pre-existing RegExpFloags
     RegExpFlags(RegExpFlags),
     // Construct from flags value
-    Value(Handle<Value>),
+    Value(StackRoot<Value>),
 }
 
 /// RegExpCreate (https://tc39.es/ecma262/#sec-regexpcreate)
 pub fn regexp_create(
     cx: Context,
     regexp_source: RegExpSource,
-    constructor: Handle<ObjectValue>,
-) -> EvalResult<Handle<Value>> {
+    constructor: StackRoot<ObjectValue>,
+) -> EvalResult<StackRoot<Value>> {
     let regexp_object = RegExpObject::new_from_constructor(cx, constructor)?;
     regexp_init(cx, regexp_object, regexp_source)
 }
@@ -329,9 +329,9 @@ pub fn regexp_create(
 /// RegExpInitialize (https://tc39.es/ecma262/#sec-regexpinitialize)
 pub fn regexp_init(
     cx: Context,
-    mut regexp_object: Handle<RegExpObject>,
+    mut regexp_object: StackRoot<RegExpObject>,
     regexp_source: RegExpSource,
-) -> EvalResult<Handle<Value>> {
+) -> EvalResult<StackRoot<Value>> {
     match regexp_source {
         RegExpSource::RegExpObject(old_regexp_object) => {
             regexp_object.compiled_regexp = old_regexp_object.compiled_regexp;
@@ -374,7 +374,7 @@ pub fn regexp_init(
     Ok(regexp_object.as_value())
 }
 
-fn value_or_empty_string(cx: Context, value: Handle<Value>) -> Handle<Value> {
+fn value_or_empty_string(cx: Context, value: StackRoot<Value>) -> StackRoot<Value> {
     if value.is_undefined() {
         cx.names.empty_string().as_string().into()
     } else {
@@ -382,7 +382,7 @@ fn value_or_empty_string(cx: Context, value: Handle<Value>) -> Handle<Value> {
     }
 }
 
-fn parse_flags(cx: Context, flags_string: Handle<StringValue>) -> EvalResult<RegExpFlags> {
+fn parse_flags(cx: Context, flags_string: StackRoot<StringValue>) -> EvalResult<RegExpFlags> {
     fn parse_lexer_stream(cx: Context, lexer_stream: impl LexerStream) -> EvalResult<RegExpFlags> {
         match RegExpParser::parse_flags(lexer_stream) {
             Ok(flags) => Ok(flags),
@@ -408,7 +408,7 @@ fn parse_flags(cx: Context, flags_string: Handle<StringValue>) -> EvalResult<Reg
 
 fn parse_pattern(
     cx: Context,
-    pattern_string: Handle<StringValue>,
+    pattern_string: StackRoot<StringValue>,
     flags: RegExpFlags,
     alloc: AstAlloc,
 ) -> EvalResult<RegExp> {
@@ -447,8 +447,8 @@ fn parse_pattern(
 
 fn escape_pattern_string(
     mut cx: Context,
-    pattern_string: Handle<StringValue>,
-) -> AllocResult<Handle<StringValue>> {
+    pattern_string: StackRoot<StringValue>,
+) -> AllocResult<StackRoot<StringValue>> {
     // Special case the empty pattern string - equivalent to an empty non-capturing group
     if pattern_string.is_empty() {
         return Ok(cx.alloc_string("(?:)")?.as_string());
@@ -488,7 +488,7 @@ impl HeapItem for HeapPtr<RegExpObject> {
         size_of::<RegExpObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.compiled_regexp);
     }

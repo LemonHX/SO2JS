@@ -1,7 +1,7 @@
 use crate::runtime::{
     alloc_error::AllocResult, error::type_error, eval_result::EvalResult, function::get_argument,
     intrinsics::weak_ref_constructor::can_be_held_weakly, object_value::ObjectValue,
-    property::Property, realm::Realm, value::ValueCollectionKey, Context, Handle, Value,
+    property::Property, realm::Realm, value::ValueCollectionKey, Context, StackRoot, Value,
 };
 
 use super::{intrinsics::Intrinsic, weak_map_object::WeakMapObject};
@@ -10,7 +10,7 @@ pub struct WeakMapPrototype;
 
 impl WeakMapPrototype {
     /// Properties of the WeakMap Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-weakmap-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -37,9 +37,9 @@ impl WeakMapPrototype {
     /// WeakMap.prototype.delete (https://tc39.es/ecma262/#sec-weakmap.prototype.delete)
     pub fn delete(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let weak_map_object = if let Some(weak_map_object) = this_weak_map_value(this_value) {
             weak_map_object
         } else {
@@ -60,9 +60,9 @@ impl WeakMapPrototype {
     /// WeakMap.prototype.get (https://tc39.es/ecma262/#sec-weakmap.prototype.get)
     pub fn get(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let weak_map_object = if let Some(weak_map_object) = this_weak_map_value(this_value) {
             weak_map_object
         } else {
@@ -80,16 +80,16 @@ impl WeakMapPrototype {
 
         match value_opt {
             None => Ok(cx.undefined()),
-            Some(value) => Ok(value.to_handle(cx)),
+            Some(value) => Ok(value.to_stack()),
         }
     }
 
     /// WeakMap.prototype.has (https://tc39.es/ecma262/#sec-weakmap.prototype.has)
     pub fn has(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let weak_map_object = if let Some(weak_map_object) = this_weak_map_value(this_value) {
             weak_map_object
         } else {
@@ -110,9 +110,9 @@ impl WeakMapPrototype {
     /// WeakMap.prototype.set (https://tc39.es/ecma262/#sec-weakmap.prototype.set)
     pub fn set(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let weak_map_object = if let Some(weak_map_object) = this_weak_map_value(this_value) {
             weak_map_object
         } else {
@@ -132,7 +132,7 @@ impl WeakMapPrototype {
     }
 }
 
-fn this_weak_map_value(value: Handle<Value>) -> Option<Handle<WeakMapObject>> {
+fn this_weak_map_value(value: StackRoot<Value>) -> Option<StackRoot<WeakMapObject>> {
     if !value.is_object() {
         return None;
     }

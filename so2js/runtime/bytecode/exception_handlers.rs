@@ -9,9 +9,9 @@ use crate::{
         alloc_error::AllocResult,
         collections::InlineArray,
         debug_print::{DebugPrint, DebugPrinter},
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
-        Context, Handle, HeapPtr,
+        Context, StackRoot, HeapPtr,
     },
     set_uninit,
 };
@@ -19,7 +19,7 @@ use alloc::format;
 use alloc::vec;
 use alloc::vec::Vec;
 
-pub struct ExceptionHandlerBuilder {
+pub struct ExceptionStackRootrBuilder {
     /// Byte offset of the start of the instruction range that is covered (inclusive).
     pub start: usize,
     /// Byte offset of the end of the instruction range that is covered (exclusive).
@@ -30,7 +30,7 @@ pub struct ExceptionHandlerBuilder {
     pub error_register: Option<GenRegister>,
 }
 
-impl ExceptionHandlerBuilder {
+impl ExceptionStackRootrBuilder {
     /// Create a new exception handler with start and end offsets. The handler offset and register
     /// index will be filled in later.
     pub fn new(start: usize, end: usize) -> Self {
@@ -43,14 +43,14 @@ impl ExceptionHandlerBuilder {
     }
 }
 
-pub struct ExceptionHandlersBuilder {
+pub struct ExceptionStackRootrsBuilder {
     /// Collection fo all handlers generated so far in the function.
-    handlers: Vec<ExceptionHandlerBuilder>,
+    handlers: Vec<ExceptionStackRootrBuilder>,
     /// The minimum width that fits all numbers in the handlers generated so far.
     width: WidthEnum,
 }
 
-impl ExceptionHandlersBuilder {
+impl ExceptionStackRootrsBuilder {
     pub fn new() -> Self {
         Self {
             handlers: vec![],
@@ -58,7 +58,7 @@ impl ExceptionHandlersBuilder {
         }
     }
 
-    pub fn add(&mut self, handler: ExceptionHandlerBuilder) {
+    pub fn add(&mut self, handler: ExceptionStackRootrBuilder) {
         // Determine the min width that fits all numbers in the handler
         self.width = self
             .width
@@ -73,7 +73,7 @@ impl ExceptionHandlersBuilder {
         self.handlers.push(handler);
     }
 
-    pub fn finish(&self, cx: Context) -> AllocResult<Option<Handle<ExceptionHandlers>>> {
+    pub fn finish(&self, cx: Context) -> AllocResult<Option<StackRoot<ExceptionStackRootrs>>> {
         if self.handlers.is_empty() {
             return Ok(None);
         }
@@ -89,7 +89,7 @@ impl ExceptionHandlersBuilder {
             self.write_operand(&mut buffer, register.signed() as isize as usize);
         }
 
-        Ok(Some(ExceptionHandlers::new(cx, buffer, self.width)?))
+        Ok(Some(ExceptionStackRootrs::new(cx, buffer, self.width)?))
     }
 
     fn write_operand(&self, buffer: &mut Vec<u8>, value: usize) {
@@ -108,7 +108,7 @@ impl ExceptionHandlersBuilder {
 }
 
 #[repr(C)]
-pub struct ExceptionHandlers {
+pub struct ExceptionStackRootrs {
     descriptor: HeapPtr<HeapItemDescriptor>,
     /// Width of the encoded handler data. A narrow or wide width means all values are encoded as
     /// one or two bytes, respectively. An extra wide width means all values are encoded as a full
@@ -118,35 +118,35 @@ pub struct ExceptionHandlers {
     handlers: InlineArray<u8>,
 }
 
-impl ExceptionHandlers {
+impl ExceptionStackRootrs {
     fn new(
         cx: Context,
         handlers: Vec<u8>,
         width: WidthEnum,
-    ) -> AllocResult<Handle<ExceptionHandlers>> {
+    ) -> AllocResult<StackRoot<ExceptionStackRootrs>> {
         let size = Self::calculate_size_in_bytes(handlers.len());
-        let mut object = cx.alloc_uninit_with_size::<ExceptionHandlers>(size)?;
+        let mut object = cx.alloc_uninit_with_size::<ExceptionStackRootrs>(size)?;
 
         set_uninit!(
             object.descriptor,
-            cx.base_descriptors.get(HeapItemKind::ExceptionHandlers)
+            cx.base_descriptors.get(HeapItemKind::ExceptionStackRootrs)
         );
         set_uninit!(object.width, width);
         object.handlers.init_from_slice(&handlers);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
-    const HANDLERS_BYTE_OFFSET: usize = field_offset!(ExceptionHandlers, handlers);
+    const HANDLERS_BYTE_OFFSET: usize = field_offset!(ExceptionStackRootrs, handlers);
 
     fn calculate_size_in_bytes(handlers_len: usize) -> usize {
         Self::HANDLERS_BYTE_OFFSET + InlineArray::<u8>::calculate_size_in_bytes(handlers_len)
     }
 
     /// A zero-copy GC-unsafe iterator over the exception handlers.
-    pub fn iter(&self) -> ExceptionHandlersIterator {
+    pub fn iter(&self) -> ExceptionStackRootrsIterator {
         let range = self.handlers.as_slice().as_ptr_range();
-        ExceptionHandlersIterator {
+        ExceptionStackRootrsIterator {
             current: range.start,
             end: range.end,
             width: self.width,
@@ -155,7 +155,7 @@ impl ExceptionHandlers {
 }
 
 /// A zero-copy GC-unsafe iterator over the exception handlers.
-pub struct ExceptionHandlersIterator {
+pub struct ExceptionStackRootrsIterator {
     current: *const u8,
     end: *const u8,
     width: WidthEnum,
@@ -163,14 +163,14 @@ pub struct ExceptionHandlersIterator {
 
 /// A view of an exception handler entry in the exception handler table.
 #[derive(Clone, Copy)]
-pub struct ExceptionHandler {
+pub struct ExceptionStackRootr {
     /// Pointer to the start of the exception handler entry.
     ptr: *const u8,
     /// Byte width of the values in this entry.
     width: WidthEnum,
 }
 
-impl ExceptionHandler {
+impl ExceptionStackRootr {
     fn get_value_at(&self, index: usize) -> usize {
         unsafe {
             match self.width {
@@ -212,14 +212,14 @@ impl ExceptionHandler {
     }
 }
 
-impl Iterator for ExceptionHandlersIterator {
-    type Item = ExceptionHandler;
+impl Iterator for ExceptionStackRootrsIterator {
+    type Item = ExceptionStackRootr;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.current == self.end {
             None
         } else {
-            let view = ExceptionHandler {
+            let view = ExceptionStackRootr {
                 ptr: self.current,
                 width: self.width,
             };
@@ -236,7 +236,7 @@ impl Iterator for ExceptionHandlersIterator {
     }
 }
 
-impl DebugPrint for HeapPtr<ExceptionHandlers> {
+impl DebugPrint for HeapPtr<ExceptionStackRootrs> {
     fn debug_format(&self, printer: &mut DebugPrinter) {
         if printer.is_short_mode() {
             printer.write_heap_item_default(self.cast());
@@ -244,7 +244,7 @@ impl DebugPrint for HeapPtr<ExceptionHandlers> {
         }
 
         // Exception handlers are indented
-        printer.write("Exception Handlers:\n");
+        printer.write("Exception StackRootrs:\n");
         printer.inc_indent();
 
         for handler in self.iter() {
@@ -267,12 +267,12 @@ impl DebugPrint for HeapPtr<ExceptionHandlers> {
     }
 }
 
-impl HeapItem for HeapPtr<ExceptionHandlers> {
+impl HeapItem for HeapPtr<ExceptionStackRootrs> {
     fn byte_size(&self) -> usize {
-        ExceptionHandlers::calculate_size_in_bytes(self.handlers.len())
+        ExceptionStackRootrs::calculate_size_in_bytes(self.handlers.len())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
     }
 }

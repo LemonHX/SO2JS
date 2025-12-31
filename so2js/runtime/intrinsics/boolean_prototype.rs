@@ -1,6 +1,6 @@
 use crate::runtime::{
     alloc_error::AllocResult, error::type_error, eval_result::EvalResult,
-    object_value::ObjectValue, realm::Realm, Context, Handle, Value,
+    object_value::ObjectValue, realm::Realm, Context, StackRoot, Value,
 };
 
 use super::{boolean_constructor::BooleanObject, intrinsics::Intrinsic};
@@ -9,7 +9,7 @@ pub struct BooleanPrototype;
 
 impl BooleanPrototype {
     /// Properties of the Boolean Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-boolean-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let object_proto = realm.get_intrinsic(Intrinsic::ObjectPrototype);
         let object = BooleanObject::new_with_proto(cx, object_proto, false)?;
 
@@ -27,9 +27,9 @@ impl BooleanPrototype {
     /// Boolean.prototype.toString (https://tc39.es/ecma262/#sec-boolean.prototype.tostring)
     pub fn to_string(
         mut cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let bool_value = this_boolean_value(cx, this_value)?;
         let string_value = if bool_value { "true" } else { "false" };
 
@@ -39,15 +39,15 @@ impl BooleanPrototype {
     /// Boolean.prototype.valueOf (https://tc39.es/ecma262/#sec-boolean.prototype.valueof)
     pub fn value_of(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let bool_value = this_boolean_value(cx, this_value)?;
         Ok(cx.bool(bool_value))
     }
 }
 
-fn this_boolean_value(cx: Context, value: Handle<Value>) -> EvalResult<bool> {
+fn this_boolean_value(cx: Context, value: StackRoot<Value>) -> EvalResult<bool> {
     if value.is_bool() {
         return Ok(value.as_bool());
     }

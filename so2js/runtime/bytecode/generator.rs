@@ -57,13 +57,13 @@ use crate::{
         source_file::SourceFile,
         string_value::{FlatString, StringValue},
         value::BigIntValue,
-        Context, Handle, HeapPtr, Realm, Value,
+        Context, StackRoot, HeapPtr, Realm, Value,
     },
 };
 
 use super::{
     constant_table_builder::{ConstantTableBuilder, ConstantTableIndex},
-    exception_handlers::{ExceptionHandlerBuilder, ExceptionHandlersBuilder},
+    exception_handlers::{ExceptionStackRootrBuilder, ExceptionStackRootrsBuilder},
     function::Closure,
     instruction::{DecodeInfo, DefinePrivatePropertyFlags, EvalFlags, OpCode},
     operand::{min_width_for_signed, ConstantIndex, Operand, Register, SInt, UInt},
@@ -72,18 +72,18 @@ use super::{
     writer::BytecodeWriter,
 };
 
-/// Bytecode generator for an entire program. Handles generating the global function as well as all
+/// Bytecode generator for an entire program. StackRoots generating the global function as well as all
 /// functions within the program.
 pub struct BytecodeProgramGenerator<'a> {
     cx: Context,
     scope_tree: &'a ScopeTree<'a>,
-    realm: Handle<Realm>,
+    realm: StackRoot<Realm>,
 
     /// Source file of the functions that are being generated.
-    source_file: Handle<SourceFile>,
+    source_file: StackRoot<SourceFile>,
 
     /// The module that is being generated, if this is a module program.
-    module: Option<Handle<SourceTextModule>>,
+    module: Option<StackRoot<SourceTextModule>>,
 
     /// Queue of functions that still need to be generated, along with the information needed to
     /// patch their creation into their parent function.
@@ -93,12 +93,12 @@ pub struct BytecodeProgramGenerator<'a> {
     ///
     /// This may be used for debugging purposes, to dump all functions in the order they were
     /// generated. Functions are only added here if the option is not None.
-    all_functions: Option<Handle<FunctionVec>>,
+    all_functions: Option<StackRoot<FunctionVec>>,
 }
 
 pub struct BytecodeScript {
-    pub script_function: Handle<BytecodeFunction>,
-    pub global_names: Handle<GlobalNames>,
+    pub script_function: StackRoot<BytecodeFunction>,
+    pub global_names: StackRoot<GlobalNames>,
 }
 
 impl Escapable for BytecodeScript {
@@ -114,14 +114,14 @@ impl<'a> BytecodeProgramGenerator<'a> {
     pub fn new(
         cx: Context,
         scope_tree: &'a ScopeTree<'a>,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
         source: Rc<Source>,
     ) -> AllocResult<Self> {
         let source_file = SourceFile::new(cx, &source)?;
 
         // If we are dumping bytecode then we must collect all functions
         let all_functions = if cx.options.print_bytecode {
-            Some(FunctionVecField::new_vec(cx, 4)?.to_handle())
+            Some(FunctionVecField::new_vec(cx, 4)?.to_stack())
         } else {
             None
         };
@@ -141,7 +141,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
     /// if necessary. Must be called on all functions after they are generated.
     fn process_generated_function(
         &mut self,
-        function: Handle<BytecodeFunction>,
+        function: StackRoot<BytecodeFunction>,
     ) -> AllocResult<()> {
         if self.all_functions.is_some() {
             FunctionVecField(&mut self.all_functions)
@@ -172,7 +172,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
     pub fn generate_from_parse_script_result(
         cx: Context,
         parse_result: &'a AnalyzedProgramResult<'a>,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
     ) -> EmitResult<BytecodeScript> {
         debug_assert!(parse_result.program.kind == ProgramKind::Script);
 
@@ -241,8 +241,8 @@ impl<'a> BytecodeProgramGenerator<'a> {
     pub fn generate_from_parse_module_result(
         cx: Context,
         parse_result: &'a AnalyzedProgramResult<'a>,
-        realm: Handle<Realm>,
-    ) -> EmitResult<Handle<SourceTextModule>> {
+        realm: StackRoot<Realm>,
+    ) -> EmitResult<StackRoot<SourceTextModule>> {
         debug_assert!(parse_result.program.kind == ProgramKind::Module);
 
         handle_scope!(cx, {
@@ -259,7 +259,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
     fn generate_module_program(
         &mut self,
         program: &'a ast::Program<'a>,
-    ) -> EmitResult<Handle<SourceTextModule>> {
+    ) -> EmitResult<StackRoot<SourceTextModule>> {
         let program_function = self.gen_module_function(program)?;
         let source_text_module = self.gen_source_text_module(program, program_function)?;
 
@@ -275,7 +275,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
     fn gen_module_function(
         &mut self,
         program: &'a ast::Program<'a>,
-    ) -> EmitResult<Handle<BytecodeFunction>> {
+    ) -> EmitResult<StackRoot<BytecodeFunction>> {
         let mut emit_result = EmitFunctionResult::empty();
 
         handle_scope!(self.cx, {
@@ -309,8 +309,8 @@ impl<'a> BytecodeProgramGenerator<'a> {
     fn gen_source_text_module(
         &mut self,
         program: &ast::Program,
-        program_function: Handle<BytecodeFunction>,
-    ) -> AllocResult<Handle<SourceTextModule>> {
+        program_function: StackRoot<BytecodeFunction>,
+    ) -> AllocResult<StackRoot<SourceTextModule>> {
         let mut module_requests = IndexSet::new();
 
         let mut imports = vec![];
@@ -552,7 +552,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
 
     fn gen_module_request(
         &mut self,
-        specifier: Handle<FlatString>,
+        specifier: StackRoot<FlatString>,
         attributes: Option<&ast::ImportAttributes>,
     ) -> AllocResult<ModuleRequest> {
         let attributes = self.gen_import_attributes(attributes)?;
@@ -565,7 +565,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
     fn gen_import_attributes(
         &mut self,
         attributes: Option<&ast::ImportAttributes>,
-    ) -> AllocResult<Option<Handle<ImportAttributes>>> {
+    ) -> AllocResult<Option<StackRoot<ImportAttributes>>> {
         if attributes.is_none() {
             return Ok(None);
         }
@@ -602,7 +602,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
     }
 
     /// Create the root module scope for module evaluation. Initialize
-    fn gen_module_scope(&mut self, program: &ast::Program) -> AllocResult<Handle<Scope>> {
+    fn gen_module_scope(&mut self, program: &ast::Program) -> AllocResult<StackRoot<Scope>> {
         let ast_node = program.scope.as_ref();
         let vm_node = self.scope_tree.get_vm_node(ast_node.vm_scope_id().unwrap());
 
@@ -639,7 +639,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
     fn alloc_export_name_string(
         &mut self,
         module_name: &ast::ExportName,
-    ) -> AllocResult<Handle<FlatString>> {
+    ) -> AllocResult<StackRoot<FlatString>> {
         match module_name {
             ast::ExportName::Id(id) => self.cx.alloc_wtf8_str(id.name),
             ast::ExportName::String(lit) => self.cx.alloc_wtf8_str(lit.value),
@@ -663,8 +663,8 @@ impl<'a> BytecodeProgramGenerator<'a> {
     pub fn generate_from_eval_parse_result(
         cx: Context,
         parse_result: &'a AnalyzedProgramResult<'a>,
-        realm: Handle<Realm>,
-    ) -> EmitResult<Handle<BytecodeFunction>> {
+        realm: StackRoot<Realm>,
+    ) -> EmitResult<StackRoot<BytecodeFunction>> {
         handle_scope!(cx, {
             let mut generator = Self::new(
                 cx,
@@ -683,7 +683,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
     fn generate_eval(
         &mut self,
         eval_program: &'a ast::Program<'a>,
-    ) -> EmitResult<Handle<BytecodeFunction>> {
+    ) -> EmitResult<StackRoot<BytecodeFunction>> {
         let program_function = self.gen_eval_function(eval_program)?;
 
         while let Some(pending_function) = self.pending_functions_queue.pop_front() {
@@ -696,7 +696,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
     fn gen_eval_function(
         &mut self,
         eval_program: &'a ast::Program<'a>,
-    ) -> EmitResult<Handle<BytecodeFunction>> {
+    ) -> EmitResult<StackRoot<BytecodeFunction>> {
         let mut emit_result = EmitFunctionResult::empty();
 
         handle_scope!(self.cx, {
@@ -764,8 +764,8 @@ impl<'a> BytecodeProgramGenerator<'a> {
     pub fn generate_from_function_constructor_parse_result(
         cx: Context,
         parse_result: &'a AnalyzedFunctionResult<'a>,
-        realm: Handle<Realm>,
-    ) -> EmitResult<Handle<BytecodeFunction>> {
+        realm: StackRoot<Realm>,
+    ) -> EmitResult<StackRoot<BytecodeFunction>> {
         handle_scope!(cx, {
             let source = parse_result.source.clone();
             let mut generator = Self::new(cx, &parse_result.scope_tree, realm, source)?;
@@ -780,7 +780,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
     fn generate_function_constructor(
         &mut self,
         function: &'a ast::Function<'a>,
-    ) -> EmitResult<Handle<BytecodeFunction>> {
+    ) -> EmitResult<StackRoot<BytecodeFunction>> {
         // Create a dummy global scope stack node that will not conflict with any real scope id
         let scope = Rc::new(ScopeStackNode {
             scope_id: usize::MAX,
@@ -1013,7 +1013,7 @@ impl<'a> BytecodeProgramGenerator<'a> {
 
     fn enqueue_pending_functions(
         &mut self,
-        parent_function: Handle<BytecodeFunction>,
+        parent_function: StackRoot<BytecodeFunction>,
         pending_functions: PendingFunctionNodes<'a>,
     ) {
         for (func_node, func_gen_patch, scope) in pending_functions {
@@ -1039,7 +1039,7 @@ pub struct BytecodeFunctionGenerator<'a> {
     pub writer: BytecodeWriter,
     cx: Context,
     scope_tree: &'a ScopeTree<'a>,
-    realm: Handle<Realm>,
+    realm: StackRoot<Realm>,
 
     /// A chain of VM scopes that the generator is currently inside. The first node is the innermost
     /// scope.
@@ -1053,7 +1053,7 @@ pub struct BytecodeFunctionGenerator<'a> {
     name: Option<Wtf8Cow<'a>>,
 
     /// Source file of the function that is being generated.
-    source_file: Handle<SourceFile>,
+    source_file: StackRoot<SourceFile>,
 
     /// Number of blocks currently allocated in the function.
     num_blocks: usize,
@@ -1129,7 +1129,7 @@ pub struct BytecodeFunctionGenerator<'a> {
 
     constant_table_builder: ConstantTableBuilder,
     register_allocator: TemporaryRegisterAllocator,
-    exception_handler_builder: ExceptionHandlersBuilder,
+    exception_handler_builder: ExceptionStackRootrsBuilder,
 
     /// Queue of functions that still need to be generated.
     pending_functions_queue: PendingFunctionNodes<'a>,
@@ -1140,9 +1140,9 @@ impl<'a> BytecodeFunctionGenerator<'a> {
         cx: Context,
         scope_tree: &'a ScopeTree<'a>,
         scope: Rc<ScopeStackNode>,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
         name: Option<Wtf8Cow<'a>>,
-        source_file: Handle<SourceFile>,
+        source_file: StackRoot<SourceFile>,
         source_range: Range<Pos>,
         derived_constructor_end_pos: Option<Pos>,
         class_fields: ClassFieldsInitializer<'a>,
@@ -1189,7 +1189,7 @@ impl<'a> BytecodeFunctionGenerator<'a> {
             derived_constructor_end_pos,
             constant_table_builder: ConstantTableBuilder::new(),
             register_allocator: TemporaryRegisterAllocator::new(num_local_registers),
-            exception_handler_builder: ExceptionHandlersBuilder::new(),
+            exception_handler_builder: ExceptionStackRootrsBuilder::new(),
             pending_functions_queue: vec![],
         }
     }
@@ -1199,9 +1199,9 @@ impl<'a> BytecodeFunctionGenerator<'a> {
         func: &'a ast::Function,
         scope_tree: &'a ScopeTree<'a>,
         scope: Rc<ScopeStackNode>,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
         default_name: Option<&Wtf8Str>,
-        source_file: Handle<SourceFile>,
+        source_file: StackRoot<SourceFile>,
         source_range: Range<Pos>,
         class_fields: ClassFieldsInitializer<'a>,
         is_constructor: bool,
@@ -1282,8 +1282,8 @@ impl<'a> BytecodeFunctionGenerator<'a> {
         program: &ast::Program,
         scope_tree: &'a ScopeTree<'a>,
         name: &'static str,
-        source_file: Handle<SourceFile>,
-        realm: Handle<Realm>,
+        source_file: StackRoot<SourceFile>,
+        realm: StackRoot<Realm>,
     ) -> EmitResult<Self> {
         // Number of local registers was determined while creating the VM scope tree
         let num_local_registers = program.scope.as_ref().num_local_registers();
@@ -1324,9 +1324,9 @@ impl<'a> BytecodeFunctionGenerator<'a> {
         cx: Context,
         scope_tree: &'a ScopeTree<'a>,
         scope: Rc<ScopeStackNode>,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
         name: &'a Wtf8Str,
-        source_file: Handle<SourceFile>,
+        source_file: StackRoot<SourceFile>,
         source_range: Range<Pos>,
         class_fields: ClassFieldsInitializer<'a>,
         is_base_constructor: bool,
@@ -1366,9 +1366,9 @@ impl<'a> BytecodeFunctionGenerator<'a> {
         class: AstPtr<ast::Class>,
         scope_tree: &'a ScopeTree<'a>,
         scope: Rc<ScopeStackNode>,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
         name: &'static str,
-        source_file: Handle<SourceFile>,
+        source_file: StackRoot<SourceFile>,
         init_func_scope: &AstScopeNode,
     ) -> EmitResult<Self> {
         let num_local_registers = init_func_scope.num_local_registers();
@@ -1725,11 +1725,11 @@ impl<'a> BytecodeFunctionGenerator<'a> {
         self.writer.mov_instruction(dest, src);
     }
 
-    fn get_cached_str(&mut self, str: &str) -> AllocResult<Handle<StringValue>> {
+    fn get_cached_str(&mut self, str: &str) -> AllocResult<StackRoot<StringValue>> {
         InternedStrings::get_generator_cache_str(self.cx, str)
     }
 
-    fn get_cached_wtf8_str(&mut self, str: &Wtf8Str) -> AllocResult<Handle<StringValue>> {
+    fn get_cached_wtf8_str(&mut self, str: &Wtf8Str) -> AllocResult<StackRoot<StringValue>> {
         InternedStrings::get_generator_cache_wtf8_str(self.cx, str)
     }
 
@@ -1753,7 +1753,7 @@ impl<'a> BytecodeFunctionGenerator<'a> {
     ) -> EmitResult<ConstantTableIndex> {
         let constant_index = self
             .constant_table_builder
-            .add_heap_item(Handle::dangling())?;
+            .add_heap_item(StackRoot::dangling())?;
         self.pending_functions_queue.push((
             function,
             FuncGenPatch::ParentFunction(constant_index),
@@ -2252,7 +2252,7 @@ impl<'a> BytecodeFunctionGenerator<'a> {
     }
 
     fn gen_async_body_exception_handler(&mut self, start: usize, end: usize) -> EmitResult<()> {
-        let mut handler = ExceptionHandlerBuilder::new(start, end);
+        let mut handler = ExceptionStackRootrBuilder::new(start, end);
         handler.handler = self.writer.current_offset();
 
         // Reject the current promise with the current error
@@ -2989,7 +2989,7 @@ impl<'a> BytecodeFunctionGenerator<'a> {
         let dest = self.allocate_destination(dest)?;
 
         // BigInts are stored in the constant table, but not deduped
-        let bigint_value = BigIntValue::new(self.cx, lit.value())?.to_handle();
+        let bigint_value = BigIntValue::new(self.cx, lit.value())?.to_stack();
         let constant_index = self
             .constant_table_builder
             .add_heap_item(bigint_value.cast())?;
@@ -4174,7 +4174,7 @@ impl<'a> BytecodeFunctionGenerator<'a> {
                     }
                 };
 
-                // Handle getter or setter methods
+                // StackRoot getter or setter methods
                 if matches!(
                     property.kind,
                     ast::PropertyKind::Get | ast::PropertyKind::Set
@@ -5576,7 +5576,7 @@ impl<'a> BytecodeFunctionGenerator<'a> {
         )?;
         self.register_allocator.release(return_value);
 
-        // Handle a throw completion from the yield
+        // StackRoot a throw completion from the yield
         self.start_block(throw_block);
 
         // Extract the throw method from the iterator if one exists
@@ -6992,7 +6992,7 @@ impl<'a> BytecodeFunctionGenerator<'a> {
                         let mut is_getter = method.kind == ast::ClassMethodKind::Get;
                         let mut is_setter = method.kind == ast::ClassMethodKind::Set;
 
-                        // Handle private accessor pairs
+                        // StackRoot private accessor pairs
                         let value = if let Some(first_method) =
                             private_accessor_pairs.remove(&private_id.name)
                         {
@@ -7117,10 +7117,10 @@ impl<'a> BytecodeFunctionGenerator<'a> {
             // Constructor has name of class
             id.name
         } else if let Some(name) = name {
-            // Handle name passed from named evaluation
+            // StackRoot name passed from named evaluation
             name
         } else if let GenClassKind::Export { name, .. } = &kind {
-            // Handle name passed from export, such as the anonymous default export name
+            // StackRoot name passed from export, such as the anonymous default export name
             name
         } else {
             // Otherwise name is the empty string if class has no name
@@ -7708,7 +7708,7 @@ impl<'a> BytecodeFunctionGenerator<'a> {
     fn gen_scope_name_strings(
         cx: Context,
         vm_node: &VMScopeNode,
-    ) -> AllocResult<Vec<Handle<FlatString>>> {
+    ) -> AllocResult<Vec<StackRoot<FlatString>>> {
         let mut name_strs = vec![];
 
         for name in vm_node.bindings().iter() {
@@ -8249,7 +8249,7 @@ impl<'a> BytecodeFunctionGenerator<'a> {
     /// from this close handler is thrown.
     fn gen_for_of_close_handler(
         &mut self,
-        mut close_handler: ExceptionHandlerBuilder,
+        mut close_handler: ExceptionStackRootrBuilder,
         finally_scope: &FinallyScope,
     ) -> EmitResult<()> {
         // Error is placed in a new scratch register
@@ -8551,8 +8551,8 @@ impl<'a> BytecodeFunctionGenerator<'a> {
         &mut self,
         catch_clause: &'a ast::CatchClause<'a>,
         scope_to_restore: GenRegister,
-        mut body_handler: ExceptionHandlerBuilder,
-    ) -> EmitResult<(StmtCompletion, ExceptionHandlerBuilder)> {
+        mut body_handler: ExceptionStackRootrBuilder,
+    ) -> EmitResult<(StmtCompletion, ExceptionStackRootrBuilder)> {
         enum Param<'a> {
             LocalRegister {
                 index: usize,
@@ -8650,7 +8650,7 @@ impl<'a> BytecodeFunctionGenerator<'a> {
 
         let catch_handler_end = self.writer.current_offset();
 
-        let catch_handler = ExceptionHandlerBuilder::new(catch_handler_start, catch_handler_end);
+        let catch_handler = ExceptionStackRootrBuilder::new(catch_handler_start, catch_handler_end);
 
         Ok((catch_completion, catch_handler))
     }
@@ -8658,13 +8658,13 @@ impl<'a> BytecodeFunctionGenerator<'a> {
     fn gen_in_exception_handler<R>(
         &mut self,
         f: impl FnOnce(&mut Self) -> EmitResult<R>,
-    ) -> EmitResult<(ExceptionHandlerBuilder, R)> {
+    ) -> EmitResult<(ExceptionStackRootrBuilder, R)> {
         // Mark the range of instructions around the callback
         let body_handler_start = self.writer.current_offset();
         let result = f(self)?;
         let body_handler_end = self.writer.current_offset();
 
-        let body_handler = ExceptionHandlerBuilder::new(body_handler_start, body_handler_end);
+        let body_handler = ExceptionStackRootrBuilder::new(body_handler_start, body_handler_end);
 
         Ok((body_handler, result))
     }
@@ -8723,7 +8723,7 @@ impl<'a> BytecodeFunctionGenerator<'a> {
     /// throw branch;
     fn gen_exception_handler_continue_to_finally(
         &mut self,
-        mut handler: ExceptionHandlerBuilder,
+        mut handler: ExceptionStackRootrBuilder,
     ) -> EmitResult<()> {
         let finally_scope = self.current_finally_scope().unwrap();
 
@@ -8749,7 +8749,7 @@ impl<'a> BytecodeFunctionGenerator<'a> {
     /// as a throw branch;
     fn gen_exception_handlers_continue_to_finally(
         &mut self,
-        handlers: Vec<ExceptionHandlerBuilder>,
+        handlers: Vec<ExceptionStackRootrBuilder>,
     ) -> EmitResult<()> {
         let finally_scope = self.current_finally_scope().unwrap();
 
@@ -9425,7 +9425,7 @@ impl<'a> BytecodeFunctionGenerator<'a> {
     fn gen_global_names(
         &mut self,
         global_scope: &AstScopeNode,
-    ) -> AllocResult<Handle<GlobalNames>> {
+    ) -> AllocResult<StackRoot<GlobalNames>> {
         // Collect all global variables and functions in scope
         let mut global_vars = HashSet::new();
         let mut global_funcs = HashSet::new();
@@ -9460,7 +9460,7 @@ impl<'a> BytecodeFunctionGenerator<'a> {
     fn gen_default_export_name(
         mut cx: Context,
         decl: &ast::ExportDefaultKind,
-    ) -> AllocResult<Handle<FlatString>> {
+    ) -> AllocResult<StackRoot<FlatString>> {
         let id = match decl {
             ast::ExportDefaultKind::Function(func) => &func.id,
             ast::ExportDefaultKind::Class(class) => &class.id,
@@ -9634,7 +9634,7 @@ enum FuncGenPatch {
 enum Patch {
     ParentFunction {
         /// The already generated parent function which creates this function
-        parent_function: Handle<BytecodeFunction>,
+        parent_function: StackRoot<BytecodeFunction>,
         /// The index into the parent function's constant table that needs to be patched with the
         /// function once it is created.
         constant_index: ConstantTableIndex,
@@ -9655,14 +9655,14 @@ struct PendingFunction<'a> {
 }
 
 pub struct EmitFunctionResult<'a> {
-    pub bytecode_function: Handle<BytecodeFunction>,
+    pub bytecode_function: StackRoot<BytecodeFunction>,
     pending_functions: PendingFunctionNodes<'a>,
 }
 
 impl EmitFunctionResult<'_> {
     fn empty() -> Self {
         EmitFunctionResult {
-            bytecode_function: Handle::dangling(),
+            bytecode_function: StackRoot::dangling(),
             pending_functions: Vec::new(),
         }
     }
@@ -10010,7 +10010,7 @@ impl StmtCompletion {
 
 type FunctionVec = BsVec<HeapPtr<BytecodeFunction>>;
 
-struct FunctionVecField<'a>(&'a mut Option<Handle<FunctionVec>>);
+struct FunctionVecField<'a>(&'a mut Option<StackRoot<FunctionVec>>);
 
 impl BsVecField<HeapPtr<BytecodeFunction>> for FunctionVecField<'_> {
     fn new_vec(cx: Context, capacity: usize) -> AllocResult<HeapPtr<FunctionVec>> {
@@ -10022,6 +10022,6 @@ impl BsVecField<HeapPtr<BytecodeFunction>> for FunctionVecField<'_> {
     }
 
     fn set(&mut self, vec: HeapPtr<FunctionVec>) {
-        *self.0 = Some(vec.to_handle());
+        *self.0 = Some(vec.to_stack());
     }
 }

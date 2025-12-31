@@ -8,10 +8,10 @@ use crate::{
 
 use super::{
     collections::InlineArray,
-    gc::{HeapItem, HeapVisitor},
+    gc::{HeapItem, GcVisitorExt},
     heap_item_descriptor::HeapItemDescriptor,
     string_value::{FlatString, StringValue},
-    Context, Handle, HeapPtr,
+    Context, StackRoot, HeapPtr,
 };
 
 #[repr(C)]
@@ -60,9 +60,9 @@ impl ScopeNames {
     pub fn new(
         cx: Context,
         flags: ScopeFlags,
-        names: &[Handle<FlatString>],
+        names: &[StackRoot<FlatString>],
         name_flags: &[ScopeNameFlags],
-    ) -> AllocResult<Handle<ScopeNames>> {
+    ) -> AllocResult<StackRoot<ScopeNames>> {
         let size = Self::calculate_size_in_bytes(names.len());
         let mut scope_names = cx.alloc_uninit_with_size::<ScopeNames>(size)?;
 
@@ -88,7 +88,7 @@ impl ScopeNames {
             )
         };
 
-        Ok(scope_names.to_handle())
+        Ok(scope_names.to_stack())
     }
 
     const NAMES_OFFSET: usize = field_offset!(ScopeNames, names);
@@ -193,7 +193,7 @@ impl HeapItem for HeapPtr<ScopeNames> {
         ScopeNames::calculate_size_in_bytes(self.len())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
 
         for name in self.names.as_mut_slice() {

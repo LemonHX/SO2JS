@@ -1,6 +1,6 @@
 use super::{
     bytecode::{
-        constant_table::ConstantTable, exception_handlers::ExceptionHandlers,
+        constant_table::ConstantTable, exception_handlers::ExceptionStackRootrs,
         function::BytecodeFunction,
     },
     gc::AnyHeapItem,
@@ -124,8 +124,8 @@ impl DebugPrint for HeapPtr<AnyHeapItem> {
             HeapItemKind::BigInt => self.cast::<BigIntValue>().debug_format(printer),
             HeapItemKind::BytecodeFunction => self.cast::<BytecodeFunction>().debug_format(printer),
             HeapItemKind::ConstantTable => self.cast::<ConstantTable>().debug_format(printer),
-            HeapItemKind::ExceptionHandlers => {
-                self.cast::<ExceptionHandlers>().debug_format(printer)
+            HeapItemKind::ExceptionStackRootrs => {
+                self.cast::<ExceptionStackRootrs>().debug_format(printer)
             }
             HeapItemKind::CompiledRegExpObject => {
                 self.cast::<CompiledRegExpObject>().debug_format(printer)

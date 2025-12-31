@@ -1,9 +1,9 @@
 use super::{
     collections::{BsArray, InlineArray},
-    gc::{HeapItem, HeapVisitor},
+    gc::{HeapItem, GcVisitorExt},
     heap_item_descriptor::HeapItemDescriptor,
     string_value::FlatString,
-    Context, Handle, HeapPtr,
+    Context, StackRoot, HeapPtr,
 };
 use crate::{
     field_offset,
@@ -31,7 +31,7 @@ type LineOffsetArray = BsArray<u32>;
 
 impl SourceFile {
     #[inline]
-    pub fn new(mut cx: Context, source: &Source) -> AllocResult<Handle<SourceFile>> {
+    pub fn new(mut cx: Context, source: &Source) -> AllocResult<StackRoot<SourceFile>> {
         let path = cx.alloc_string(source.file_path())?;
         let display_name = if source.has_display_name() {
             Some(cx.alloc_string(source.display_name())?)
@@ -52,7 +52,7 @@ impl SourceFile {
 
         scope.contents.init_from_slice(source.contents.as_bytes());
 
-        Ok(scope.to_handle())
+        Ok(scope.to_stack())
     }
 
     const CONTENTS_OFFSET: usize = field_offset!(SourceFile, contents);
@@ -63,13 +63,13 @@ impl SourceFile {
     }
 
     #[inline]
-    pub fn path(&self) -> Handle<FlatString> {
-        self.path.to_handle()
+    pub fn path(&self) -> StackRoot<FlatString> {
+        self.path.to_stack()
     }
 
     #[inline]
-    pub fn display_name(&self) -> Handle<FlatString> {
-        self.display_name.as_ref().unwrap_or(&self.path).to_handle()
+    pub fn display_name(&self) -> StackRoot<FlatString> {
+        self.display_name.as_ref().unwrap_or(&self.path).to_stack()
     }
 
     #[inline]
@@ -83,7 +83,7 @@ impl SourceFile {
     }
 }
 
-impl Handle<SourceFile> {
+impl StackRoot<SourceFile> {
     pub fn line_offsets_ptr(&mut self, cx: Context) -> AllocResult<HeapPtr<LineOffsetArray>> {
         if let Some(line_offsets) = self.line_offsets {
             return Ok(line_offsets);
@@ -120,7 +120,7 @@ impl HeapItem for HeapPtr<SourceFile> {
         SourceFile::calculate_size_in_bytes(self.contents.len())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
         visitor.visit_pointer(&mut self.path);
         visitor.visit_pointer_opt(&mut self.display_name);

@@ -11,7 +11,7 @@ use crate::{
         property::Property,
         realm::Realm,
         type_utilities::is_callable,
-        Context, EvalResult, Handle, Value,
+        Context, EvalResult, StackRoot, Value,
     },
 };
 
@@ -21,7 +21,7 @@ pub struct PromisePrototype;
 
 impl PromisePrototype {
     /// Properties of the Promise Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-promise-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -48,9 +48,9 @@ impl PromisePrototype {
     /// Promise.prototype.catch (https://tc39.es/ecma262/#sec-promise.prototype.catch)
     pub fn catch(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let on_rejected = get_argument(cx, arguments, 0);
         invoke(
             cx,
@@ -63,9 +63,9 @@ impl PromisePrototype {
     /// Promise.prototype.finally (https://tc39.es/ecma262/#sec-promise.prototype.finally)
     pub fn finally(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Promise.prototype.finally called on non-object");
         }
@@ -121,7 +121,7 @@ impl PromisePrototype {
         )
     }
 
-    fn get_constructor(cx: Context, function: Handle<ObjectValue>) -> Handle<ObjectValue> {
+    fn get_constructor(cx: Context, function: StackRoot<ObjectValue>) -> StackRoot<ObjectValue> {
         function
             .private_element_find(cx, cx.well_known_symbols.constructor().cast())
             .unwrap()
@@ -131,13 +131,13 @@ impl PromisePrototype {
 
     fn set_constructor(
         cx: Context,
-        mut function: Handle<ObjectValue>,
-        value: Handle<ObjectValue>,
+        mut function: StackRoot<ObjectValue>,
+        value: StackRoot<ObjectValue>,
     ) -> AllocResult<()> {
         function.private_element_set(cx, cx.well_known_symbols.constructor().cast(), value.into())
     }
 
-    fn get_on_finally(cx: Context, function: Handle<ObjectValue>) -> Handle<ObjectValue> {
+    fn get_on_finally(cx: Context, function: StackRoot<ObjectValue>) -> StackRoot<ObjectValue> {
         function
             .private_element_find(cx, cx.well_known_symbols.on_finally().cast())
             .unwrap()
@@ -147,13 +147,13 @@ impl PromisePrototype {
 
     fn set_on_finally(
         cx: Context,
-        mut function: Handle<ObjectValue>,
-        value: Handle<ObjectValue>,
+        mut function: StackRoot<ObjectValue>,
+        value: StackRoot<ObjectValue>,
     ) -> AllocResult<()> {
         function.private_element_set(cx, cx.well_known_symbols.on_finally().cast(), value.into())
     }
 
-    fn get_value(cx: Context, function: Handle<ObjectValue>) -> Handle<Value> {
+    fn get_value(cx: Context, function: StackRoot<ObjectValue>) -> StackRoot<Value> {
         function
             .private_element_find(cx, cx.well_known_symbols.values().cast())
             .unwrap()
@@ -162,17 +162,17 @@ impl PromisePrototype {
 
     fn set_value(
         cx: Context,
-        mut function: Handle<ObjectValue>,
-        value: Handle<Value>,
+        mut function: StackRoot<ObjectValue>,
+        value: StackRoot<Value>,
     ) -> AllocResult<()> {
         function.private_element_set(cx, cx.well_known_symbols.values().cast(), value)
     }
 
     pub fn finally_then(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let current_function = cx.current_function();
 
         let constructor = Self::get_constructor(cx, current_function);
@@ -204,18 +204,18 @@ impl PromisePrototype {
 
     pub fn finally_then_continue(
         mut cx: Context,
-        _: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let current_function = cx.current_function();
         Ok(Self::get_value(cx, current_function))
     }
 
     pub fn finally_catch(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let current_function = cx.current_function();
 
         let constructor = Self::get_constructor(cx, current_function);
@@ -247,9 +247,9 @@ impl PromisePrototype {
 
     pub fn finally_catch_continue(
         mut cx: Context,
-        _: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let current_function = cx.current_function();
         let value = Self::get_value(cx, current_function);
 
@@ -259,9 +259,9 @@ impl PromisePrototype {
     /// Promise.prototype.then (https://tc39.es/ecma262/#sec-promise.prototype.then)
     pub fn then(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !is_promise(*this_value) {
             return type_error(cx, "Promise.prototype.then called on non-promise");
         }
@@ -286,11 +286,11 @@ impl PromisePrototype {
 /// PerformPromiseThen (https://tc39.es/ecma262/#sec-performpromisethen) with a capability provided.
 pub fn perform_promise_then(
     cx: Context,
-    mut promise: Handle<PromiseObject>,
-    fulfill_handler: Handle<Value>,
-    reject_handler: Handle<Value>,
-    capability: Option<Handle<PromiseCapability>>,
-) -> AllocResult<Handle<Value>> {
+    mut promise: StackRoot<PromiseObject>,
+    fulfill_handler: StackRoot<Value>,
+    reject_handler: StackRoot<Value>,
+    capability: Option<StackRoot<PromiseCapability>>,
+) -> AllocResult<StackRoot<Value>> {
     let fulfill_handler = if is_callable(fulfill_handler) {
         Some(fulfill_handler.as_object())
     } else {

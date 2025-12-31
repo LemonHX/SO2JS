@@ -13,7 +13,7 @@ use crate::{
         collections::{array::ByteArray, InlineArray},
         debug_print::{DebugPrint, DebugPrintMode, DebugPrinter},
         function::{set_function_length, set_function_name},
-        gc::{HeapItem, HeapVisitor},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
         intrinsics::{
             intrinsics::Intrinsic,
@@ -27,13 +27,13 @@ use crate::{
         scope::Scope,
         source_file::SourceFile,
         string_value::StringValue,
-        Context, Handle, HeapPtr, PropertyDescriptor, PropertyKey, Realm,
+        Context, StackRoot, HeapPtr, PropertyDescriptor, PropertyKey, Realm,
     },
     set_uninit,
 };
 
 use super::{
-    constant_table::ConstantTable, exception_handlers::ExceptionHandlers,
+    constant_table::ConstantTable, exception_handlers::ExceptionStackRootrs,
     instruction::debug_format_instructions, source_map::BytecodeSourceMap,
 };
 
@@ -49,16 +49,16 @@ extend_object! {
 impl Closure {
     pub fn new(
         cx: Context,
-        function: Handle<BytecodeFunction>,
-        scope: Handle<Scope>,
-    ) -> AllocResult<Handle<Closure>> {
+        function: StackRoot<BytecodeFunction>,
+        scope: StackRoot<Scope>,
+    ) -> AllocResult<StackRoot<Closure>> {
         let mut object =
             object_create::<Closure>(cx, HeapItemKind::Closure, Intrinsic::FunctionPrototype)?;
 
         set_uninit!(object.function, *function);
         set_uninit!(object.scope, *scope);
 
-        let closure = object.to_handle();
+        let closure = object.to_stack();
         Self::init_common_properties(cx, closure, function, cx.current_realm())?;
 
         Ok(closure)
@@ -66,16 +66,16 @@ impl Closure {
 
     pub fn new_with_proto(
         cx: Context,
-        function: Handle<BytecodeFunction>,
-        scope: Handle<Scope>,
-        prototype: Handle<ObjectValue>,
-    ) -> AllocResult<Handle<Closure>> {
+        function: StackRoot<BytecodeFunction>,
+        scope: StackRoot<Scope>,
+        prototype: StackRoot<ObjectValue>,
+    ) -> AllocResult<StackRoot<Closure>> {
         let mut object = object_create_with_proto::<Closure>(cx, HeapItemKind::Closure, prototype)?;
 
         set_uninit!(object.function, *function);
         set_uninit!(object.scope, *scope);
 
-        let closure = object.to_handle();
+        let closure = object.to_stack();
         Self::init_common_properties(cx, closure, function, cx.current_realm())?;
 
         Ok(closure)
@@ -83,17 +83,17 @@ impl Closure {
 
     pub fn new_in_realm(
         cx: Context,
-        function: Handle<BytecodeFunction>,
-        scope: Handle<Scope>,
-        realm: Handle<Realm>,
-    ) -> AllocResult<Handle<Closure>> {
+        function: StackRoot<BytecodeFunction>,
+        scope: StackRoot<Scope>,
+        realm: StackRoot<Realm>,
+    ) -> AllocResult<StackRoot<Closure>> {
         let proto = realm.get_intrinsic(Intrinsic::FunctionPrototype);
         let mut object = object_create_with_proto::<Closure>(cx, HeapItemKind::Closure, proto)?;
 
         set_uninit!(object.function, *function);
         set_uninit!(object.scope, *scope);
 
-        let closure = object.to_handle();
+        let closure = object.to_stack();
         Self::init_common_properties(cx, closure, function, realm)?;
 
         Ok(closure)
@@ -101,10 +101,10 @@ impl Closure {
 
     pub fn new_builtin(
         cx: Context,
-        function: Handle<BytecodeFunction>,
-        scope: Handle<Scope>,
-        prototype: Option<Handle<ObjectValue>>,
-    ) -> AllocResult<Handle<Closure>> {
+        function: StackRoot<BytecodeFunction>,
+        scope: StackRoot<Scope>,
+        prototype: Option<StackRoot<ObjectValue>>,
+    ) -> AllocResult<StackRoot<Closure>> {
         let mut object =
             object_create_with_optional_proto::<Closure>(cx, HeapItemKind::Closure, prototype)?;
 
@@ -112,7 +112,7 @@ impl Closure {
         set_uninit!(object.scope, *scope);
 
         // Does not need to the `name` and `length` properties as these will be set by caller
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     pub fn init_extra_fields(
@@ -130,8 +130,8 @@ impl Closure {
     }
 
     #[inline]
-    pub fn function(&self) -> Handle<BytecodeFunction> {
-        self.function.to_handle()
+    pub fn function(&self) -> StackRoot<BytecodeFunction> {
+        self.function.to_stack()
     }
 
     #[inline]
@@ -140,12 +140,12 @@ impl Closure {
     }
 
     #[inline]
-    pub fn global_object(&self) -> Handle<ObjectValue> {
+    pub fn global_object(&self) -> StackRoot<ObjectValue> {
         self.function_ptr().realm_ptr().global_object()
     }
 
     #[inline]
-    pub fn realm(&self) -> Handle<Realm> {
+    pub fn realm(&self) -> StackRoot<Realm> {
         self.function_ptr().realm()
     }
 
@@ -153,15 +153,15 @@ impl Closure {
     /// this is a constructor.
     fn init_common_properties(
         cx: Context,
-        closure: Handle<Closure>,
-        function: Handle<BytecodeFunction>,
-        realm: Handle<Realm>,
+        closure: StackRoot<Closure>,
+        function: StackRoot<BytecodeFunction>,
+        realm: StackRoot<Realm>,
     ) -> AllocResult<()> {
         set_function_length(cx, closure.into(), function.function_length())?;
 
         // Default to the empty string if a name was not provided
         let name = if let Some(name) = function.name {
-            PropertyKey::string_handle(cx, name.to_handle())?
+            PropertyKey::string_handle(cx, name.to_stack())?
         } else {
             cx.names.empty_string()
         };
@@ -172,7 +172,7 @@ impl Closure {
             let proto = realm.get_intrinsic(Intrinsic::ObjectPrototype);
             let prototype =
                 object_create_with_proto::<ObjectValue>(cx, HeapItemKind::OrdinaryObject, proto)?
-                    .to_handle();
+                    .to_stack();
 
             let desc = PropertyDescriptor::data(closure.into(), true, false, true);
             must_a!(define_property_or_throw(
@@ -195,7 +195,7 @@ impl Closure {
     }
 }
 
-impl Handle<Closure> {
+impl StackRoot<Closure> {
     /// Set the function name for this closure if the function name was not set when the closure
     /// was first created.
     ///
@@ -205,7 +205,7 @@ impl Handle<Closure> {
     pub fn set_lazy_function_name(
         &mut self,
         cx: Context,
-        name: Handle<StringValue>,
+        name: StackRoot<StringValue>,
     ) -> AllocResult<()> {
         let property = Property::data(name.into(), false, false, true);
         self.as_object().set_property(cx, cx.names.name(), property)
@@ -217,7 +217,7 @@ impl HeapItem for HeapPtr<Closure> {
         size_of::<Closure>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.function);
         visitor.visit_pointer(&mut self.scope);
@@ -233,7 +233,7 @@ pub struct BytecodeFunction {
     /// Constants referenced by the function (or raw jump offsets)
     constant_table: Option<HeapPtr<ConstantTable>>,
     /// Exception handlers in this function.
-    exception_handlers: Option<HeapPtr<ExceptionHandlers>>,
+    exception_handlers: Option<HeapPtr<ExceptionStackRootrs>>,
     /// The realm this function was defined in.
     realm: HeapPtr<Realm>,
     /// Number of local registers (and temporaries) needed by the function.
@@ -277,9 +277,9 @@ impl BytecodeFunction {
     pub fn new(
         cx: Context,
         bytecode: Vec<u8>,
-        constant_table: Option<Handle<ConstantTable>>,
-        exception_handlers: Option<Handle<ExceptionHandlers>>,
-        realm: Handle<Realm>,
+        constant_table: Option<StackRoot<ConstantTable>>,
+        exception_handlers: Option<StackRoot<ExceptionStackRootrs>>,
+        realm: StackRoot<Realm>,
         num_registers: u32,
         num_parameters: u32,
         function_length: u32,
@@ -290,10 +290,10 @@ impl BytecodeFunction {
         is_async: bool,
         new_target_index: Option<u32>,
         generator_index: Option<u32>,
-        name: Option<Handle<StringValue>>,
-        source_file: Handle<SourceFile>,
-        source_map: Handle<ByteArray>,
-    ) -> AllocResult<Handle<BytecodeFunction>> {
+        name: Option<StackRoot<StringValue>>,
+        source_file: StackRoot<SourceFile>,
+        source_map: StackRoot<ByteArray>,
+    ) -> AllocResult<StackRoot<BytecodeFunction>> {
         let size = Self::calculate_size_in_bytes(bytecode.len());
         let mut object = cx.alloc_uninit_with_size::<BytecodeFunction>(size)?;
 
@@ -320,16 +320,16 @@ impl BytecodeFunction {
         set_uninit!(object.rust_runtime_function_id, None);
         object.bytecode.init_from_slice(&bytecode);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     pub fn new_rust_runtime_function(
         mut cx: Context,
         builtin_func: RustRuntimeFunction,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
         is_constructor: bool,
-        name: Option<Handle<StringValue>>,
-    ) -> AllocResult<Handle<BytecodeFunction>> {
+        name: Option<StackRoot<StringValue>>,
+    ) -> AllocResult<StackRoot<BytecodeFunction>> {
         let function_id = cx.rust_runtime_functions.get_id(builtin_func).unwrap();
 
         let size = Self::calculate_size_in_bytes(0);
@@ -367,7 +367,7 @@ impl BytecodeFunction {
         set_uninit!(object.rust_runtime_function_id, Some(function_id));
         object.bytecode.init_from_slice(&[]);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     const BYTECODE_BYTE_OFFSET: usize = field_offset!(BytecodeFunction, bytecode);
@@ -387,7 +387,7 @@ impl BytecodeFunction {
     }
 
     #[inline]
-    pub fn exception_handlers_ptr(&self) -> Option<HeapPtr<ExceptionHandlers>> {
+    pub fn exception_handlers_ptr(&self) -> Option<HeapPtr<ExceptionStackRootrs>> {
         self.exception_handlers
     }
 
@@ -397,8 +397,8 @@ impl BytecodeFunction {
     }
 
     #[inline]
-    pub fn realm(&self) -> Handle<Realm> {
-        self.realm.to_handle()
+    pub fn realm(&self) -> StackRoot<Realm> {
+        self.realm.to_stack()
     }
 
     #[inline]
@@ -447,8 +447,8 @@ impl BytecodeFunction {
     }
 
     #[inline]
-    pub fn name(&self) -> Option<Handle<StringValue>> {
-        self.name.map(|n| n.to_handle())
+    pub fn name(&self) -> Option<StackRoot<StringValue>> {
+        self.name.map(|n| n.to_stack())
     }
 
     #[inline]
@@ -476,7 +476,7 @@ impl DebugPrint for HeapPtr<BytecodeFunction> {
     /// Debug print this function only.
     fn debug_format(&self, printer: &mut DebugPrinter) {
         let name = if let Some(name) = self.name {
-            name.to_handle().format().unwrap()
+            name.to_stack().format().unwrap()
         } else {
             "<anonymous>".to_owned()
         };
@@ -538,7 +538,7 @@ impl HeapItem for HeapPtr<BytecodeFunction> {
         BytecodeFunction::calculate_size_in_bytes(self.bytecode.len())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
 
         visitor.visit_pointer_opt(&mut self.constant_table);

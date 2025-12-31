@@ -7,7 +7,7 @@ use so2js::{
     runtime::{
         bytecode::generator::{BytecodeProgramGenerator, BytecodeScript},
         module::source_text_module::SourceTextModule,
-        Context, ContextBuilder, Handle,
+        Context, ContextBuilder, StackRoot,
     },
 };
 
@@ -171,7 +171,7 @@ fn print_regexp_bytecode(path: &str) -> GenericResult<String> {
 
 enum BytecodeResult {
     Script(BytecodeScript),
-    Module(Handle<SourceTextModule>),
+    Module(StackRoot<SourceTextModule>),
 }
 
 fn generate_bytecode(cx: Context, path: &str) -> GenericResult<BytecodeResult> {

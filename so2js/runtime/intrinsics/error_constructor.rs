@@ -8,7 +8,7 @@ use crate::{
         builtin_function::BuiltinFunction,
         eval_result::EvalResult,
         function::get_argument,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         object_value::ObjectValue,
         ordinary_object::{object_create, object_create_from_constructor},
@@ -17,7 +17,7 @@ use crate::{
         stack_trace::{create_current_stack_frame_info, create_stack_trace, StackFrameInfoArray},
         string_value::FlatString,
         type_utilities::to_string,
-        Context, Handle, HeapPtr, Value,
+        Context, StackRoot, HeapPtr, Value,
     },
     set_uninit,
 };
@@ -60,9 +60,9 @@ impl ErrorObject {
         cx: Context,
         prototype: Intrinsic,
         skip_current_frame: bool,
-    ) -> AllocResult<Handle<ErrorObject>> {
+    ) -> AllocResult<StackRoot<ErrorObject>> {
         let mut error =
-            object_create::<ErrorObject>(cx, HeapItemKind::ErrorObject, prototype)?.to_handle();
+            object_create::<ErrorObject>(cx, HeapItemKind::ErrorObject, prototype)?.to_stack();
 
         set_uninit!(error.is_stack_overflow, false);
 
@@ -73,17 +73,17 @@ impl ErrorObject {
 
     pub fn new_from_constructor(
         cx: Context,
-        constructor: Handle<ObjectValue>,
+        constructor: StackRoot<ObjectValue>,
         prototype: Intrinsic,
         skip_current_frame: bool,
-    ) -> EvalResult<Handle<ErrorObject>> {
+    ) -> EvalResult<StackRoot<ErrorObject>> {
         let mut error = object_create_from_constructor::<ErrorObject>(
             cx,
             constructor,
             HeapItemKind::ErrorObject,
             prototype,
         )?
-        .to_handle();
+        .to_stack();
 
         set_uninit!(error.is_stack_overflow, false);
 
@@ -94,7 +94,7 @@ impl ErrorObject {
 
     fn initialize_stack_trace(
         cx: Context,
-        mut error: Handle<ErrorObject>,
+        mut error: StackRoot<ErrorObject>,
         skip_current_frame: bool,
     ) -> AllocResult<()> {
         // Initialize remaining state before collecting stack frame info, as we must ensure all
@@ -117,13 +117,13 @@ impl ErrorObject {
     }
 }
 
-impl Handle<ErrorObject> {
+impl StackRoot<ErrorObject> {
     /// Return the stack trace for this error. Stack trace is lazily generated on first access.
     pub fn get_stack_trace(&mut self, cx: Context) -> AllocResult<CachedStackTraceInfo> {
         match self.stack_trace_state {
             StackTraceState::Generated(cached_stack_trace) => Ok(cached_stack_trace),
             StackTraceState::StackFrameInfo(stack_frame_info) => {
-                let stack_trace = create_stack_trace(cx, stack_frame_info.to_handle())?;
+                let stack_trace = create_stack_trace(cx, stack_frame_info.to_stack())?;
                 self.stack_trace_state = StackTraceState::Generated(stack_trace);
                 Ok(stack_trace)
             }
@@ -138,7 +138,7 @@ pub struct ErrorConstructor;
 
 impl ErrorConstructor {
     /// Properties of the Error Constructor (https://tc39.es/ecma262/#sec-properties-of-the-error-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -162,9 +162,9 @@ impl ErrorConstructor {
     /// Error (https://tc39.es/ecma262/#sec-error-message)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let new_target = if let Some(new_target) = cx.current_new_target() {
             new_target
         } else {
@@ -198,9 +198,9 @@ impl ErrorConstructor {
     /// Error.isError (https://tc39.es/ecma262/#sec-error.iserror)
     pub fn is_error(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let arg = get_argument(cx, arguments, 0);
 
         if !arg.is_object() {
@@ -214,8 +214,8 @@ impl ErrorConstructor {
 /// InstallErrorCause (https://tc39.es/ecma262/#sec-installerrorcause)
 pub fn install_error_cause(
     cx: Context,
-    object: Handle<ErrorObject>,
-    options: Handle<Value>,
+    object: StackRoot<ErrorObject>,
+    options: StackRoot<Value>,
 ) -> EvalResult<()> {
     if options.is_object() {
         let options = options.as_object();
@@ -238,7 +238,7 @@ impl HeapItem for HeapPtr<ErrorObject> {
         size_of::<ErrorObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
 
         match &mut self.stack_trace_state {

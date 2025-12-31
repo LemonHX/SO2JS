@@ -12,12 +12,12 @@ use super::{
     abstract_operations::{define_property_or_throw, has_own_property, is_extensible},
     builtin_function::BuiltinFunction,
     collections::InlineArray,
-    gc::{HeapItem, HeapVisitor},
+    gc::{HeapItem, GcVisitorExt},
     heap_item_descriptor::HeapItemDescriptor,
     object_value::ObjectValue,
     scope_names::ScopeNames,
     string_value::FlatString,
-    Context, EvalResult, Handle, HeapPtr, PropertyDescriptor, PropertyKey, Realm, Value,
+    Context, EvalResult, StackRoot, HeapPtr, PropertyDescriptor, PropertyKey, Realm, Value,
 };
 
 #[repr(C)]
@@ -35,10 +35,10 @@ pub struct GlobalNames {
 impl GlobalNames {
     pub fn new(
         cx: Context,
-        vars: HashSet<Handle<FlatString>>,
-        funcs: HashSet<Handle<FlatString>>,
-        scope_names: Handle<ScopeNames>,
-    ) -> AllocResult<Handle<GlobalNames>> {
+        vars: HashSet<StackRoot<FlatString>>,
+        funcs: HashSet<StackRoot<FlatString>>,
+        scope_names: StackRoot<ScopeNames>,
+    ) -> AllocResult<StackRoot<GlobalNames>> {
         let num_funcs = funcs.len();
         let num_names = vars.len() + num_funcs;
 
@@ -58,7 +58,7 @@ impl GlobalNames {
             global_names.names.set_unchecked(i, **name);
         }
 
-        Ok(global_names.to_handle())
+        Ok(global_names.to_stack())
     }
 
     fn calculate_size_in_bytes(num_names: usize) -> usize {
@@ -66,8 +66,8 @@ impl GlobalNames {
         names_offset + InlineArray::<HeapPtr<FlatString>>::calculate_size_in_bytes(num_names)
     }
 
-    pub fn scope_names(&self) -> Handle<ScopeNames> {
-        self.scope_names.to_handle()
+    pub fn scope_names(&self) -> StackRoot<ScopeNames> {
+        self.scope_names.to_stack()
     }
 }
 
@@ -76,7 +76,7 @@ impl HeapItem for HeapPtr<GlobalNames> {
         GlobalNames::calculate_size_in_bytes(self.names.len())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
         visitor.visit_pointer(&mut self.scope_names);
 
@@ -88,8 +88,8 @@ impl HeapItem for HeapPtr<GlobalNames> {
 
 pub fn create_global_declaration_instantiation_intrinsic(
     cx: Context,
-    realm: Handle<Realm>,
-) -> AllocResult<Handle<Value>> {
+    realm: StackRoot<Realm>,
+) -> AllocResult<StackRoot<Value>> {
     Ok(BuiltinFunction::create(
         cx,
         global_declaration_instantiation_runtime,
@@ -104,9 +104,9 @@ pub fn create_global_declaration_instantiation_intrinsic(
 /// GlobalDeclarationInstantiation in the rust runtime, called from the script init function.
 pub fn global_declaration_instantiation_runtime(
     cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let global_names = arguments.first().unwrap().cast::<GlobalNames>();
     let realm = cx.current_realm();
 
@@ -121,15 +121,15 @@ pub fn global_declaration_instantiation_runtime(
 /// and may be overwritten later when the corresponding declaration is evaluated.
 fn global_declaration_instantiation(
     cx: Context,
-    realm: Handle<Realm>,
-    global_names: Handle<GlobalNames>,
+    realm: StackRoot<Realm>,
+    global_names: StackRoot<GlobalNames>,
 ) -> EvalResult<()> {
     let global_object = realm.global_object();
 
     // Check whether any lexical names conflict with existing global names
     let mut lexical_names = vec![];
     for name_ptr in global_names.scope_names().name_ptrs() {
-        lexical_names.push(name_ptr.to_handle());
+        lexical_names.push(name_ptr.to_stack());
     }
     realm.can_declare_lexical_names(cx, &lexical_names)?;
 
@@ -137,7 +137,7 @@ fn global_declaration_instantiation(
     realm.can_declare_var_names(cx, global_names.names.as_slice())?;
 
     // Reuse handle between iterations
-    let mut name_handle = Handle::<FlatString>::empty(cx);
+    let mut name_handle = StackRoot::<FlatString>::empty(cx);
 
     // First check if functions and then variables can be declared in the global object
     for i in 0..global_names.names.len() {
@@ -186,8 +186,8 @@ fn global_declaration_instantiation(
 /// HasRestrictedGlobalProperty (https://tc39.es/ecma262/#sec-hasrestrictedglobalproperty)
 pub fn has_restricted_global_property(
     cx: Context,
-    global_object: Handle<ObjectValue>,
-    name_key: Handle<PropertyKey>,
+    global_object: StackRoot<ObjectValue>,
+    name_key: StackRoot<PropertyKey>,
 ) -> EvalResult<bool> {
     let existing_prop = global_object.get_own_property(cx, name_key)?;
 
@@ -200,8 +200,8 @@ pub fn has_restricted_global_property(
 /// CanDeclareGlobalVar (https://tc39.es/ecma262/#sec-candeclareglobalvar)
 pub fn can_declare_global_var(
     cx: Context,
-    global_object: Handle<ObjectValue>,
-    name_key: Handle<PropertyKey>,
+    global_object: StackRoot<ObjectValue>,
+    name_key: StackRoot<PropertyKey>,
 ) -> EvalResult<bool> {
     if has_own_property(cx, global_object, name_key)? {
         return Ok(true);
@@ -213,8 +213,8 @@ pub fn can_declare_global_var(
 /// CanDeclareGlobalFunction (https://tc39.es/ecma262/#sec-candeclareglobalfunction)
 pub fn can_declare_global_function(
     cx: Context,
-    global_object: Handle<ObjectValue>,
-    name_key: Handle<PropertyKey>,
+    global_object: StackRoot<ObjectValue>,
+    name_key: StackRoot<PropertyKey>,
 ) -> EvalResult<bool> {
     let existing_prop = global_object.get_own_property(cx, name_key)?;
 
@@ -237,8 +237,8 @@ pub fn can_declare_global_function(
 /// CreateGlobalVarBinding (https://tc39.es/ecma262/#sec-createglobalvarbinding)
 pub fn create_global_var_binding(
     cx: Context,
-    global_object: Handle<ObjectValue>,
-    name_key: Handle<PropertyKey>,
+    global_object: StackRoot<ObjectValue>,
+    name_key: StackRoot<PropertyKey>,
     can_delete: bool,
 ) -> EvalResult<()> {
     let has_property = has_own_property(cx, global_object, name_key)?;
@@ -258,8 +258,8 @@ pub fn create_global_var_binding(
 /// CreateGlobalFunctionBinding (https://tc39.es/ecma262/#sec-createglobalfunctionbinding)
 pub fn create_global_function_binding(
     cx: Context,
-    global_object: Handle<ObjectValue>,
-    name_key: Handle<PropertyKey>,
+    global_object: StackRoot<ObjectValue>,
+    name_key: StackRoot<PropertyKey>,
     can_delete: bool,
 ) -> EvalResult<()> {
     let existing_prop = global_object.get_own_property(cx, name_key)?;

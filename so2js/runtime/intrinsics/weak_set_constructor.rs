@@ -9,7 +9,7 @@ use crate::runtime::{
     object_value::ObjectValue,
     realm::Realm,
     type_utilities::is_callable,
-    Context, Handle, Value,
+    Context, StackRoot, Value,
 };
 
 use super::{intrinsics::Intrinsic, weak_set_object::WeakSetObject};
@@ -18,7 +18,7 @@ pub struct WeakSetConstructor;
 
 impl WeakSetConstructor {
     /// Properties of the WeakSet Constructor (https://tc39.es/ecma262/#sec-properties-of-the-weakset-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -40,9 +40,9 @@ impl WeakSetConstructor {
     /// WeakSet (https://tc39.es/ecma262/#sec-weakset-iterable)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let new_target = if let Some(new_target) = cx.current_new_target() {
             new_target
         } else {

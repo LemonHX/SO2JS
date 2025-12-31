@@ -25,16 +25,16 @@ use crate::{
             to_property_key, to_string, to_uint32, ToPrimitivePreferredType,
         },
         value::{BigIntValue, Value, BOOL_TAG, NULL_TAG, UNDEFINED_TAG},
-        Context, Handle, Realm,
+        Context, StackRoot, Realm,
     },
 };
 
 /// GetTemplateObject (https://tc39.es/ecma262/#sec-gettemplateobject)
 pub fn generate_template_object(
     mut cx: Context,
-    realm: Handle<Realm>,
+    realm: StackRoot<Realm>,
     lit: &ast::TemplateLiteral,
-) -> AllocResult<Handle<ObjectValue>> {
+) -> AllocResult<StackRoot<ObjectValue>> {
     let num_strings = lit.quasis.len();
     let template_object =
         must_a!(array_create_in_realm(cx, realm, num_strings as u64, None)).as_object();
@@ -42,7 +42,7 @@ pub fn generate_template_object(
         must_a!(array_create_in_realm(cx, realm, num_strings as u64, None)).as_object();
 
     // Property key is shared between iterations
-    let mut index_key = PropertyKey::uninit().to_handle(cx);
+    let mut index_key = PropertyKey::uninit().to_stack();
 
     for (i, quasi) in lit.quasis.iter().enumerate() {
         index_key.replace(PropertyKey::array_index(cx, i as u32)?);
@@ -87,8 +87,8 @@ pub fn generate_template_object(
 
 pub fn eval_delete_property(
     cx: Context,
-    object: Handle<Value>,
-    key: Handle<PropertyKey>,
+    object: StackRoot<Value>,
+    key: StackRoot<PropertyKey>,
     is_strict: bool,
 ) -> EvalResult<bool> {
     let mut base_object = to_object(cx, object)?;
@@ -101,7 +101,7 @@ pub fn eval_delete_property(
     Ok(delete_status)
 }
 
-pub fn eval_typeof(mut cx: Context, value: Handle<Value>) -> AllocResult<Handle<StringValue>> {
+pub fn eval_typeof(mut cx: Context, value: StackRoot<Value>) -> AllocResult<StackRoot<StringValue>> {
     let type_string = if value.is_pointer() {
         let kind = value.as_pointer().descriptor().kind();
         match kind {
@@ -130,7 +130,7 @@ pub fn eval_typeof(mut cx: Context, value: Handle<Value>) -> AllocResult<Handle<
     Ok(cx.alloc_string(type_string)?.as_string())
 }
 
-pub fn eval_negate(cx: Context, value: Handle<Value>) -> EvalResult<Handle<Value>> {
+pub fn eval_negate(cx: Context, value: StackRoot<Value>) -> EvalResult<StackRoot<Value>> {
     let value = to_numeric(cx, value)?;
 
     if value.is_bigint() {
@@ -141,7 +141,7 @@ pub fn eval_negate(cx: Context, value: Handle<Value>) -> EvalResult<Handle<Value
     }
 }
 
-pub fn eval_bitwise_not(cx: Context, value: Handle<Value>) -> EvalResult<Handle<Value>> {
+pub fn eval_bitwise_not(cx: Context, value: StackRoot<Value>) -> EvalResult<StackRoot<Value>> {
     let value = to_numeric(cx, value)?;
 
     if value.is_bigint() {
@@ -155,9 +155,9 @@ pub fn eval_bitwise_not(cx: Context, value: Handle<Value>) -> EvalResult<Handle<
 
 pub fn eval_add(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let left_prim = to_primitive(cx, left_value, ToPrimitivePreferredType::None)?;
     let right_prim = to_primitive(cx, right_value, ToPrimitivePreferredType::None)?;
     if left_prim.is_string() || right_prim.is_string() {
@@ -185,9 +185,9 @@ pub fn eval_add(
 
 pub fn eval_subtract(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let left_num = to_numeric(cx, left_value)?;
     let right_num = to_numeric(cx, right_value)?;
 
@@ -206,9 +206,9 @@ pub fn eval_subtract(
 
 pub fn eval_multiply(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let left_num = to_numeric(cx, left_value)?;
     let right_num = to_numeric(cx, right_value)?;
 
@@ -227,9 +227,9 @@ pub fn eval_multiply(
 
 pub fn eval_divide(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let left_num = to_numeric(cx, left_value)?;
     let right_num = to_numeric(cx, right_value)?;
 
@@ -253,9 +253,9 @@ pub fn eval_divide(
 
 pub fn eval_remainder(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let left_num = to_numeric(cx, left_value)?;
     let right_num = to_numeric(cx, right_value)?;
 
@@ -284,9 +284,9 @@ pub fn eval_remainder(
 
 pub fn eval_exponentiation(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let left_num = to_numeric(cx, left_value)?;
     let right_num = to_numeric(cx, right_value)?;
 
@@ -322,9 +322,9 @@ pub fn eval_exponentiation(
 
 pub fn eval_less_than(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let left = to_primitive(cx, left_value, ToPrimitivePreferredType::Number)?;
     let right = to_primitive(cx, right_value, ToPrimitivePreferredType::Number)?;
 
@@ -338,9 +338,9 @@ pub fn eval_less_than(
 
 pub fn eval_greater_than(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let left = to_primitive(cx, left_value, ToPrimitivePreferredType::Number)?;
     let right = to_primitive(cx, right_value, ToPrimitivePreferredType::Number)?;
 
@@ -355,9 +355,9 @@ pub fn eval_greater_than(
 
 pub fn eval_less_than_or_equal(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let left = to_primitive(cx, left_value, ToPrimitivePreferredType::Number)?;
     let right = to_primitive(cx, right_value, ToPrimitivePreferredType::Number)?;
 
@@ -368,9 +368,9 @@ pub fn eval_less_than_or_equal(
 
 pub fn eval_greater_than_or_equal(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let left = to_primitive(cx, left_value, ToPrimitivePreferredType::Number)?;
     let right = to_primitive(cx, right_value, ToPrimitivePreferredType::Number)?;
 
@@ -380,9 +380,9 @@ pub fn eval_greater_than_or_equal(
 
 pub fn eval_bitwise_and(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let left_num = to_numeric(cx, left_value)?;
     let right_num = to_numeric(cx, right_value)?;
 
@@ -404,9 +404,9 @@ pub fn eval_bitwise_and(
 
 pub fn eval_bitwise_or(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let left_num = to_numeric(cx, left_value)?;
     let right_num = to_numeric(cx, right_value)?;
 
@@ -428,9 +428,9 @@ pub fn eval_bitwise_or(
 
 pub fn eval_bitwise_xor(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let left_num = to_numeric(cx, left_value)?;
     let right_num = to_numeric(cx, right_value)?;
 
@@ -452,9 +452,9 @@ pub fn eval_bitwise_xor(
 
 pub fn eval_shift_left(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let left_num = to_numeric(cx, left_value)?;
     let right_num = to_numeric(cx, right_value)?;
 
@@ -484,9 +484,9 @@ pub fn eval_shift_left(
 
 pub fn eval_shift_right_arithmetic(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let left_num = to_numeric(cx, left_value)?;
     let right_num = to_numeric(cx, right_value)?;
 
@@ -551,9 +551,9 @@ fn eval_bigint_left_shift(cx: Context, left: &BigInt, right: &BigInt) -> EvalRes
 
 pub fn eval_shift_right_logical(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
-) -> EvalResult<Handle<Value>> {
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
+) -> EvalResult<StackRoot<Value>> {
     let left_num = to_numeric(cx, left_value)?;
     let right_num = to_numeric(cx, right_value)?;
 
@@ -568,14 +568,14 @@ pub fn eval_shift_right_logical(
     // Shift modulus 32
     let shift = right_u32 & 0x1F;
 
-    Ok(Value::from(left_smi >> shift).to_handle(cx))
+    Ok(Value::from(left_smi >> shift).to_stack())
 }
 
 /// InstanceofOperator (https://tc39.es/ecma262/#sec-instanceofoperator)
 pub fn eval_instanceof_expression(
     cx: Context,
-    value: Handle<Value>,
-    target: Handle<Value>,
+    value: StackRoot<Value>,
+    target: StackRoot<Value>,
 ) -> EvalResult<bool> {
     if !target.is_object() {
         return type_error(cx, "invalid instanceof operand");
@@ -599,8 +599,8 @@ pub fn eval_instanceof_expression(
 
 pub fn eval_in_expression(
     cx: Context,
-    left_value: Handle<Value>,
-    right_value: Handle<Value>,
+    left_value: StackRoot<Value>,
+    right_value: StackRoot<Value>,
 ) -> EvalResult<bool> {
     if !right_value.is_object() {
         return type_error(cx, "right side of 'in' must be an object");

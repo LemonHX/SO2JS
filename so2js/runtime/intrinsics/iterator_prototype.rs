@@ -13,7 +13,7 @@ use crate::{
         object_value::ObjectValue,
         realm::Realm,
         type_utilities::{is_callable, to_boolean, to_integer_or_infinity, to_number},
-        Context, EvalResult, Handle, Value,
+        Context, EvalResult, StackRoot, Value,
     },
 };
 use alloc::vec;
@@ -22,7 +22,7 @@ use alloc::vec;
 pub struct IteratorPrototype;
 
 impl IteratorPrototype {
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -70,18 +70,18 @@ impl IteratorPrototype {
     /// get Iterator.prototype.constructor (https://tc39.es/ecma262/#sec-get-iterator.prototype.constructor)
     pub fn get_constructor(
         cx: Context,
-        _: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         Ok(cx.get_intrinsic(Intrinsic::IteratorConstructor).as_value())
     }
 
     /// set Iterator.prototype.constructor (https://tc39.es/ecma262/#sec-set-iterator.prototype.constructor)
     pub fn set_constructor(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
 
         setter_that_ignores_prototype_properties(
@@ -98,9 +98,9 @@ impl IteratorPrototype {
     /// Iterator.prototype.drop (https://tc39.es/ecma262/#sec-iterator.prototype.drop)
     pub fn drop(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Iterator.prototype.drop called on non-object");
         }
@@ -136,9 +136,9 @@ impl IteratorPrototype {
     /// Iterator.prototype.every (https://tc39.es/ecma262/#sec-iterator.prototype.every)
     pub fn every(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Iterator.prototype.every called on non-object");
         }
@@ -154,7 +154,7 @@ impl IteratorPrototype {
 
         let mut iterated = get_iterator_direct(cx, this_value.as_object())?;
         let mut counter: u64 = 0;
-        let mut counter_handle: Handle<Value> = Handle::empty(cx);
+        let mut counter_handle: StackRoot<Value> = StackRoot::empty(cx);
 
         loop {
             // Get the next value from the iterator, returning true if done
@@ -181,9 +181,9 @@ impl IteratorPrototype {
     /// Iterator.prototype.filter (https://tc39.es/ecma262/#sec-iterator.prototype.filter)
     pub fn filter(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Iterator.prototype.filter called on non-object");
         }
@@ -205,9 +205,9 @@ impl IteratorPrototype {
     /// Iterator.prototype.find (https://tc39.es/ecma262/#sec-iterator.prototype.find)
     pub fn find(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Iterator.prototype.find called on non-object");
         }
@@ -223,7 +223,7 @@ impl IteratorPrototype {
 
         let mut iterated = get_iterator_direct(cx, this_value.as_object())?;
         let mut counter: u64 = 0;
-        let mut counter_handle: Handle<Value> = Handle::empty(cx);
+        let mut counter_handle: StackRoot<Value> = StackRoot::empty(cx);
 
         loop {
             // Get the next value from the iterator, returning undefined if done
@@ -250,9 +250,9 @@ impl IteratorPrototype {
     /// Iterator.prototype.flatMap (https://tc39.es/ecma262/#sec-iterator.prototype.flatmap)
     pub fn flat_map(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Iterator.prototype.flatMap called on non-object");
         }
@@ -274,9 +274,9 @@ impl IteratorPrototype {
     /// Iterator.prototype.forEach (https://tc39.es/ecma262/#sec-iterator.prototype.foreach)
     pub fn for_each(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Iterator.prototype.forEach called on non-object");
         }
@@ -292,7 +292,7 @@ impl IteratorPrototype {
 
         let mut iterated = get_iterator_direct(cx, this_value.as_object())?;
         let mut counter: u64 = 0;
-        let mut counter_handle: Handle<Value> = Handle::empty(cx);
+        let mut counter_handle: StackRoot<Value> = StackRoot::empty(cx);
 
         loop {
             // Get the next value from the iterator, returning true if done
@@ -316,9 +316,9 @@ impl IteratorPrototype {
     /// Iterator.prototype.map (https://tc39.es/ecma262/#sec-iterator.prototype.map)
     pub fn map(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Iterator.prototype.map called on non-object");
         }
@@ -339,9 +339,9 @@ impl IteratorPrototype {
     /// Iterator.prototype.reduce (https://tc39.es/ecma262/#sec-iterator.prototype.reduce)
     pub fn reduce(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Iterator.prototype.reduce called on non-object");
         }
@@ -375,7 +375,7 @@ impl IteratorPrototype {
             counter = 0;
         };
 
-        let mut counter_handle: Handle<Value> = Handle::empty(cx);
+        let mut counter_handle: StackRoot<Value> = StackRoot::empty(cx);
 
         loop {
             // Get the next value from the iterator, returning the accumulator if done
@@ -407,9 +407,9 @@ impl IteratorPrototype {
     /// Iterator.prototype.some (https://tc39.es/ecma262/#sec-iterator.prototype.some)
     pub fn some(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Iterator.prototype.some called on non-object");
         }
@@ -425,7 +425,7 @@ impl IteratorPrototype {
 
         let mut iterated = get_iterator_direct(cx, this_value.as_object())?;
         let mut counter: u64 = 0;
-        let mut counter_handle: Handle<Value> = Handle::empty(cx);
+        let mut counter_handle: StackRoot<Value> = StackRoot::empty(cx);
 
         loop {
             // Get the next value from the iterator, returning false if done
@@ -452,9 +452,9 @@ impl IteratorPrototype {
     /// Iterator.prototype.take (https://tc39.es/ecma262/#sec-iterator.prototype.take)
     pub fn take(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Iterator.prototype.take called on non-object");
         }
@@ -490,9 +490,9 @@ impl IteratorPrototype {
     /// Iterator.prototype.toArray (https://tc39.es/ecma262/#sec-iterator.prototype.toarray)
     pub fn to_array(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Iterator.prototype.toArray called on non-object");
         }
@@ -513,18 +513,18 @@ impl IteratorPrototype {
     #[no_mangle]
     pub fn iterator_prototype_get_to_string_tag(
         cx: Context,
-        _: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         Ok(cx.names.iterator().as_string().as_value())
     }
 
     /// set Iterator.prototype [ @@toStringTag ] (https://tc39.es/ecma262/#sec-set-iterator.prototype-%symbol.tostringtag%)
     pub fn set_to_string_tag(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
 
         setter_that_ignores_prototype_properties(

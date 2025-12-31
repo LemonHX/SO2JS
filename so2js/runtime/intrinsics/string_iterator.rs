@@ -6,7 +6,7 @@ use crate::{
         alloc_error::AllocResult,
         error::type_error,
         eval_result::EvalResult,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         iterator::create_iter_result_object,
         object_value::ObjectValue,
@@ -14,7 +14,7 @@ use crate::{
         property::Property,
         realm::Realm,
         string_value::{FlatString, SafeCodePointIterator},
-        Context, Handle, HeapPtr, Value,
+        Context, StackRoot, HeapPtr, Value,
     },
     set_uninit,
 };
@@ -29,7 +29,7 @@ extend_object! {
 }
 
 impl StringIterator {
-    pub fn new(cx: Context, string: Handle<FlatString>) -> AllocResult<Handle<StringIterator>> {
+    pub fn new(cx: Context, string: StackRoot<FlatString>) -> AllocResult<StackRoot<StringIterator>> {
         let mut object = object_create::<StringIterator>(
             cx,
             HeapItemKind::StringIterator,
@@ -38,7 +38,7 @@ impl StringIterator {
 
         set_uninit!(object.iter, string.iter_code_points_safe());
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     cast_from_value_fn!(StringIterator, "String Iterator");
@@ -48,7 +48,7 @@ impl StringIterator {
 pub struct StringIteratorPrototype;
 
 impl StringIteratorPrototype {
-    pub fn new(mut cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(mut cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let proto = realm.get_intrinsic(Intrinsic::IteratorPrototype);
         let mut object = ObjectValue::new(cx, Some(proto), true)?;
 
@@ -69,9 +69,9 @@ impl StringIteratorPrototype {
     /// %StringIteratorPrototype%.next (https://tc39.es/ecma262/#sec-%stringiteratorprototype%.next)
     pub fn next(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let mut string_iterator = StringIterator::cast_from_value(cx, this_value)?;
 
         match string_iterator.iter.next() {
@@ -94,7 +94,7 @@ impl HeapItem for HeapPtr<StringIterator> {
         size_of::<StringIterator>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         self.iter.visit_pointers(visitor);
     }

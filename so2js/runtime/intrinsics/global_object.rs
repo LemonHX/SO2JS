@@ -17,7 +17,7 @@ use crate::{
         string_value::{FlatString, StringValue},
         to_string,
         type_utilities::{to_int32, to_number},
-        Context, EvalResult, Handle, PropertyKey, Realm, Value,
+        Context, EvalResult, StackRoot, PropertyKey, Realm, Value,
     },
 };
 use alloc::format;
@@ -26,7 +26,7 @@ use so2js_macros::match_u32;
 use super::intrinsics::Intrinsic;
 
 /// SetDefaultGlobalBindings (https://tc39.es/ecma262/#sec-setdefaultglobalbindings)
-pub fn set_default_global_bindings(cx: Context, realm: Handle<Realm>) -> EvalResult<()> {
+pub fn set_default_global_bindings(cx: Context, realm: StackRoot<Realm>) -> EvalResult<()> {
     handle_scope!(cx, {
         macro_rules! value_prop {
             ($name:expr, $value:expr, $is_writable:expr, $is_enumerable:expr, $is_configurable:expr) => {{
@@ -153,24 +153,24 @@ pub fn set_default_global_bindings(cx: Context, realm: Handle<Realm>) -> EvalRes
     })
 }
 
-pub fn create_eval(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<Value>> {
+pub fn create_eval(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<Value>> {
     Ok(BuiltinFunction::create(cx, eval, 1, cx.names.eval(), realm, None)?.into())
 }
 
-pub fn create_parse_float(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<Value>> {
+pub fn create_parse_float(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<Value>> {
     Ok(BuiltinFunction::create(cx, parse_float, 1, cx.names.parse_float(), realm, None)?.into())
 }
 
-pub fn create_parse_int(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<Value>> {
+pub fn create_parse_int(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<Value>> {
     Ok(BuiltinFunction::create(cx, parse_int, 2, cx.names.parse_int(), realm, None)?.into())
 }
 
 /// eval (https://tc39.es/ecma262/#sec-eval-x)
 pub fn eval(
     cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let code_arg = get_argument(cx, arguments, 0);
 
     perform_eval(
@@ -185,9 +185,9 @@ pub fn eval(
 /// isFinite (https://tc39.es/ecma262/#sec-isfinite-number)
 pub fn is_finite(
     cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let argument = get_argument(cx, arguments, 0);
     let num = to_number(cx, argument)?;
     Ok(cx.bool(!num.is_nan() && !num.is_infinity()))
@@ -196,9 +196,9 @@ pub fn is_finite(
 /// isNaN (https://tc39.es/ecma262/#sec-isnan-number)
 pub fn is_nan(
     cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let argument = get_argument(cx, arguments, 0);
     let num = to_number(cx, argument)?;
     Ok(cx.bool(num.is_nan()))
@@ -207,9 +207,9 @@ pub fn is_nan(
 /// parseFloat (https://tc39.es/ecma262/#sec-parsefloat-string)
 pub fn parse_float(
     cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let input_string_arg = get_argument(cx, arguments, 0);
     let input_string = to_string(cx, input_string_arg)?;
 
@@ -219,7 +219,7 @@ pub fn parse_float(
     }
 }
 
-fn parse_float_with_string_lexer(string: Handle<StringValue>) -> AllocResult<Option<f64>> {
+fn parse_float_with_string_lexer(string: StackRoot<StringValue>) -> AllocResult<Option<f64>> {
     let mut lexer = StringLexer::new(string)?;
 
     skip_string_whitespace(&mut lexer);
@@ -229,9 +229,9 @@ fn parse_float_with_string_lexer(string: Handle<StringValue>) -> AllocResult<Opt
 /// parseInt (https://tc39.es/ecma262/#sec-parseint-string-radix)
 pub fn parse_int(
     cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let input_string_arg = get_argument(cx, arguments, 0);
     let input_string = to_string(cx, input_string_arg)?;
 
@@ -341,9 +341,9 @@ fn parse_int_impl(mut lexer: StringLexer, radix: i32) -> Option<f64> {
 /// decodeURI (https://tc39.es/ecma262/#sec-decodeuri-encodeduri)
 pub fn decode_uri(
     cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let uri_arg = get_argument(cx, arguments, 0);
     let uri_string = to_string(cx, uri_arg)?;
 
@@ -353,9 +353,9 @@ pub fn decode_uri(
 /// decodeURIComponent (https://tc39.es/ecma262/#sec-decodeuricomponent-encodeduricomponent)
 pub fn decode_uri_component(
     cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let uri_component_arg = get_argument(cx, arguments, 0);
     let uri_component_string = to_string(cx, uri_component_arg)?;
 
@@ -365,8 +365,8 @@ pub fn decode_uri_component(
 /// Decode (https://tc39.es/ecma262/#sec-decode)
 fn decode<const INCLUDE_URI_UNESCAPED: bool>(
     cx: Context,
-    string: Handle<StringValue>,
-) -> EvalResult<Handle<Value>> {
+    string: StackRoot<StringValue>,
+) -> EvalResult<StackRoot<Value>> {
     let mut decoded_string = Wtf8String::new();
 
     let flat_string = string.flatten()?;
@@ -489,16 +489,16 @@ fn decode<const INCLUDE_URI_UNESCAPED: bool>(
     }
 
     Ok(FlatString::from_wtf8(cx, decoded_string.as_bytes())?
-        .to_handle()
+        .to_stack()
         .as_value())
 }
 
 /// encodeURI (https://tc39.es/ecma262/#sec-encodeuri-uri)
 pub fn encode_uri(
     cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let uri_arg = get_argument(cx, arguments, 0);
     let uri_string = to_string(cx, uri_arg)?;
 
@@ -508,9 +508,9 @@ pub fn encode_uri(
 /// encodeURIComponent (https://tc39.es/ecma262/#sec-encodeuricomponent-uricomponent)
 pub fn encode_uri_component(
     cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let uri_component_arg = get_argument(cx, arguments, 0);
     let uri_component_string = to_string(cx, uri_component_arg)?;
 
@@ -520,8 +520,8 @@ pub fn encode_uri_component(
 /// Encode (https://tc39.es/ecma262/#sec-encode)
 fn encode<const INCLUDE_URI_UNESCAPED: bool>(
     cx: Context,
-    string: Handle<StringValue>,
-) -> EvalResult<Handle<Value>> {
+    string: StackRoot<StringValue>,
+) -> EvalResult<StackRoot<Value>> {
     let mut encoded_string = Wtf8String::new();
 
     for code_point in string.iter_code_points()? {
@@ -570,13 +570,13 @@ fn encode<const INCLUDE_URI_UNESCAPED: bool>(
     // Safe since only ASCII characters were used
     Ok(
         FlatString::from_one_byte_slice(cx, encoded_string.as_bytes())?
-            .to_handle()
+            .to_stack()
             .as_value(),
     )
 }
 
 // Additional Properties of the Global Object (https://tc39.es/ecma262/#sec-additional-properties-of-the-global-object)
-pub fn init_global_annex_b_methods(mut cx: Context, realm: Handle<Realm>) -> AllocResult<()> {
+pub fn init_global_annex_b_methods(mut cx: Context, realm: StackRoot<Realm>) -> AllocResult<()> {
     let mut global_object = realm.global_object();
 
     let escape_name = cx.alloc_string("escape")?.as_string();
@@ -593,9 +593,9 @@ pub fn init_global_annex_b_methods(mut cx: Context, realm: Handle<Realm>) -> All
 /// escape (https://tc39.es/ecma262/#sec-escape-string)
 pub fn escape(
     mut cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let string_arg = get_argument(cx, arguments, 0);
     let string = to_string(cx, string_arg)?;
 
@@ -626,9 +626,9 @@ pub fn escape(
 /// unescape (https://tc39.es/ecma262/#sec-unescape-string)
 pub fn unescape(
     mut cx: Context,
-    _: Handle<Value>,
-    arguments: &[Handle<Value>],
-) -> EvalResult<Handle<Value>> {
+    _: StackRoot<Value>,
+    arguments: &[StackRoot<Value>],
+) -> EvalResult<StackRoot<Value>> {
     let string_arg = get_argument(cx, arguments, 0);
     let string = to_string(cx, string_arg)?;
     let length = string.len();
@@ -673,7 +673,7 @@ pub fn unescape(
 }
 
 fn parse_hex_code_units(
-    string: Handle<StringValue>,
+    string: StackRoot<StringValue>,
     start_index: u32,
     num_code_units: u32,
 ) -> AllocResult<Option<u32>> {

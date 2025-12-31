@@ -17,7 +17,7 @@ use crate::{
         ordinary_object::get_prototype_from_constructor,
         property_key::PropertyKey,
         type_utilities::{is_array, is_callable, is_constructor_value, to_object, to_uint32},
-        Context, EvalResult, Handle, Realm, Value,
+        Context, EvalResult, StackRoot, Realm, Value,
     },
 };
 
@@ -27,7 +27,7 @@ pub struct ArrayConstructor;
 
 impl ArrayConstructor {
     /// Properties of the Array Constructor (https://tc39.es/ecma262/#sec-properties-of-the-array-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -57,9 +57,9 @@ impl ArrayConstructor {
     /// Array (https://tc39.es/ecma262/#sec-array)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let new_target = cx
             .current_new_target()
             .unwrap_or_else(|| cx.current_function());
@@ -90,7 +90,7 @@ impl ArrayConstructor {
                 1
             };
 
-            let int_len_value = Value::from(int_len).to_handle(cx);
+            let int_len_value = Value::from(int_len).to_stack();
             must!(set(
                 cx,
                 array.into(),
@@ -104,7 +104,7 @@ impl ArrayConstructor {
             let array = array_create(cx, arguments.len() as u64, Some(proto))?;
 
             // Property key is shared between iterations
-            let mut key = PropertyKey::uninit().to_handle(cx);
+            let mut key = PropertyKey::uninit().to_stack();
 
             for index in 0..arguments.len() {
                 key.replace(PropertyKey::array_index(cx, index as u32)?);
@@ -120,9 +120,9 @@ impl ArrayConstructor {
     /// Array.from (https://tc39.es/ecma262/#sec-array.from)
     pub fn from(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         // Determine if map function was provided and is callable
         let map_function_arg = get_argument(cx, arguments, 1);
         let map_function = if map_function_arg.is_undefined() {
@@ -147,9 +147,9 @@ impl ArrayConstructor {
                 must!(array_create(cx, 0, None)).into()
             };
 
-            // Handle is shared between iterations
-            let mut key = PropertyKey::uninit().to_handle(cx);
-            let mut index_value: Handle<Value> = Handle::empty(cx);
+            // StackRoot is shared between iterations
+            let mut key = PropertyKey::uninit().to_stack();
+            let mut index_value: StackRoot<Value> = StackRoot::empty(cx);
             let mut i = 0;
 
             iter_iterator_method_values(cx, items_arg, iterator, &mut |cx, value| {
@@ -187,7 +187,7 @@ impl ArrayConstructor {
                 None
             })?;
 
-            let length_value = Value::from(i).to_handle(cx);
+            let length_value = Value::from(i).to_stack();
             set(cx, array, cx.names.length(), length_value, true)?;
 
             return Ok(array.as_value());
@@ -196,7 +196,7 @@ impl ArrayConstructor {
         // Otherwise assume items arg is array like and copy elements from it
         let array_like = must!(to_object(cx, items_arg));
         let length = length_of_array_like(cx, array_like)?;
-        let length_value = Value::from(length).to_handle(cx);
+        let length_value = Value::from(length).to_stack();
 
         let array = if is_constructor_value(this_value) {
             construct(cx, this_value.as_object(), &[length_value], None)?
@@ -204,9 +204,9 @@ impl ArrayConstructor {
             array_create(cx, length, None)?.into()
         };
 
-        // Handles are shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
-        let mut index_value: Handle<Value> = Handle::empty(cx);
+        // StackRoots are shared between iterations
+        let mut key = PropertyKey::uninit().to_stack();
+        let mut index_value: StackRoot<Value> = StackRoot::empty(cx);
 
         // Copy elements from items array
         for i in 0..length {
@@ -231,9 +231,9 @@ impl ArrayConstructor {
     /// Array.isArray (https://tc39.es/ecma262/#sec-array.isarray)
     pub fn is_array(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let argument = get_argument(cx, arguments, 0);
         let is_array = is_array(cx, argument)?;
         Ok(cx.bool(is_array))
@@ -242,11 +242,11 @@ impl ArrayConstructor {
     /// Array.of (https://tc39.es/ecma262/#sec-array.of)
     pub fn of(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let length = arguments.len();
-        let length_value = Value::from(length).to_handle(cx);
+        let length_value = Value::from(length).to_stack();
 
         let array = if is_constructor_value(this_value) {
             construct(cx, this_value.as_object(), &[length_value], None)?
@@ -254,7 +254,7 @@ impl ArrayConstructor {
             array_create(cx, length as u64, None)?.into()
         };
 
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         for index in 0..length {
             key.replace(PropertyKey::array_index(cx, index as u32)?);

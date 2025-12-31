@@ -153,10 +153,10 @@ macro_rules! extract_vtable_function {
     ($method_name:ident, $trait:ident) => {
         pub const fn $method_name<T>() -> *const ()
         where
-            $crate::runtime::Handle<T>: $trait,
+            $crate::runtime::StackRoot<T>: $trait,
         {
             unsafe {
-                let example_ptr: *const $crate::runtime::Handle<T> =
+                let example_ptr: *const $crate::runtime::StackRoot<T> =
                     core::ptr::NonNull::dangling().as_ptr();
                 let example_fat_ptr: *const dyn $trait = example_ptr;
                 let fat_ptr =

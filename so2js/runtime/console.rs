@@ -14,11 +14,11 @@ use super::{
     },
     type_utilities::number_to_string,
     value::{BOOL_TAG, NULL_TAG, UNDEFINED_TAG},
-    Context, Handle, Value,
+    Context, StackRoot, Value,
 };
 
 /// Format for printing value to console
-pub fn to_console_string(cx: Context, value: Handle<Value>) -> AllocResult<String> {
+pub fn to_console_string(cx: Context, value: StackRoot<Value>) -> AllocResult<String> {
     let result = if value.is_pointer() {
         match value.as_pointer().descriptor().kind() {
             HeapItemKind::String => value.as_string().format()?,
@@ -59,7 +59,7 @@ pub fn to_console_string(cx: Context, value: Handle<Value>) -> AllocResult<Strin
     Ok(result)
 }
 
-fn error_to_console_string(cx: Context, mut error: Handle<ErrorObject>) -> AllocResult<String> {
+fn error_to_console_string(cx: Context, mut error: StackRoot<ErrorObject>) -> AllocResult<String> {
     let name = error_name(cx, error).format()?;
     let mut formatter = ErrorFormatter::new(name);
 
@@ -83,7 +83,7 @@ fn new_heap_source_info(
 ) -> AllocResult<Option<SourceInfo>> {
     let (mut source_file, line, col) =
         if let Some((source_file, line, col)) = &stack_trace_info.source_file_line_col {
-            (source_file.to_handle(), *line, *col)
+            (source_file.to_stack(), *line, *col)
         } else {
             return Ok(None);
         };

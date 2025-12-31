@@ -10,7 +10,7 @@ use crate::runtime::{
     realm::Realm,
     type_utilities::is_callable,
     value::{Value, ValueCollectionKey},
-    Context, Handle,
+    Context, StackRoot,
 };
 
 use super::{
@@ -23,7 +23,7 @@ pub struct MapPrototype;
 
 impl MapPrototype {
     /// Properties of the Map Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-map-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -68,9 +68,9 @@ impl MapPrototype {
     /// Map.prototype.clear (https://tc39.es/ecma262/#sec-map.prototype.clear)
     pub fn clear(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let map = if let Some(map) = this_map_value(this_value) {
             map
         } else {
@@ -85,9 +85,9 @@ impl MapPrototype {
     /// Map.prototype.delete (https://tc39.es/ecma262/#sec-map.prototype.delete)
     pub fn delete(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let map = if let Some(map) = this_map_value(this_value) {
             map
         } else {
@@ -107,9 +107,9 @@ impl MapPrototype {
     /// Map.prototype.entries (https://tc39.es/ecma262/#sec-map.prototype.entries)
     pub fn entries(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let map = if let Some(map) = this_map_value(this_value) {
             map
         } else {
@@ -122,9 +122,9 @@ impl MapPrototype {
     /// Map.prototype.forEach (https://tc39.es/ecma262/#sec-map.prototype.foreach)
     pub fn for_each(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let map = if let Some(map) = this_map_value(this_value) {
             map
         } else {
@@ -140,12 +140,12 @@ impl MapPrototype {
         let this_arg = get_argument(cx, arguments, 1);
 
         // Share key and value handles during iteration
-        let mut key_handle = Handle::<Value>::empty(cx);
-        let mut value_handle = Handle::<Value>::empty(cx);
+        let mut key_handle = StackRoot::<Value>::empty(cx);
+        let mut value_handle = StackRoot::<Value>::empty(cx);
 
         // Must use gc and invalidation safe iteration since arbitrary code can be executed between
         // iterations.
-        for (key, value) in map.map_data().to_handle().iter_gc_safe() {
+        for (key, value) in map.map_data().to_stack().iter_gc_safe() {
             key_handle.replace(key.into());
             value_handle.replace(value);
 
@@ -159,9 +159,9 @@ impl MapPrototype {
     /// Map.prototype.get (https://tc39.es/ecma262/#sec-map.prototype.get)
     pub fn get(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let map = if let Some(map) = this_map_value(this_value) {
             map
         } else {
@@ -174,7 +174,7 @@ impl MapPrototype {
         let map_key = ValueCollectionKey::from(key)?;
 
         match map.map_data().get(&map_key) {
-            Some(value) => Ok(value.to_handle(cx)),
+            Some(value) => Ok(value.to_stack()),
             None => Ok(cx.undefined()),
         }
     }
@@ -182,9 +182,9 @@ impl MapPrototype {
     /// Map.prototype.has (https://tc39.es/ecma262/#sec-map.prototype.has)
     pub fn has(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let map = if let Some(map) = this_map_value(this_value) {
             map
         } else {
@@ -202,9 +202,9 @@ impl MapPrototype {
     /// Map.prototype.keys (https://tc39.es/ecma262/#sec-map.prototype.keys)
     pub fn keys(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let map = if let Some(map) = this_map_value(this_value) {
             map
         } else {
@@ -217,9 +217,9 @@ impl MapPrototype {
     /// Map.prototype.set (https://tc39.es/ecma262/#sec-map.prototype.set)
     pub fn set(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let map = if let Some(map) = this_map_value(this_value) {
             map
         } else {
@@ -242,24 +242,24 @@ impl MapPrototype {
     /// get Map.prototype.size (https://tc39.es/ecma262/#sec-get-map.prototype.size)
     pub fn size(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let map = if let Some(map) = this_map_value(this_value) {
             map
         } else {
             return type_error(cx, "size accessor must be called on map");
         };
 
-        Ok(Value::from(map.map_data().num_entries_occupied()).to_handle(cx))
+        Ok(Value::from(map.map_data().num_entries_occupied()).to_stack())
     }
 
     /// Map.prototype.values (https://tc39.es/ecma262/#sec-map.prototype.values)
     pub fn values(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let map = if let Some(map) = this_map_value(this_value) {
             map
         } else {
@@ -270,7 +270,7 @@ impl MapPrototype {
     }
 }
 
-fn this_map_value(value: Handle<Value>) -> Option<Handle<MapObject>> {
+fn this_map_value(value: StackRoot<Value>) -> Option<StackRoot<MapObject>> {
     if !value.is_object() {
         return None;
     }

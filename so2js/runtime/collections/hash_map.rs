@@ -2,7 +2,7 @@ use crate::{
     field_offset,
     runtime::{
         alloc_error::AllocResult,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
         Context, HeapPtr,
     },
@@ -160,7 +160,7 @@ impl<K: Eq + Hash + Clone, V: Clone> BsHashMap<K, V> {
     }
 
     /// Visit pointers intrinsic to all HashMaps. Do not visit entries as they could be of any type.
-    pub fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    pub fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_pointer(&mut self.descriptor);
     }
 
@@ -285,7 +285,7 @@ pub trait BsHashMapField<K: Eq + Hash + Clone, V: Clone> {
         }
 
         // Save old map behind handle before allocating
-        let old_map = old_map.to_handle();
+        let old_map = old_map.to_stack();
 
         // Double size leaving map 1/4 full after growing
         let new_capacity = capacity * 2;
@@ -402,7 +402,7 @@ impl<K: Eq + Hash + Clone, V: Clone> HeapItem for HeapPtr<BsHashMap<K, V>> {
         BsHashMap::<K, V>::calculate_size_in_bytes(self.capacity())
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         BsHashMap::<K, V>::visit_pointers(self, visitor)
     }
 }

@@ -4,7 +4,7 @@ use crate::{
         alloc_error::AllocResult,
         boxed_value::BoxedValue,
         error::reference_error,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         module::module::Module,
         object_value::VirtualObject,
@@ -16,7 +16,7 @@ use crate::{
         property::Property,
         rust_vtables::extract_virtual_object_vtable,
         type_utilities::same_value,
-        Context, EvalResult, Handle, HeapPtr, PropertyDescriptor, PropertyKey, Value,
+        Context, EvalResult, StackRoot, HeapPtr, PropertyDescriptor, PropertyKey, Value,
     },
     set_uninit,
 };
@@ -59,7 +59,7 @@ impl ModuleNamespaceObject {
 
         set_uninit!(object.module, module.to_heap());
 
-        let object = object.to_handle();
+        let object = object.to_stack();
 
         // Module Namepace Objects [ %Symbol.toStringTag% ] (https://tc39.es/ecma262/#sec-%symbol.tostringtag%)
         let to_string_tag_key = cx.well_known_symbols.to_string_tag();
@@ -99,7 +99,7 @@ impl HeapPtr<ModuleNamespaceObject> {
 
     fn lookup_export_source_text_module(
         cx: Context,
-        module: Handle<SourceTextModule>,
+        module: StackRoot<SourceTextModule>,
         key: PropertyKey,
     ) -> EvalResult<Option<Value>> {
         let exports = module.exports_ptr();
@@ -121,10 +121,10 @@ impl HeapPtr<ModuleNamespaceObject> {
 
             let namespace_object =
                 if heap_item.descriptor().kind() == HeapItemKind::SourceTextModule {
-                    let mut module = heap_item.cast::<SourceTextModule>().to_handle();
+                    let mut module = heap_item.cast::<SourceTextModule>().to_stack();
                     module.get_namespace_object(cx)?
                 } else {
-                    let mut module = heap_item.cast::<SyntheticModule>().to_handle();
+                    let mut module = heap_item.cast::<SyntheticModule>().to_stack();
                     module.get_namespace_object(cx)?
                 };
 
@@ -134,11 +134,11 @@ impl HeapPtr<ModuleNamespaceObject> {
 
     fn lookup_export_synthetic_module(
         cx: Context,
-        module: Handle<SyntheticModule>,
+        module: StackRoot<SyntheticModule>,
         key: PropertyKey,
     ) -> AllocResult<Option<Value>> {
         // Coerce to string, which is guaranteed to be flat
-        let name = key.to_handle(cx).to_value(cx)?.as_string().as_flat();
+        let name = key.to_stack().to_value(cx)?.as_string().as_flat();
         let scope_names = module.module_scope_ptr().scope_names_ptr();
 
         if let Some(scope_index) = scope_names.lookup_name(*name) {
@@ -150,9 +150,9 @@ impl HeapPtr<ModuleNamespaceObject> {
     }
 }
 
-impl Handle<ModuleNamespaceObject> {
+impl StackRoot<ModuleNamespaceObject> {
     #[inline]
-    fn has_property_non_symbol(&self, cx: Context, key: Handle<PropertyKey>) -> AllocResult<bool> {
+    fn has_property_non_symbol(&self, cx: Context, key: StackRoot<PropertyKey>) -> AllocResult<bool> {
         match DynModule::from_heap(&self.module).as_enum() {
             // Check the exports map
             ModuleEnum::SourceText(module) => Ok(module.exports_ptr().contains_key(&key)),
@@ -168,12 +168,12 @@ impl Handle<ModuleNamespaceObject> {
 }
 
 #[wrap_ordinary_object]
-impl VirtualObject for Handle<ModuleNamespaceObject> {
+impl VirtualObject for StackRoot<ModuleNamespaceObject> {
     /// [[GetOwnProperty]] (https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-getownproperty-p)
     fn get_own_property(
         &self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
     ) -> EvalResult<Option<PropertyDescriptor>> {
         if key.is_symbol() {
             return Ok(ordinary_get_own_property(cx, (*self).into(), key));
@@ -182,7 +182,7 @@ impl VirtualObject for Handle<ModuleNamespaceObject> {
         match self.lookup_export(cx, *key)? {
             None => Ok(None),
             Some(value) => {
-                let value = value.to_handle(cx);
+                let value = value.to_stack();
                 let desc = PropertyDescriptor::data(value, true, true, false);
                 Ok(Some(desc))
             }
@@ -193,7 +193,7 @@ impl VirtualObject for Handle<ModuleNamespaceObject> {
     fn define_own_property(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
+        key: StackRoot<PropertyKey>,
         desc: PropertyDescriptor,
     ) -> EvalResult<bool> {
         if key.is_symbol() {
@@ -223,7 +223,7 @@ impl VirtualObject for Handle<ModuleNamespaceObject> {
     }
 
     /// [[HasProperty]] (https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-hasproperty-p)
-    fn has_property(&self, cx: Context, key: Handle<PropertyKey>) -> EvalResult<bool> {
+    fn has_property(&self, cx: Context, key: StackRoot<PropertyKey>) -> EvalResult<bool> {
         if key.is_symbol() {
             return ordinary_has_property(cx, (*self).into(), key);
         }
@@ -235,16 +235,16 @@ impl VirtualObject for Handle<ModuleNamespaceObject> {
     fn get(
         &self,
         cx: Context,
-        key: Handle<PropertyKey>,
-        receiver: Handle<Value>,
-    ) -> EvalResult<Handle<Value>> {
+        key: StackRoot<PropertyKey>,
+        receiver: StackRoot<Value>,
+    ) -> EvalResult<StackRoot<Value>> {
         if key.is_symbol() {
             return ordinary_get(cx, (*self).into(), key, receiver);
         }
 
         match self.lookup_export(cx, *key)? {
             None => Ok(cx.undefined()),
-            Some(value) => Ok(value.to_handle(cx)),
+            Some(value) => Ok(value.to_stack()),
         }
     }
 
@@ -252,15 +252,15 @@ impl VirtualObject for Handle<ModuleNamespaceObject> {
     fn set(
         &mut self,
         _: Context,
-        _: Handle<PropertyKey>,
-        _: Handle<Value>,
-        _: Handle<Value>,
+        _: StackRoot<PropertyKey>,
+        _: StackRoot<Value>,
+        _: StackRoot<Value>,
     ) -> EvalResult<bool> {
         Ok(false)
     }
 
     /// [[Delete]] (https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-delete-p)
-    fn delete(&mut self, cx: Context, key: Handle<PropertyKey>) -> EvalResult<bool> {
+    fn delete(&mut self, cx: Context, key: StackRoot<PropertyKey>) -> EvalResult<bool> {
         if key.is_symbol() {
             return ordinary_delete(cx, (*self).into(), key);
         }
@@ -269,14 +269,14 @@ impl VirtualObject for Handle<ModuleNamespaceObject> {
     }
 
     /// [[OwnPropertyKeys]] (https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-ownpropertykeys)
-    fn own_property_keys(&self, cx: Context) -> EvalResult<Vec<Handle<Value>>> {
+    fn own_property_keys(&self, cx: Context) -> EvalResult<Vec<StackRoot<Value>>> {
         let mut string_keys = match DynModule::from_heap(&self.module).as_enum() {
             ModuleEnum::SourceText(module) => {
                 // Gather all exported keys
                 let raw_keys = module
                     .exports_ptr()
                     .iter_gc_unsafe()
-                    .map(|(key, _)| key.to_handle(cx))
+                    .map(|(key, _)| key.to_stack())
                     .collect::<Vec<_>>();
 
                 // Convert all keys to strings
@@ -294,7 +294,7 @@ impl VirtualObject for Handle<ModuleNamespaceObject> {
                 .scope_names_ptr()
                 .name_ptrs()
                 .iter()
-                .map(|name| name.to_handle())
+                .map(|name| name.to_stack())
                 .collect::<Vec<_>>(),
         };
 
@@ -319,7 +319,7 @@ impl HeapItem for HeapPtr<ModuleNamespaceObject> {
         size_of::<ModuleNamespaceObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         self.module.visit_pointers(visitor);
     }

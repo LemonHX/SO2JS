@@ -8,7 +8,7 @@ use crate::runtime::{
     object_value::ObjectValue,
     realm::Realm,
     type_utilities::is_callable,
-    Context, Handle, Value,
+    Context, StackRoot, Value,
 };
 
 use super::{
@@ -20,7 +20,7 @@ pub struct WeakMapConstructor;
 
 impl WeakMapConstructor {
     /// Properties of the WeakMap Constructor (https://tc39.es/ecma262/#sec-properties-of-the-weakmap-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -42,9 +42,9 @@ impl WeakMapConstructor {
     /// WeakMap (https://tc39.es/ecma262/#sec-weakmap-iterable)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let new_target = if let Some(new_target) = cx.current_new_target() {
             new_target
         } else {

@@ -30,7 +30,7 @@ pub fn wrap_ordinary_object(_attr: TokenStream, item: TokenStream) -> TokenStrea
         fn get_own_property(
             &self,
             cx: Context,
-            key: Handle<PropertyKey>,
+            key: StackRoot<PropertyKey>,
         ) -> EvalResult<Option<PropertyDescriptor>> {
             self.ordinary_object().get_own_property(cx, key)
         }
@@ -41,7 +41,7 @@ pub fn wrap_ordinary_object(_attr: TokenStream, item: TokenStream) -> TokenStrea
         fn define_own_property(
             &mut self,
             cx: Context,
-            key: Handle<PropertyKey>,
+            key: StackRoot<PropertyKey>,
             desc: PropertyDescriptor,
         ) -> EvalResult<bool> {
             self.ordinary_object().define_own_property(cx, key, desc)
@@ -50,7 +50,7 @@ pub fn wrap_ordinary_object(_attr: TokenStream, item: TokenStream) -> TokenStrea
 
     implement_if_undefined!(
         "has_property",
-        fn has_property(&self, cx: Context, key: Handle<PropertyKey>) -> EvalResult<bool> {
+        fn has_property(&self, cx: Context, key: StackRoot<PropertyKey>) -> EvalResult<bool> {
             self.ordinary_object().has_property(cx, key)
         }
     );
@@ -60,9 +60,9 @@ pub fn wrap_ordinary_object(_attr: TokenStream, item: TokenStream) -> TokenStrea
         fn get(
             &self,
             cx: Context,
-            key: Handle<PropertyKey>,
-            receiver: Handle<Value>,
-        ) -> EvalResult<Handle<Value>> {
+            key: StackRoot<PropertyKey>,
+            receiver: StackRoot<Value>,
+        ) -> EvalResult<StackRoot<Value>> {
             self.ordinary_object().get(cx, key, receiver)
         }
     );
@@ -72,9 +72,9 @@ pub fn wrap_ordinary_object(_attr: TokenStream, item: TokenStream) -> TokenStrea
         fn set(
             &mut self,
             cx: Context,
-            key: Handle<PropertyKey>,
-            value: Handle<Value>,
-            receiver: Handle<Value>,
+            key: StackRoot<PropertyKey>,
+            value: StackRoot<Value>,
+            receiver: StackRoot<Value>,
         ) -> EvalResult<bool> {
             self.ordinary_object().set(cx, key, value, receiver)
         }
@@ -82,14 +82,14 @@ pub fn wrap_ordinary_object(_attr: TokenStream, item: TokenStream) -> TokenStrea
 
     implement_if_undefined!(
         "delete",
-        fn delete(&mut self, cx: Context, key: Handle<PropertyKey>) -> EvalResult<bool> {
+        fn delete(&mut self, cx: Context, key: StackRoot<PropertyKey>) -> EvalResult<bool> {
             self.ordinary_object().delete(cx, key)
         }
     );
 
     implement_if_undefined!(
         "own_property_keys",
-        fn own_property_keys(&self, cx: Context) -> EvalResult<Vec<Handle<Value>>> {
+        fn own_property_keys(&self, cx: Context) -> EvalResult<Vec<StackRoot<Value>>> {
             self.ordinary_object().own_property_keys(cx)
         }
     );

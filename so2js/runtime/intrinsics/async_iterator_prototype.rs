@@ -1,5 +1,5 @@
 use crate::runtime::{
-    alloc_error::AllocResult, object_value::ObjectValue, realm::Realm, Context, Handle,
+    alloc_error::AllocResult, object_value::ObjectValue, realm::Realm, Context, StackRoot,
 };
 
 use super::{intrinsics::Intrinsic, rust_runtime::return_this};
@@ -8,7 +8,7 @@ use super::{intrinsics::Intrinsic, rust_runtime::return_this};
 pub struct AsyncIteratorPrototype;
 
 impl AsyncIteratorPrototype {
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),

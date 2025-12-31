@@ -4,7 +4,7 @@ use crate::runtime::alloc_error::AllocResult;
 
 use super::{
     accessor::Accessor,
-    gc::{Handle, HeapVisitor},
+    gc::{StackRoot, GcVisitorExt},
     object_value::ObjectValue,
     value::Value,
     Context,
@@ -19,7 +19,7 @@ use super::{
 /// as properties, with bitflags noting the private property kind.
 #[derive(Clone)]
 pub struct Property {
-    value: Handle<Value>,
+    value: StackRoot<Value>,
     flags: PropertyFlags,
 }
 
@@ -49,7 +49,7 @@ pub const DENSE_ARRAY_PROPERTY_FLAGS: PropertyFlags = PropertyFlags::IS_WRITABLE
 impl Property {
     #[inline]
     pub fn data(
-        value: Handle<Value>,
+        value: StackRoot<Value>,
         is_writable: bool,
         is_enumerable: bool,
         is_configurable: bool,
@@ -73,7 +73,7 @@ impl Property {
 
     #[inline]
     pub fn accessor(
-        accessor_value: Handle<Value>,
+        accessor_value: StackRoot<Value>,
         is_enumerable: bool,
         is_configurable: bool,
     ) -> Property {
@@ -93,21 +93,21 @@ impl Property {
         }
     }
 
-    pub fn private_field(value: Handle<Value>) -> Property {
+    pub fn private_field(value: StackRoot<Value>) -> Property {
         Property {
             value,
             flags: PropertyFlags::IS_PRIVATE_FIELD,
         }
     }
 
-    pub fn private_method(method: Handle<ObjectValue>) -> Property {
+    pub fn private_method(method: StackRoot<ObjectValue>) -> Property {
         Property {
             value: method.into(),
             flags: PropertyFlags::IS_PRIVATE_METHOD,
         }
     }
 
-    pub fn private_getter(cx: Context, getter: Handle<ObjectValue>) -> AllocResult<Property> {
+    pub fn private_getter(cx: Context, getter: StackRoot<ObjectValue>) -> AllocResult<Property> {
         let accessor_value = Accessor::new(cx, Some(getter), None)?;
         Ok(Property {
             value: accessor_value.into(),
@@ -115,7 +115,7 @@ impl Property {
         })
     }
 
-    pub fn private_setter(cx: Context, setter: Handle<ObjectValue>) -> AllocResult<Property> {
+    pub fn private_setter(cx: Context, setter: StackRoot<ObjectValue>) -> AllocResult<Property> {
         let accessor_value = Accessor::new(cx, None, Some(setter))?;
         Ok(Property {
             value: accessor_value.into(),
@@ -123,14 +123,14 @@ impl Property {
         })
     }
 
-    pub fn private_accessor(accessor: Handle<Accessor>) -> Property {
+    pub fn private_accessor(accessor: StackRoot<Accessor>) -> Property {
         Property {
             value: accessor.into(),
             flags: PropertyFlags::IS_PRIVATE_ACCESSOR,
         }
     }
 
-    pub fn value(&self) -> Handle<Value> {
+    pub fn value(&self) -> StackRoot<Value> {
         self.value
     }
 
@@ -162,7 +162,7 @@ impl Property {
         self.flags.contains(DENSE_ARRAY_PROPERTY_FLAGS)
     }
 
-    pub fn set_value(&mut self, value: Handle<Value>) {
+    pub fn set_value(&mut self, value: StackRoot<Value>) {
         self.value = value;
     }
 
@@ -199,7 +199,7 @@ impl Property {
 
     pub fn from_heap(cx: Context, heap_property: &HeapProperty) -> Property {
         Property {
-            value: heap_property.value.to_handle(cx),
+            value: heap_property.value.to_stack(),
             flags: heap_property.flags,
         }
     }
@@ -218,7 +218,7 @@ impl HeapProperty {
         )
     }
 
-    pub fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    pub fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         visitor.visit_value(&mut self.value);
     }
 }

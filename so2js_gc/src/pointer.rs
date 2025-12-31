@@ -31,11 +31,16 @@ impl<T> GcPtr<T> {
     /// Create from a raw pointer
     ///
     /// # Safety
-    /// The pointer must be non-null and point to a valid GC-managed object
+    /// The pointer must be non-null and point to a valid GC-managed object.
+    /// Note: This is marked as safe for compatibility with HeapPtr, but the
+    /// caller must ensure the pointer is valid.
     #[inline]
-    pub const unsafe fn from_ptr(ptr: *mut T) -> GcPtr<T> {
-        GcPtr {
-            ptr: NonNull::new_unchecked(ptr),
+    #[allow(clippy::not_unsafe_ptr_arg_deref)]
+    pub const fn from_ptr(ptr: *mut T) -> GcPtr<T> {
+        unsafe {
+            GcPtr {
+                ptr: NonNull::new_unchecked(ptr),
+            }
         }
     }
 
@@ -59,12 +64,25 @@ impl<T> GcPtr<T> {
         }
     }
 
+    /// Cast to another type (mutable reference version)
+    /// For compatibility with HeapPtr
+    #[inline]
+    pub fn cast_mut<U>(&mut self) -> &mut GcPtr<U> {
+        unsafe { core::mem::transmute(self) }
+    }
+
     /// Create an uninitialized (dangling) pointer
     #[inline]
     pub const fn dangling() -> GcPtr<T> {
         GcPtr {
             ptr: NonNull::dangling(),
         }
+    }
+
+    /// Alias for `dangling()` - for compatibility with HeapPtr
+    #[inline]
+    pub const fn uninit() -> GcPtr<T> {
+        Self::dangling()
     }
 
     /// Check if this is a dangling pointer

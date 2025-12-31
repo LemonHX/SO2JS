@@ -138,6 +138,9 @@ impl Heap {
 
         let layout = GcHeader::layout_for_size(size);
 
+        // Get context pointer for the GcHeader
+        let context_ptr = ctx.as_context_ptr();
+
         unsafe {
             // Allocate memory
             let ptr = alloc::alloc::alloc(layout);
@@ -147,7 +150,7 @@ impl Heap {
 
             // Initialize GcHeader
             let header = ptr as *mut GcHeader;
-            header.write(GcHeader::new(size));
+            header.write(GcHeader::new(size, context_ptr));
             let header_nn = NonNull::new_unchecked(header);
 
             // During GC, new objects are BLACK (won't be collected this cycle)

@@ -9,14 +9,14 @@ use crate::{
         error::type_error,
         eval_result::EvalResult,
         function::get_argument,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         object_value::ObjectValue,
         ordinary_object::object_create,
         realm::Realm,
         type_utilities::to_string,
         value::SymbolValue,
-        Context, Handle, HeapPtr, Value,
+        Context, StackRoot, HeapPtr, Value,
     },
     set_uninit,
 };
@@ -34,8 +34,8 @@ extend_object! {
 impl SymbolObject {
     pub fn new_from_value(
         cx: Context,
-        symbol_data: Handle<SymbolValue>,
-    ) -> AllocResult<Handle<SymbolObject>> {
+        symbol_data: StackRoot<SymbolValue>,
+    ) -> AllocResult<StackRoot<SymbolObject>> {
         let mut object = object_create::<SymbolObject>(
             cx,
             HeapItemKind::SymbolObject,
@@ -44,11 +44,11 @@ impl SymbolObject {
 
         set_uninit!(object.symbol_data, *symbol_data);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
-    pub fn symbol_data(&self) -> Handle<SymbolValue> {
-        self.symbol_data.to_handle()
+    pub fn symbol_data(&self) -> StackRoot<SymbolValue> {
+        self.symbol_data.to_stack()
     }
 }
 
@@ -56,7 +56,7 @@ pub struct SymbolConstructor;
 
 impl SymbolConstructor {
     /// Properties of the Symbol Constructor (https://tc39.es/ecma262/#sec-properties-of-the-symbol-constructor)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut func = BuiltinFunction::intrinsic_constructor(
             cx,
             Self::construct,
@@ -125,9 +125,9 @@ impl SymbolConstructor {
     /// Symbol (https://tc39.es/ecma262/#sec-symbol-description)
     pub fn construct(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if cx.current_new_target().is_some() {
             return type_error(cx, "Symbol is not a constructor");
         }
@@ -145,13 +145,13 @@ impl SymbolConstructor {
     /// Symbol.for (https://tc39.es/ecma262/#sec-symbol.for)
     pub fn for_(
         mut cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let argument = get_argument(cx, arguments, 0);
         let string_key = to_string(cx, argument)?.flatten()?;
         if let Some(symbol_value) = cx.global_symbol_registry().get(&string_key) {
-            return Ok(symbol_value.to_handle().into());
+            return Ok(symbol_value.to_stack().into());
         }
 
         let new_symbol = SymbolValue::new(
@@ -169,9 +169,9 @@ impl SymbolConstructor {
     /// Symbol.keyFor (https://tc39.es/ecma262/#sec-symbol.keyfor)
     pub fn key_for(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let symbol_value = get_argument(cx, arguments, 0);
         if !symbol_value.is_symbol() {
             return type_error(cx, "expected symbol value");
@@ -180,7 +180,7 @@ impl SymbolConstructor {
 
         for (string, symbol) in cx.global_symbol_registry().iter_gc_unsafe() {
             if symbol.ptr_eq(&symbol_value) {
-                return Ok(string.to_handle().as_value());
+                return Ok(string.to_stack().as_value());
             }
         }
 
@@ -193,7 +193,7 @@ impl HeapItem for HeapPtr<SymbolObject> {
         size_of::<SymbolObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.symbol_data);
     }

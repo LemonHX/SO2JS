@@ -2,7 +2,7 @@ use super::{error_constructor::ErrorObject, intrinsics::Intrinsic};
 use crate::runtime::{
     abstract_operations::get, alloc_error::AllocResult, error::type_error, eval_result::EvalResult,
     object_value::ObjectValue, realm::Realm, string_value::StringValue, to_console_string,
-    type_utilities::to_string, Context, Handle, Value,
+    type_utilities::to_string, Context, StackRoot, Value,
 };
 use alloc::string::String;
 use alloc::string::ToString;
@@ -12,7 +12,7 @@ pub struct ErrorPrototype;
 
 impl ErrorPrototype {
     /// Properties of the Error Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-error-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -35,9 +35,9 @@ impl ErrorPrototype {
     /// Error.prototype.toString (https://tc39.es/ecma262/#sec-error.prototype.tostring)
     pub fn to_string(
         mut cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "expected object");
         }
@@ -70,9 +70,9 @@ impl ErrorPrototype {
 
     pub fn get_stack(
         mut cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         // Check that `stack` getter was called on an error object
         if !this_value.is_object() || !this_value.as_object().is_error() {
             return Ok(cx.undefined());
@@ -92,7 +92,7 @@ impl ErrorPrototype {
 }
 
 /// Format an error object into a one line string containing name and message
-fn format_error_one_line(cx: Context, error: Handle<ErrorObject>) -> AllocResult<String> {
+fn format_error_one_line(cx: Context, error: StackRoot<ErrorObject>) -> AllocResult<String> {
     let name = error_name(cx, error);
     let name_str = name.format().unwrap_or_default();
 
@@ -102,14 +102,14 @@ fn format_error_one_line(cx: Context, error: Handle<ErrorObject>) -> AllocResult
     })
 }
 
-pub fn error_name(cx: Context, error: Handle<ErrorObject>) -> Handle<StringValue> {
+pub fn error_name(cx: Context, error: StackRoot<ErrorObject>) -> StackRoot<StringValue> {
     match get(cx, error.as_object(), cx.names.name()) {
         Ok(name_value) if name_value.is_string() => name_value.as_string(),
         _ => cx.names.error().as_string(),
     }
 }
 
-pub fn error_message(cx: Context, error: Handle<ErrorObject>) -> AllocResult<Option<String>> {
+pub fn error_message(cx: Context, error: StackRoot<ErrorObject>) -> AllocResult<Option<String>> {
     match get(cx, error.as_object(), cx.names.message()) {
         Ok(message_value) => Ok(Some(to_console_string(cx, message_value)?)),
         Err(_) => Ok(None),

@@ -17,6 +17,19 @@ pub enum GcColor {
     Black = 2,
 }
 
+impl GcColor {
+    /// Convert from u8 (used for pointer compression)
+    #[inline]
+    pub fn from_u8(val: u8) -> GcColor {
+        match val {
+            0 => GcColor::White,
+            1 => GcColor::Gray,
+            2 => GcColor::Black,
+            _ => GcColor::White, // Should never happen, treat as White
+        }
+    }
+}
+
 impl Default for GcColor {
     fn default() -> Self {
         GcColor::White
@@ -48,17 +61,26 @@ impl Default for GcPhase {
 ///
 /// This header is placed immediately before the object data in memory.
 /// The HeapPtr points to the object data, so we need to offset back to find the header.
+///
+/// Memory optimization: On amd64/aarch64, pointers are 8-byte aligned, so the low 3 bits
+/// are always zero. We use the low 2 bits to store the GC color (0-2), avoiding extra fields.
 #[repr(C)]
 pub struct GcHeader {
-    /// Current color in tri-color marking
-    color: GcColor,
-    /// Padding for alignment
-    _padding: [u8; 7],
+    /// Combined context pointer and color.
+    /// - Bits [63:3]: Context pointer (shifted right by 3, or just masked)
+    /// - Bits [2:0]: GC color (0=White, 1=Gray, 2=Black)
+    /// Since context pointers are 8-byte aligned, low 3 bits are always 0.
+    context_and_color: usize,
     /// Size of allocation (object size, not including header)
     alloc_size: usize,
     /// Next object in the all-objects list (for sweeping)
     next_object: Option<NonNull<GcHeader>>,
 }
+
+/// Mask for extracting color from context_and_color (low 3 bits)
+const COLOR_MASK: usize = 0b111;
+/// Mask for extracting pointer from context_and_color
+const PTR_MASK: usize = !COLOR_MASK;
 
 impl GcHeader {
     /// Size of the GC header (must be aligned to 8 bytes)
@@ -67,12 +89,15 @@ impl GcHeader {
     /// Alignment of allocations
     pub const ALIGN: usize = 8;
 
-    /// Create a new GC header for an allocation
+    /// Create a new GC header for an allocation with context pointer
     #[inline]
-    pub fn new(alloc_size: usize) -> GcHeader {
+    pub fn new(alloc_size: usize, context_ptr: *mut ()) -> GcHeader {
+        debug_assert!(
+            (context_ptr as usize) & COLOR_MASK == 0,
+            "context_ptr must be 8-byte aligned"
+        );
         GcHeader {
-            color: GcColor::White,
-            _padding: [0; 7],
+            context_and_color: context_ptr as usize, // color = 0 (White)
             alloc_size,
             next_object: None,
         }
@@ -81,13 +106,29 @@ impl GcHeader {
     /// Get the color of this object
     #[inline]
     pub fn color(&self) -> GcColor {
-        self.color
+        GcColor::from_u8((self.context_and_color & COLOR_MASK) as u8)
     }
 
     /// Set the color of this object
     #[inline]
     pub fn set_color(&mut self, color: GcColor) {
-        self.color = color;
+        self.context_and_color = (self.context_and_color & PTR_MASK) | (color as usize);
+    }
+
+    /// Get the context pointer
+    #[inline]
+    pub fn context_ptr(&self) -> *mut () {
+        (self.context_and_color & PTR_MASK) as *mut ()
+    }
+
+    /// Set the context pointer (preserves color)
+    #[inline]
+    pub fn set_context_ptr(&mut self, ptr: *mut ()) {
+        debug_assert!(
+            (ptr as usize) & COLOR_MASK == 0,
+            "context_ptr must be 8-byte aligned"
+        );
+        self.context_and_color = (ptr as usize) | (self.context_and_color & COLOR_MASK);
     }
 
     /// Get the object allocation size (not including header)
@@ -140,13 +181,13 @@ impl GcHeader {
     /// Check if this object is marked (gray or black)
     #[inline]
     pub fn is_marked(&self) -> bool {
-        self.color != GcColor::White
+        self.color() != GcColor::White
     }
 
     /// Check if this object needs scanning (is gray)
     #[inline]
     pub fn needs_scanning(&self) -> bool {
-        self.color == GcColor::Gray
+        self.color() == GcColor::Gray
     }
 }
 
@@ -168,7 +209,7 @@ mod tests {
 
     #[test]
     fn test_gc_header_color() {
-        let mut header = GcHeader::new(64);
+        let mut header = GcHeader::new(64, core::ptr::null_mut());
         assert_eq!(header.color(), GcColor::White);
 
         header.set_color(GcColor::Gray);
@@ -179,5 +220,30 @@ mod tests {
         assert_eq!(header.color(), GcColor::Black);
         assert!(header.is_marked());
         assert!(!header.needs_scanning());
+    }
+
+    #[test]
+    fn test_gc_header_context_ptr() {
+        // Create a fake context pointer (8-byte aligned)
+        let fake_context = 0x1234_5678_9ABC_DEF0_usize as *mut ();
+        let mut header = GcHeader::new(64, fake_context);
+
+        assert_eq!(header.context_ptr(), fake_context);
+        assert_eq!(header.color(), GcColor::White);
+
+        // Change color should preserve context
+        header.set_color(GcColor::Gray);
+        assert_eq!(header.context_ptr(), fake_context);
+        assert_eq!(header.color(), GcColor::Gray);
+
+        header.set_color(GcColor::Black);
+        assert_eq!(header.context_ptr(), fake_context);
+        assert_eq!(header.color(), GcColor::Black);
+
+        // Change context should preserve color
+        let new_context = 0xFEDC_BA98_7654_3210_usize as *mut ();
+        header.set_context_ptr(new_context);
+        assert_eq!(header.context_ptr(), new_context);
+        assert_eq!(header.color(), GcColor::Black);
     }
 }

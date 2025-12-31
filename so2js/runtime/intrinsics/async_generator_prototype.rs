@@ -19,7 +19,7 @@ use crate::{
         property::Property,
         property_descriptor::PropertyDescriptor,
         realm::Realm,
-        Context, Handle, Value,
+        Context, StackRoot, Value,
     },
 };
 
@@ -29,7 +29,7 @@ pub struct AsyncGeneratorPrototype;
 
 impl AsyncGeneratorPrototype {
     /// The %AsyncGeneratorPrototype% Object (https://tc39.es/ecma262/#sec-properties-of-asyncgenerator-prototype)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::AsyncIteratorPrototype)),
@@ -61,9 +61,9 @@ impl AsyncGeneratorPrototype {
     /// %AsyncGeneratorPrototype%.next (https://tc39.es/ecma262/#sec-asyncgenerator-prototype-next)
     pub fn next(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
 
         let promise_constructor = cx.get_intrinsic(Intrinsic::PromiseConstructor);
@@ -103,9 +103,9 @@ impl AsyncGeneratorPrototype {
     /// %AsyncGeneratorPrototype%.return (https://tc39.es/ecma262/#sec-asyncgenerator-prototype-return)
     pub fn return_(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get_argument(cx, arguments, 0);
 
         let promise_constructor = cx.get_intrinsic(Intrinsic::PromiseConstructor);
@@ -132,9 +132,9 @@ impl AsyncGeneratorPrototype {
     /// %AsyncGeneratorPrototype%.throw (https://tc39.es/ecma262/#sec-asyncgenerator-prototype-throw)
     pub fn throw(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let error = get_argument(cx, arguments, 0);
 
         let promise_constructor = cx.get_intrinsic(Intrinsic::PromiseConstructor);
@@ -177,16 +177,16 @@ impl AsyncGeneratorPrototype {
     /// async generator prototype. Install this property on an async generator function.
     pub fn install_on_async_generator_function(
         cx: Context,
-        closure: Handle<Closure>,
+        closure: StackRoot<Closure>,
     ) -> EvalResult<()> {
         let proto = object_create::<ObjectValue>(
             cx,
             HeapItemKind::OrdinaryObject,
             Intrinsic::AsyncGeneratorPrototype,
         )?
-        .to_handle();
+        .to_stack();
 
-        let proto_desc = PropertyDescriptor::data(proto.to_handle().into(), true, false, false);
+        let proto_desc = PropertyDescriptor::data(proto.to_stack().into(), true, false, false);
         define_property_or_throw(cx, closure.into(), cx.names.prototype(), proto_desc)?;
 
         Ok(())

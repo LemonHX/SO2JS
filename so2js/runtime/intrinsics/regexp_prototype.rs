@@ -29,7 +29,7 @@ use crate::{
             is_callable, same_object_value, same_value, to_boolean, to_integer_or_infinity,
             to_length, to_object, to_uint32,
         },
-        Context, Handle, PropertyKey, Value,
+        Context, StackRoot, PropertyKey, Value,
     },
 };
 use alloc::string::String;
@@ -48,7 +48,7 @@ pub struct RegExpPrototype;
 
 impl RegExpPrototype {
     /// Properties of the RegExp Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-regexp-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -86,9 +86,9 @@ impl RegExpPrototype {
 
     /// Additional Properties of the RegExp.prototype Object (https://tc39.es/ecma262/#sec-additional-properties-of-the-regexp.prototype-object)
     pub fn init_annex_b_methods(
-        mut regexp_prototype: Handle<ObjectValue>,
+        mut regexp_prototype: StackRoot<ObjectValue>,
         mut cx: Context,
-        realm: Handle<Realm>,
+        realm: StackRoot<Realm>,
     ) -> AllocResult<()> {
         let compile_name = cx.alloc_string("compile")?.as_string();
         let compile_key = PropertyKey::string_not_array_index_handle(cx, compile_name)?;
@@ -98,9 +98,9 @@ impl RegExpPrototype {
     /// RegExp.prototype.exec (https://tc39.es/ecma262/#sec-regexp.prototype.exec)
     pub fn exec(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let regexp_object = if let Some(regexp_object) = as_regexp_object(this_value) {
             regexp_object
         } else {
@@ -119,18 +119,18 @@ impl RegExpPrototype {
     /// get RegExp.prototype.dotAll (https://tc39.es/ecma262/#sec-get-regexp.prototype.dotAll)
     pub fn dot_all(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         regexp_has_flag(cx, this_value, RegExpFlags::DOT_ALL)
     }
 
     /// get RegExp.prototype.flags (https://tc39.es/ecma262/#sec-get-regexp.prototype.flags)
     pub fn flags(
         mut cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Expected a regular expression");
         }
@@ -191,36 +191,36 @@ impl RegExpPrototype {
     /// get RegExp.prototype.global (https://tc39.es/ecma262/#sec-get-regexp.prototype.global)
     pub fn global(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         regexp_has_flag(cx, this_value, RegExpFlags::GLOBAL)
     }
 
     /// get RegExp.prototype.hasIndices (https://tc39.es/ecma262/#sec-get-regexp.prototype.hasIndices)
     pub fn has_indices(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         regexp_has_flag(cx, this_value, RegExpFlags::HAS_INDICES)
     }
 
     /// get RegExp.prototype.ignoreCase (https://tc39.es/ecma262/#sec-get-regexp.prototype.ignorecase)
     pub fn ignore_case(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         regexp_has_flag(cx, this_value, RegExpFlags::IGNORE_CASE)
     }
 
     /// RegExp.prototype [ @@match ] (https://tc39.es/ecma262/#sec-regexp.prototype-%symbol.match%)
     pub fn match_(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "RegExp.prototype[@@match] must be called on object");
         }
@@ -278,7 +278,7 @@ impl RegExpPrototype {
                 let last_index = to_length(cx, last_index)?;
 
                 let next_index = advance_u64_string_index(string_value, last_index, is_unicode)?;
-                let next_index_value = Value::from(next_index).to_handle(cx);
+                let next_index_value = Value::from(next_index).to_stack();
                 set(
                     cx,
                     regexp_object,
@@ -295,9 +295,9 @@ impl RegExpPrototype {
     /// RegExp.prototype [ @@matchAll ] (https://tc39.es/ecma262/#sec-regexp-prototype-%symbol.matchall%)
     pub fn match_all(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "RegExp.prototype[@@matchAll] must be called on object");
         }
@@ -321,7 +321,7 @@ impl RegExpPrototype {
 
         let last_index = get(cx, regexp_object, cx.names.last_index())?;
         let last_index = to_length(cx, last_index)?;
-        let last_index_value = Value::from(last_index).to_handle(cx);
+        let last_index_value = Value::from(last_index).to_stack();
 
         set(cx, matcher, cx.names.last_index(), last_index_value, true)?;
 
@@ -335,18 +335,18 @@ impl RegExpPrototype {
     /// get RegExp.prototype.multiline (https://tc39.es/ecma262/#sec-get-regexp.prototype.multiline)
     pub fn multiline(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         regexp_has_flag(cx, this_value, RegExpFlags::MULTILINE)
     }
 
     /// RegExp.prototype [ @@replace ] (https://tc39.es/ecma262/#sec-regexp.prototype-%symbol.replace%)
     pub fn replace(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "RegExp.prototype[@@replace] must be called on object");
         }
@@ -383,7 +383,7 @@ impl RegExpPrototype {
         }
 
         // Key is shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         let mut exec_results = vec![];
 
@@ -414,7 +414,7 @@ impl RegExpPrototype {
                 let this_index = to_length(cx, this_index)?;
 
                 let next_index = advance_u64_string_index(target_string, this_index, is_unicode)?;
-                let next_index_value = Value::from(next_index).to_handle(cx);
+                let next_index_value = Value::from(next_index).to_stack();
                 set(
                     cx,
                     regexp_object,
@@ -473,7 +473,7 @@ impl RegExpPrototype {
                             cx.undefined()
                         }
                     }));
-                    replacer_args.push(Value::from(matched_position).to_handle(cx));
+                    replacer_args.push(Value::from(matched_position).to_stack());
                     replacer_args.push(target_string.into());
 
                     if !named_captures.is_undefined() {
@@ -540,9 +540,9 @@ impl RegExpPrototype {
     /// RegExp.prototype [ @@search ] (https://tc39.es/ecma262/#sec-regexp.prototype-%symbol.search%)
     pub fn search(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "RegExp.prototype[@@search] must be called on object");
         }
@@ -584,9 +584,9 @@ impl RegExpPrototype {
     /// get RegExp.prototype.source (https://tc39.es/ecma262/#sec-get-regexp.prototype.source)
     pub fn source(
         mut cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if this_value.is_object() {
             let this_object = this_value.as_object();
             if let Some(regexp_object) = this_object.as_regexp_object() {
@@ -605,9 +605,9 @@ impl RegExpPrototype {
     /// RegExp.prototype [ @@split ] (https://tc39.es/ecma262/#sec-regexp.prototype-%symbol.split%)
     pub fn split(
         mut cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let regexp_object = if this_value.is_object() {
             this_value.as_object()
         } else {
@@ -660,19 +660,19 @@ impl RegExpPrototype {
             return Ok(result_array.as_value());
         }
 
-        // Handle the empty string case
+        // StackRoot the empty string case
         if string_value.is_empty() {
             let exec_result = regexp_exec(cx, splitter, string_value)?;
             if !exec_result.is_null() {
                 return Ok(result_array.as_value());
             }
 
-            let zero_key = PropertyKey::from_u8(0).to_handle(cx);
+            let zero_key = PropertyKey::from_u8(0).to_stack();
             create_data_property_or_throw(cx, result_array, zero_key, string_value.into())?;
         }
 
         // Property keys are shared between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         let size = string_value.len();
         let mut array_length = 0;
@@ -682,7 +682,7 @@ impl RegExpPrototype {
         // Keep executing RegExp until there are no more matches or the entire string has been
         // searched.
         while q < size {
-            let q_value = Value::from(q).to_handle(cx);
+            let q_value = Value::from(q).to_stack();
             set(cx, splitter, cx.names.last_index(), q_value, true)?;
 
             // Execute RegExp at current index, advancing to next index if there is no match
@@ -750,18 +750,18 @@ impl RegExpPrototype {
     /// get RegExp.prototype.sticky (https://tc39.es/ecma262/#sec-get-regexp.prototype.sticky)
     pub fn sticky(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         regexp_has_flag(cx, this_value, RegExpFlags::STICKY)
     }
 
     /// RegExp.prototype.test (https://tc39.es/ecma262/#sec-regexp.prototype.test)
     pub fn test(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let regexp_object = if this_value.is_object() {
             this_value.as_object()
         } else {
@@ -779,9 +779,9 @@ impl RegExpPrototype {
     /// RegExp.prototype.toString (https://tc39.es/ecma262/#sec-regexp.prototype.tostring)
     pub fn to_string(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if !this_value.is_object() {
             return type_error(cx, "Expected a regular expression");
         }
@@ -807,27 +807,27 @@ impl RegExpPrototype {
     /// get RegExp.prototype.unicode (https://tc39.es/ecma262/#sec-get-regexp.prototype.unicode)
     pub fn unicode(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         regexp_has_flag(cx, this_value, RegExpFlags::UNICODE_AWARE)
     }
 
     /// get RegExp.prototype.unicodeSets (https://tc39.es/ecma262/#sec-get-regexp.prototype.unicodesets)
     pub fn unicode_sets(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         regexp_has_flag(cx, this_value, RegExpFlags::UNICODE_SETS)
     }
 
     /// RegExp.prototype.compile (https://tc39.es/ecma262/#sec-regexp.prototype.compile)
     pub fn compile(
         cx: Context,
-        this_value: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let regexp_object = if let Some(regexp_object) = as_regexp_object(this_value) {
             regexp_object
         } else {
@@ -860,9 +860,9 @@ impl RegExpPrototype {
 /// RegExpHasFlag (https://tc39.es/ecma262/#sec-regexphasflag)
 fn regexp_has_flag(
     cx: Context,
-    this_value: Handle<Value>,
+    this_value: StackRoot<Value>,
     flag: RegExpFlags,
-) -> EvalResult<Handle<Value>> {
+) -> EvalResult<StackRoot<Value>> {
     if this_value.is_object() {
         let this_object = this_value.as_object();
         if let Some(regexp_object) = this_object.as_regexp_object() {
@@ -880,7 +880,7 @@ fn regexp_has_flag(
 }
 
 pub fn flags_string_contains(
-    flags_string: Handle<StringValue>,
+    flags_string: StackRoot<StringValue>,
     flag: CodePoint,
 ) -> AllocResult<bool> {
     Ok(flags_string.iter_code_points()?.any(|c| c == flag))
@@ -889,9 +889,9 @@ pub fn flags_string_contains(
 /// RegExpExec (https://tc39.es/ecma262/#sec-regexpexec)
 pub fn regexp_exec(
     cx: Context,
-    regexp_object: Handle<ObjectValue>,
-    string_value: Handle<StringValue>,
-) -> EvalResult<Handle<Value>> {
+    regexp_object: StackRoot<ObjectValue>,
+    string_value: StackRoot<StringValue>,
+) -> EvalResult<StackRoot<Value>> {
     let exec = get(cx, regexp_object, cx.names.exec())?;
 
     if is_callable(exec) {
@@ -913,9 +913,9 @@ pub fn regexp_exec(
 /// RegExpBuiltinExec (https://tc39.es/ecma262/#sec-regexpbuiltinexec)
 fn regexp_builtin_exec(
     cx: Context,
-    regexp_object: Handle<RegExpObject>,
-    string_value: Handle<StringValue>,
-) -> EvalResult<Handle<Value>> {
+    regexp_object: StackRoot<RegExpObject>,
+    string_value: StackRoot<StringValue>,
+) -> EvalResult<StackRoot<Value>> {
     let compiled_regexp = regexp_object.compiled_regexp();
     let string_length = string_value.len();
 
@@ -952,7 +952,7 @@ fn regexp_builtin_exec(
     // Run the matching engine on the regexp and input string
     let match_ = run_matcher(compiled_regexp, string_value, last_index)?;
 
-    // Handle match failure, resetting last index under sticky flag
+    // StackRoot match failure, resetting last index under sticky flag
     if match_.is_none() {
         if is_global || is_sticky {
             let zero_value = cx.zero();
@@ -975,7 +975,7 @@ fn regexp_builtin_exec(
 
     // Update last index to point past end of capture
     if is_global || is_sticky {
-        let last_index_value = Value::from(full_capture.end).to_handle(cx);
+        let last_index_value = Value::from(full_capture.end).to_stack();
         set(
             cx,
             regexp_object.into(),
@@ -989,7 +989,7 @@ fn regexp_builtin_exec(
     let result_array = must!(array_create(cx, capture_groups.len() as u64, None)).as_object();
 
     // Mark the start of the full match
-    let index_value = Value::from(full_capture.start).to_handle(cx);
+    let index_value = Value::from(full_capture.start).to_stack();
     must!(create_data_property_or_throw(
         cx,
         result_array,
@@ -1008,7 +1008,7 @@ fn regexp_builtin_exec(
     // Add the groups object to the result, or undefined if there are no named capture groups
     let named_groups_object = if compiled_regexp.has_named_capture_groups {
         object_create_with_optional_proto::<ObjectValue>(cx, HeapItemKind::OrdinaryObject, None)?
-            .to_handle()
+            .to_stack()
             .into()
     } else {
         cx.undefined()
@@ -1033,7 +1033,7 @@ fn regexp_builtin_exec(
                 HeapItemKind::OrdinaryObject,
                 None,
             )?
-            .to_handle()
+            .to_stack()
             .into()
         } else {
             cx.undefined()
@@ -1072,8 +1072,8 @@ fn regexp_builtin_exec(
         // Add capture indices to indices array if present
         let match_index_pair = if let Some((indices_array, indices_groups)) = indices_result {
             let match_index_pair = if let Some(capture) = capture {
-                let start_index = Value::from(capture.start).to_handle(cx);
-                let end_index = Value::from(capture.end).to_handle(cx);
+                let start_index = Value::from(capture.start).to_stack();
+                let end_index = Value::from(capture.end).to_stack();
                 create_array_from_list(cx, &[start_index, end_index])?.into()
             } else {
                 cx.undefined()
@@ -1093,7 +1093,7 @@ fn regexp_builtin_exec(
         // Add group name to groups object if group was named
         if i != 0 {
             if let Some(group_name) = compiled_regexp.capture_groups_as_slice()[i - 1] {
-                let group_name = group_name.to_handle();
+                let group_name = group_name.to_stack();
                 let group_name_key = PropertyKey::string_handle(cx, group_name.as_string())?;
 
                 // Group names object is guaranteed to be an object value
@@ -1149,7 +1149,7 @@ fn regexp_builtin_exec(
 ///
 /// Caller must ensure that the index is not out of bounds.
 fn advance_string_index(
-    string_value: Handle<StringValue>,
+    string_value: StackRoot<StringValue>,
     prev_index: u32,
     is_unicode: bool,
 ) -> AllocResult<u32> {
@@ -1169,7 +1169,7 @@ fn advance_string_index(
 /// Saem as AdvanceStringIndex, but index is expanded to the u64 range and is not guarnateed to be
 /// in bounds for the string.
 pub fn advance_u64_string_index(
-    string_value: Handle<StringValue>,
+    string_value: StackRoot<StringValue>,
     prev_index: u64,
     is_unicode: bool,
 ) -> AllocResult<u64> {

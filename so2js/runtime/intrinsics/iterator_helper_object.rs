@@ -5,7 +5,7 @@ use crate::{
     runtime::{
         abstract_operations::call_object,
         alloc_error::AllocResult,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         generator_object::GeneratorState,
         heap_item_descriptor::HeapItemKind,
         iterator::{
@@ -15,7 +15,7 @@ use crate::{
         object_value::ObjectValue,
         ordinary_object::object_create_with_proto,
         type_utilities::to_boolean,
-        Context, EvalResult, Handle, HeapPtr, Value,
+        Context, EvalResult, StackRoot, HeapPtr, Value,
     },
     set_uninit,
 };
@@ -68,7 +68,7 @@ enum IteratorHelperState {
 impl IteratorHelperObject {
     /// Creates and initializes a new IteratorHelperObject. Does not set the iterator helper's
     /// state, which must be done by the caller.
-    fn new(cx: Context, iterator: &Iterator) -> AllocResult<Handle<IteratorHelperObject>> {
+    fn new(cx: Context, iterator: &Iterator) -> AllocResult<StackRoot<IteratorHelperObject>> {
         let prototype = cx.get_intrinsic(Intrinsic::IteratorHelperPrototype);
         let mut object = object_create_with_proto::<IteratorHelperObject>(
             cx,
@@ -81,14 +81,14 @@ impl IteratorHelperObject {
         set_uninit!(object.is_done, iterator.is_done);
         set_uninit!(object.generator_state, GeneratorState::SuspendedStart);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
     pub fn new_drop(
         cx: Context,
         iterator: &Iterator,
         limit: f64,
-    ) -> AllocResult<Handle<IteratorHelperObject>> {
+    ) -> AllocResult<StackRoot<IteratorHelperObject>> {
         let mut object = Self::new(cx, iterator)?;
         set_uninit!(object.state, IteratorHelperState::Drop(limit));
         Ok(object)
@@ -98,7 +98,7 @@ impl IteratorHelperObject {
         cx: Context,
         iterator: &Iterator,
         limit: f64,
-    ) -> AllocResult<Handle<IteratorHelperObject>> {
+    ) -> AllocResult<StackRoot<IteratorHelperObject>> {
         let mut object = Self::new(cx, iterator)?;
         set_uninit!(object.state, IteratorHelperState::Take(limit));
         Ok(object)
@@ -107,8 +107,8 @@ impl IteratorHelperObject {
     pub fn new_filter(
         cx: Context,
         iterator: &Iterator,
-        predicate: Handle<ObjectValue>,
-    ) -> AllocResult<Handle<IteratorHelperObject>> {
+        predicate: StackRoot<ObjectValue>,
+    ) -> AllocResult<StackRoot<IteratorHelperObject>> {
         let mut object = Self::new(cx, iterator)?;
         set_uninit!(
             object.state,
@@ -123,8 +123,8 @@ impl IteratorHelperObject {
     pub fn new_map(
         cx: Context,
         iterator: &Iterator,
-        mapper: Handle<ObjectValue>,
-    ) -> AllocResult<Handle<IteratorHelperObject>> {
+        mapper: StackRoot<ObjectValue>,
+    ) -> AllocResult<StackRoot<IteratorHelperObject>> {
         let mut object = Self::new(cx, iterator)?;
         set_uninit!(
             object.state,
@@ -139,8 +139,8 @@ impl IteratorHelperObject {
     pub fn new_flat_map(
         cx: Context,
         iterator: &Iterator,
-        mapper: Handle<ObjectValue>,
-    ) -> AllocResult<Handle<IteratorHelperObject>> {
+        mapper: StackRoot<ObjectValue>,
+    ) -> AllocResult<StackRoot<IteratorHelperObject>> {
         let mut object = Self::new(cx, iterator)?;
         set_uninit!(
             object.state,
@@ -172,23 +172,23 @@ impl IteratorHelperObject {
     fn iterator(&self, cx: Context) -> Iterator {
         Iterator {
             iterator: self.iterator_object(),
-            next_method: self.next_method.to_handle(cx),
+            next_method: self.next_method.to_stack(),
             is_done: self.is_done,
         }
     }
 
-    pub fn iterator_object(&self) -> Handle<ObjectValue> {
-        self.iterator.to_handle()
+    pub fn iterator_object(&self) -> StackRoot<ObjectValue> {
+        self.iterator.to_stack()
     }
 }
 
-impl Handle<IteratorHelperObject> {
+impl StackRoot<IteratorHelperObject> {
     /// Execute the next() method, either starting from the GeneratedStart state or from the
     /// GeneratedYield state. In other words, starting from either the start of the generator
     /// closure or from after a yield point.
     ///
     /// Return None if the generator is done, or Some of the next iterator result object.
-    pub fn next(&mut self, cx: Context, is_start: bool) -> EvalResult<Option<Handle<ObjectValue>>> {
+    pub fn next(&mut self, cx: Context, is_start: bool) -> EvalResult<Option<StackRoot<ObjectValue>>> {
         match self.state() {
             IteratorHelperState::Drop(_) => self.next_drop(cx, is_start),
             IteratorHelperState::Take(_) => self.next_take(cx),
@@ -199,13 +199,13 @@ impl Handle<IteratorHelperObject> {
     }
 
     /// Returns either the return value or an error.
-    pub fn return_(&mut self, cx: Context) -> EvalResult<Handle<Value>> {
+    pub fn return_(&mut self, cx: Context) -> EvalResult<StackRoot<Value>> {
         if let IteratorHelperState::FlatMap { inner_iterator, .. } = self.state() {
-            // Handle more complex return logic within flatMap. Implement logic directly following
+            // StackRoot more complex return logic within flatMap. Implement logic directly following
             // the yield when yielding an abnormal completion.
             //
             // First close the inner iterator, then close the outer iterator.
-            let inner_iterator = inner_iterator.as_ref().unwrap().0.to_handle();
+            let inner_iterator = inner_iterator.as_ref().unwrap().0.to_stack();
             let backup_completion = iterator_close(cx, inner_iterator, Ok(cx.undefined()));
             match backup_completion {
                 Err(error) => iterator_close(cx, self.iterator_object(), Err(error)),
@@ -220,7 +220,7 @@ impl Handle<IteratorHelperObject> {
         &mut self,
         cx: Context,
         iterator: &mut Iterator,
-    ) -> EvalResult<Option<Handle<ObjectValue>>> {
+    ) -> EvalResult<Option<StackRoot<ObjectValue>>> {
         let result = iterator_step(cx, iterator);
         self.is_done = iterator.is_done;
         result
@@ -230,7 +230,7 @@ impl Handle<IteratorHelperObject> {
         &mut self,
         cx: Context,
         iterator: &mut Iterator,
-    ) -> EvalResult<Option<Handle<Value>>> {
+    ) -> EvalResult<Option<StackRoot<Value>>> {
         let result = iterator_step_value(cx, iterator);
         self.is_done = iterator.is_done;
         result
@@ -240,7 +240,7 @@ impl Handle<IteratorHelperObject> {
         &mut self,
         cx: Context,
         is_start: bool,
-    ) -> EvalResult<Option<Handle<ObjectValue>>> {
+    ) -> EvalResult<Option<StackRoot<ObjectValue>>> {
         let limit = if let IteratorHelperState::Drop(limit) = self.state() {
             *limit
         } else {
@@ -276,7 +276,7 @@ impl Handle<IteratorHelperObject> {
             .transpose()
     }
 
-    fn next_take(&mut self, cx: Context) -> EvalResult<Option<Handle<ObjectValue>>> {
+    fn next_take(&mut self, cx: Context) -> EvalResult<Option<StackRoot<ObjectValue>>> {
         let remaining = if let IteratorHelperState::Take(remaining) = self.state_mut() {
             remaining
         } else {
@@ -305,7 +305,7 @@ impl Handle<IteratorHelperObject> {
         &mut self,
         cx: Context,
         is_start: bool,
-    ) -> EvalResult<Option<Handle<ObjectValue>>> {
+    ) -> EvalResult<Option<StackRoot<ObjectValue>>> {
         let predicate = if let IteratorHelperState::Filter { predicate, counter } = self.state_mut()
         {
             // Counter is initialized to 0 on start, increment it after the first iteration
@@ -313,13 +313,13 @@ impl Handle<IteratorHelperObject> {
                 *counter += 1;
             }
 
-            predicate.to_handle()
+            predicate.to_stack()
         } else {
             unreachable!()
         };
 
         let mut iterator = self.iterator(cx);
-        let mut counter_value: Handle<Value> = Handle::empty(cx);
+        let mut counter_value: StackRoot<Value> = StackRoot::empty(cx);
 
         // Keep looping until we find a value fron the underlying iterator which passes the
         // predicate function.
@@ -363,10 +363,10 @@ impl Handle<IteratorHelperObject> {
         }
     }
 
-    fn next_map(&mut self, cx: Context, is_start: bool) -> EvalResult<Option<Handle<ObjectValue>>> {
+    fn next_map(&mut self, cx: Context, is_start: bool) -> EvalResult<Option<StackRoot<ObjectValue>>> {
         let (mapper, counter) =
             if let IteratorHelperState::Map { mapper, counter } = self.state_mut() {
-                (mapper.to_handle(), counter)
+                (mapper.to_stack(), counter)
             } else {
                 unreachable!()
             };
@@ -376,7 +376,7 @@ impl Handle<IteratorHelperObject> {
             *counter += 1;
         }
 
-        let counter_value = Value::from(*counter).to_handle(cx);
+        let counter_value = Value::from(*counter).to_stack();
 
         // Get the next value from the underlying iterator
         let value = match self.iterator_step_value(cx, &mut self.iterator(cx))? {
@@ -396,7 +396,7 @@ impl Handle<IteratorHelperObject> {
         }
     }
 
-    fn next_flat_map(&mut self, cx: Context) -> EvalResult<Option<Handle<ObjectValue>>> {
+    fn next_flat_map(&mut self, cx: Context) -> EvalResult<Option<StackRoot<ObjectValue>>> {
         let mut inner_iterator_opt: Option<Iterator> = None;
 
         let mapper = if let IteratorHelperState::FlatMap {
@@ -408,19 +408,19 @@ impl Handle<IteratorHelperObject> {
             // Set the initial inner iterator, if one exists
             if let Some((iterator, next_method)) = inner_iterator {
                 inner_iterator_opt = Some(Iterator {
-                    iterator: iterator.to_handle(),
-                    next_method: next_method.to_handle(cx),
+                    iterator: iterator.to_stack(),
+                    next_method: next_method.to_stack(),
                     is_done: false,
                 });
             }
 
-            mapper.to_handle()
+            mapper.to_stack()
         } else {
             unreachable!()
         };
 
         let mut iterator = self.iterator(cx);
-        let mut counter_value: Handle<Value> = Handle::empty(cx);
+        let mut counter_value: StackRoot<Value> = StackRoot::empty(cx);
 
         // Outer loop iterates through the values of the underlying iterator
         loop {
@@ -509,7 +509,7 @@ impl HeapItem for HeapPtr<IteratorHelperObject> {
         size_of::<IteratorHelperObject>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.iterator);
         visitor.visit_value(&mut self.next_method);

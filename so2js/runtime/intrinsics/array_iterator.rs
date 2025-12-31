@@ -8,7 +8,7 @@ use crate::{
         array_object::create_array_from_list,
         error::type_error,
         eval_result::EvalResult,
-        gc::{HeapItem, HeapVisitor},
+        gc::{HeapItem, GcVisitorExt},
         heap_item_descriptor::HeapItemKind,
         iterator::create_iter_result_object,
         object_value::ObjectValue,
@@ -17,7 +17,7 @@ use crate::{
         property_key::PropertyKey,
         realm::Realm,
         value::Value,
-        Context, Handle, HeapPtr,
+        Context, StackRoot, HeapPtr,
     },
     set_uninit,
 };
@@ -37,7 +37,7 @@ extend_object! {
         kind: ArrayIteratorKind,
         is_done: bool,
         current_index: usize,
-        get_length: fn(cx: Context, array: Handle<ObjectValue>) -> EvalResult<u64>,
+        get_length: fn(cx: Context, array: StackRoot<ObjectValue>) -> EvalResult<u64>,
     }
 }
 
@@ -50,9 +50,9 @@ pub enum ArrayIteratorKind {
 impl ArrayIterator {
     pub fn new(
         cx: Context,
-        array: Handle<ObjectValue>,
+        array: StackRoot<ObjectValue>,
         kind: ArrayIteratorKind,
-    ) -> AllocResult<Handle<ArrayIterator>> {
+    ) -> AllocResult<StackRoot<ArrayIterator>> {
         let mut object = object_create::<ArrayIterator>(
             cx,
             HeapItemKind::ArrayIterator,
@@ -73,14 +73,14 @@ impl ArrayIterator {
         set_uninit!(object.current_index, 0);
         set_uninit!(object.get_length, get_length);
 
-        Ok(object.to_handle())
+        Ok(object.to_stack())
     }
 
-    fn array(&self) -> Handle<ObjectValue> {
-        self.array.to_handle()
+    fn array(&self) -> StackRoot<ObjectValue> {
+        self.array.to_stack()
     }
 
-    fn get_typed_array_length(cx: Context, array: Handle<ObjectValue>) -> EvalResult<u64> {
+    fn get_typed_array_length(cx: Context, array: StackRoot<ObjectValue>) -> EvalResult<u64> {
         let typed_array = array.as_typed_array();
 
         let typed_array_record = make_typed_array_with_buffer_witness_record(typed_array);
@@ -91,7 +91,7 @@ impl ArrayIterator {
         Ok(typed_array_length(&typed_array_record) as u64)
     }
 
-    fn get_array_like_length(cx: Context, array: Handle<ObjectValue>) -> EvalResult<u64> {
+    fn get_array_like_length(cx: Context, array: StackRoot<ObjectValue>) -> EvalResult<u64> {
         length_of_array_like(cx, array)
     }
 
@@ -102,7 +102,7 @@ impl ArrayIterator {
 pub struct ArrayIteratorPrototype;
 
 impl ArrayIteratorPrototype {
-    pub fn new(mut cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(mut cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let proto = realm.get_intrinsic(Intrinsic::IteratorPrototype);
         let mut object = ObjectValue::new(cx, Some(proto), true)?;
 
@@ -124,9 +124,9 @@ impl ArrayIteratorPrototype {
     /// Adapted from the abstract closure in CreateArrayIterator (https://tc39.es/ecma262/#sec-createarrayiterator)
     pub fn next(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let mut array_iterator = ArrayIterator::cast_from_value(cx, this_value)?;
         let array = array_iterator.array();
 
@@ -148,7 +148,7 @@ impl ArrayIteratorPrototype {
 
         match array_iterator.kind {
             ArrayIteratorKind::Key => {
-                let key = Value::from(current_index).to_handle(cx);
+                let key = Value::from(current_index).to_stack();
                 Ok(create_iter_result_object(cx, key, false)?)
             }
             ArrayIteratorKind::Value => {
@@ -157,7 +157,7 @@ impl ArrayIteratorPrototype {
                 Ok(create_iter_result_object(cx, value, false)?)
             }
             ArrayIteratorKind::KeyAndValue => {
-                let key = Value::from(current_index).to_handle(cx);
+                let key = Value::from(current_index).to_stack();
                 let property_key = PropertyKey::from_u64_handle(cx, current_index)?;
                 let value = array.get(cx, property_key, array.into())?;
 
@@ -173,7 +173,7 @@ impl HeapItem for HeapPtr<ArrayIterator> {
         size_of::<ArrayIterator>()
     }
 
-    fn visit_pointers(&mut self, visitor: &mut impl HeapVisitor) {
+    fn visit_pointers(&mut self, visitor: &mut impl GcVisitorExt) {
         self.visit_object_pointers(visitor);
         visitor.visit_pointer(&mut self.array);
     }

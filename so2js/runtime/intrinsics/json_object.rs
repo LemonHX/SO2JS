@@ -20,7 +20,7 @@ use crate::{
         type_utilities::{
             is_array, is_callable, number_to_string, to_integer_or_infinity, to_number,
         },
-        Context, EvalResult, Handle, PropertyKey, Realm, Value,
+        Context, EvalResult, StackRoot, PropertyKey, Realm, Value,
     },
 };
 use alloc::vec;
@@ -34,7 +34,7 @@ use super::intrinsics::Intrinsic;
 pub struct JSONObject;
 
 impl JSONObject {
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -59,9 +59,9 @@ impl JSONObject {
     /// JSON.parse (https://tc39.es/ecma262/#sec-json.parse)
     pub fn parse(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         let text_arg = get_argument(cx, arguments, 0);
         let text_string = to_string(cx, text_arg)?;
 
@@ -94,17 +94,17 @@ impl JSONObject {
     /// InternalizeJSONProperty (https://tc39.es/ecma262/#sec-internalizejsonproperty)
     fn internalize_json_property(
         cx: Context,
-        holder: Handle<ObjectValue>,
-        holder_key: Handle<PropertyKey>,
-        reviver: Handle<ObjectValue>,
-    ) -> EvalResult<Handle<Value>> {
+        holder: StackRoot<ObjectValue>,
+        holder_key: StackRoot<PropertyKey>,
+        reviver: StackRoot<ObjectValue>,
+    ) -> EvalResult<StackRoot<Value>> {
         let value = get(cx, holder, holder_key)?;
 
         if value.is_object() {
             let mut value = value.as_object();
 
             // Key is shared between iterations
-            let mut key = PropertyKey::uninit().to_handle(cx);
+            let mut key = PropertyKey::uninit().to_stack();
 
             if is_array(cx, value.into())? {
                 let length = length_of_array_like(cx, value)?;
@@ -144,9 +144,9 @@ impl JSONObject {
     /// JSON.stringify (https://tc39.es/ecma262/#sec-json.stringify)
     pub fn stringify(
         cx: Context,
-        _: Handle<Value>,
-        arguments: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         // Replacer arg may be a function or property list
         let replacer_arg = get_argument(cx, arguments, 1);
 
@@ -162,7 +162,7 @@ impl JSONObject {
                 let mut property_keys = vec![];
 
                 // Share key between iterations
-                let mut key = PropertyKey::uninit().to_handle(cx);
+                let mut key = PropertyKey::uninit().to_stack();
 
                 let replacer_array = replacer_arg.as_object();
                 let length = length_of_array_like(cx, replacer_array)?;
@@ -481,17 +481,17 @@ fn parse_json_string(lexer: &mut StringLexer) -> Option<Wtf8String> {
 }
 
 impl JSONValue {
-    pub fn to_js_value(&self, mut cx: Context) -> AllocResult<Handle<Value>> {
+    pub fn to_js_value(&self, mut cx: Context) -> AllocResult<StackRoot<Value>> {
         let value = match self {
             Self::Null => cx.null(),
             Self::Boolean(b) => cx.bool(*b),
-            Self::Number(n) => Value::from(*n).to_handle(cx),
+            Self::Number(n) => Value::from(*n).to_stack(),
             Self::String(s) => cx.alloc_wtf8_string(s)?.into(),
             Self::Array(values) => {
                 let array = must_a!(array_create(cx, 0, None));
 
                 // Key is shared between iterations
-                let mut key = PropertyKey::uninit().to_handle(cx);
+                let mut key = PropertyKey::uninit().to_stack();
 
                 for (i, value) in values.iter().enumerate() {
                     key.replace(PropertyKey::from_u64(cx, i as u64)?);
@@ -505,8 +505,8 @@ impl JSONValue {
                 let object = ordinary_object_create(cx)?;
 
                 // Key is shared between iterations
-                let mut key_value: Handle<Value> = Handle::empty(cx);
-                let mut key = PropertyKey::uninit().to_handle(cx);
+                let mut key_value: StackRoot<Value> = StackRoot::empty(cx);
+                let mut key = PropertyKey::uninit().to_stack();
 
                 for (key_string, value) in properties {
                     key_value.replace(cx.alloc_wtf8_string_ptr(key_string)?.as_string().into());
@@ -529,17 +529,17 @@ struct JSONSerializer {
     /// String that we are building
     builder: Wtf8String,
 
-    stack: Vec<Handle<ObjectValue>>,
-    replacer_function: Option<Handle<ObjectValue>>,
-    property_list: Option<Vec<Handle<PropertyKey>>>,
+    stack: Vec<StackRoot<ObjectValue>>,
+    replacer_function: Option<StackRoot<ObjectValue>>,
+    property_list: Option<Vec<StackRoot<PropertyKey>>>,
     indent: u32,
     gap: Wtf8String,
 }
 
 impl JSONSerializer {
     fn new(
-        replacer_function: Option<Handle<ObjectValue>>,
-        property_list: Option<Vec<Handle<PropertyKey>>>,
+        replacer_function: Option<StackRoot<ObjectValue>>,
+        property_list: Option<Vec<StackRoot<PropertyKey>>>,
         gap: Wtf8String,
     ) -> Self {
         JSONSerializer {
@@ -552,7 +552,7 @@ impl JSONSerializer {
         }
     }
 
-    fn build(self, mut cx: Context) -> AllocResult<Handle<StringValue>> {
+    fn build(self, mut cx: Context) -> AllocResult<StackRoot<StringValue>> {
         Ok(cx.alloc_wtf8_string(&self.builder)?.as_string())
     }
 
@@ -563,8 +563,8 @@ impl JSONSerializer {
     fn serialize_json_property(
         &mut self,
         cx: Context,
-        key: Handle<PropertyKey>,
-        holder: Handle<ObjectValue>,
+        key: StackRoot<PropertyKey>,
+        holder: StackRoot<ObjectValue>,
     ) -> EvalResult<bool> {
         let mut value = get(cx, holder, key)?;
 
@@ -631,7 +631,7 @@ impl JSONSerializer {
     }
 
     /// QuoteJSONString (https://tc39.es/ecma262/#sec-quotejsonstring)
-    fn serialize_json_string(&mut self, string: Handle<StringValue>) -> AllocResult<()> {
+    fn serialize_json_string(&mut self, string: StackRoot<StringValue>) -> AllocResult<()> {
         self.builder.push_char('"');
 
         for code_point in string.iter_code_points()? {
@@ -669,7 +669,7 @@ impl JSONSerializer {
         }
     }
 
-    fn check_for_cycle(&mut self, cx: Context, value: Handle<ObjectValue>) -> EvalResult<()> {
+    fn check_for_cycle(&mut self, cx: Context, value: StackRoot<ObjectValue>) -> EvalResult<()> {
         let value_ptr = *value;
         let has_cycle = self
             .stack
@@ -687,7 +687,7 @@ impl JSONSerializer {
     fn serialize_json_object(
         &mut self,
         cx: Context,
-        object: Handle<ObjectValue>,
+        object: StackRoot<ObjectValue>,
     ) -> EvalResult<()> {
         self.check_for_cycle(cx, object)?;
 
@@ -698,7 +698,7 @@ impl JSONSerializer {
             let property_key_values = enumerable_own_property_names(cx, object, KeyOrValue::Key)?;
             for property_key_value in property_key_values {
                 let property_key = PropertyKey::from_value(cx, property_key_value)?;
-                keys.push(property_key.to_handle(cx));
+                keys.push(property_key.to_stack());
             }
         };
 
@@ -761,7 +761,7 @@ impl JSONSerializer {
     }
 
     /// SerializeJSONArray (https://tc39.es/ecma262/#sec-serializejsonarray)
-    fn serialize_json_array(&mut self, cx: Context, array: Handle<ObjectValue>) -> EvalResult<()> {
+    fn serialize_json_array(&mut self, cx: Context, array: StackRoot<ObjectValue>) -> EvalResult<()> {
         self.check_for_cycle(cx, array)?;
 
         self.builder.push_char('[');
@@ -770,7 +770,7 @@ impl JSONSerializer {
         self.indent += 1;
 
         // Share key between iterations
-        let mut key = PropertyKey::uninit().to_handle(cx);
+        let mut key = PropertyKey::uninit().to_stack();
 
         let length = length_of_array_like(cx, array)?;
         for i in 0..length {

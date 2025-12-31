@@ -1,6 +1,6 @@
 use crate::runtime::{
     alloc_error::AllocResult, error::type_error, eval_result::EvalResult,
-    object_value::ObjectValue, property::Property, realm::Realm, Context, Handle, Value,
+    object_value::ObjectValue, property::Property, realm::Realm, Context, StackRoot, Value,
 };
 
 use super::{intrinsics::Intrinsic, weak_ref_constructor::WeakRefObject};
@@ -9,7 +9,7 @@ pub struct WeakRefPrototype;
 
 impl WeakRefPrototype {
     /// Properties of the WeakRef Prototype Object (https://tc39.es/ecma262/#sec-properties-of-the-weak-ref-prototype-object)
-    pub fn new(cx: Context, realm: Handle<Realm>) -> AllocResult<Handle<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -33,18 +33,18 @@ impl WeakRefPrototype {
     /// WeakRef.prototype.deref (https://tc39.es/ecma262/#sec-weak-ref.prototype.deref)
     pub fn deref(
         cx: Context,
-        this_value: Handle<Value>,
-        _: &[Handle<Value>],
-    ) -> EvalResult<Handle<Value>> {
+        this_value: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         if let Some(weak_ref_object) = this_weak_ref_value(this_value) {
-            Ok(weak_ref_object.weak_ref_target().to_handle(cx))
+            Ok(weak_ref_object.weak_ref_target().to_stack())
         } else {
             type_error(cx, "deref method must be called on WeakRef")
         }
     }
 }
 
-fn this_weak_ref_value(value: Handle<Value>) -> Option<Handle<WeakRefObject>> {
+fn this_weak_ref_value(value: StackRoot<Value>) -> Option<StackRoot<WeakRefObject>> {
     if !value.is_object() {
         return None;
     }

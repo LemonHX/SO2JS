@@ -23,19 +23,19 @@ use crate::{
         },
         object_value::ObjectValue,
         ordinary_object::get_prototype_from_constructor,
-        to_string, Context, Handle, Value,
+        to_string, Context, StackRoot, Value,
     },
 };
 
 /// CreateDynamicFunction (https://tc39.es/ecma262/#sec-createdynamicfunction)
 pub fn create_dynamic_function(
     mut cx: Context,
-    constructor: Handle<ObjectValue>,
-    new_target: Option<Handle<ObjectValue>>,
-    args: &[Handle<Value>],
+    constructor: StackRoot<ObjectValue>,
+    new_target: Option<StackRoot<ObjectValue>>,
+    args: &[StackRoot<Value>],
     is_async: bool,
     is_generator: bool,
-) -> EvalResult<Handle<ObjectValue>> {
+) -> EvalResult<StackRoot<ObjectValue>> {
     let new_target = new_target.unwrap_or(constructor);
 
     let prefix;

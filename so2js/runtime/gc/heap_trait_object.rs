@@ -9,7 +9,7 @@ macro_rules! heap_trait_object {
         #[derive(Clone, Copy)]
         #[repr(C)]
         pub struct $stack_object {
-            pub data: $crate::runtime::Handle<$crate::runtime::object_value::ObjectValue>,
+            pub data: $crate::runtime::StackRoot<$crate::runtime::object_value::ObjectValue>,
             vtable: *const (),
         }
 
@@ -21,9 +21,9 @@ macro_rules! heap_trait_object {
             vtable: *const (),
         }
 
-        impl<T> $crate::runtime::Handle<T>
+        impl<T> $crate::runtime::StackRoot<T>
         where
-            $crate::runtime::Handle<T>: $trait,
+            $crate::runtime::StackRoot<T>: $trait,
         {
             #[inline]
             pub fn $into_dyn(self) -> $stack_object
@@ -48,7 +48,7 @@ macro_rules! heap_trait_object {
             }
 
             #[allow(dead_code)]
-            pub fn visit_pointers(&mut self, visitor: &mut impl $crate::runtime::gc::HeapVisitor) {
+            pub fn visit_pointers(&mut self, visitor: &mut impl $crate::runtime::gc::GcVisitorExt) {
                 visitor.visit_pointer(&mut self.data);
                 visitor.visit_rust_vtable_pointer(&mut self.vtable);
             }
@@ -73,7 +73,7 @@ macro_rules! heap_trait_object {
             #[inline]
             pub fn from_heap(heap_object: &$heap_object) -> $stack_object {
                 $stack_object {
-                    data: heap_object.data.to_handle(),
+                    data: heap_object.data.to_stack(),
                     vtable: heap_object.vtable,
                 }
             }
