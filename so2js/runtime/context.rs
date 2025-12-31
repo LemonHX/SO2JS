@@ -149,7 +149,7 @@ impl Context {
     }
 
     fn new(options: Rc<Options>, sys: Option<Box<dyn crate::sys::Sys>>) -> AllocResult<Context> {
-        let cx_cell = Box::new(ContextCell {
+        let mut cx_cell = Box::new(ContextCell {
             sys,
             heap: Heap::new(options.heap_size),
             handle_context: StackRootContext::new(),
@@ -187,7 +187,8 @@ impl Context {
 
         let mut cx = unsafe { Context::from_ptr(NonNull::new_unchecked(Box::leak(cx_cell))) };
         // pass it here
-        cx.rust_runtime_functions.cx_ptr = cx.ptr.as_ptr();
+        cx.rust_runtime_functions.cx_ptr = cx.as_ptr();
+
         cx.vm = Some(Box::new(VM::new(cx)));
         cx.init_heap_allocated_context_fields()?;
 
@@ -533,12 +534,12 @@ impl Context {
 
     #[inline]
     pub fn smi(&self, value: i32) -> StackRoot<Value> {
-        Value::smi(value).to_stack()
+        Value::smi(value).to_stack_with(*self)
     }
 
     #[inline]
     pub fn number(&self, value: f64) -> StackRoot<Value> {
-        Value::number(value).to_stack()
+        Value::number(value).to_stack_with(*self)
     }
 
     /// Visit all heap roots for a garbage collection. This optionally visits pointers that are

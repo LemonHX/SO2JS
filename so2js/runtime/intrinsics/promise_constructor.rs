@@ -18,7 +18,7 @@ use crate::{
         promise_object::{promise_resolve, resolve, PromiseCapability, PromiseObject},
         realm::Realm,
         type_utilities::is_callable,
-        Context, StackRoot, PropertyKey, Value,
+        Context, PropertyKey, StackRoot, Value,
     },
 };
 
@@ -181,12 +181,12 @@ impl PromiseConstructor {
             .value()
     }
 
-    fn set_index(cx: Context, mut function: StackRoot<ObjectValue>, value: Value) -> AllocResult<()> {
-        function.private_element_set(
-            cx,
-            cx.well_known_symbols.index().cast(),
-            value.to_stack(),
-        )
+    fn set_index(
+        cx: Context,
+        mut function: StackRoot<ObjectValue>,
+        value: Value,
+    ) -> AllocResult<()> {
+        function.private_element_set(cx, cx.well_known_symbols.index().cast(), value.to_stack())
     }
 
     fn get_values(cx: Context, function: StackRoot<ObjectValue>) -> StackRoot<ArrayObject> {
@@ -206,7 +206,10 @@ impl PromiseConstructor {
         function.private_element_set(cx, cx.well_known_symbols.values().cast(), value.into())
     }
 
-    fn get_capability(cx: Context, function: StackRoot<ObjectValue>) -> StackRoot<PromiseCapability> {
+    fn get_capability(
+        cx: Context,
+        function: StackRoot<ObjectValue>,
+    ) -> StackRoot<PromiseCapability> {
         function
             .private_element_find(cx, cx.well_known_symbols.capability().cast())
             .unwrap()
@@ -223,7 +226,10 @@ impl PromiseConstructor {
         function.private_element_set(cx, cx.well_known_symbols.capability().cast(), value.into())
     }
 
-    fn get_remaining_elements(cx: Context, function: StackRoot<ObjectValue>) -> StackRoot<NumberObject> {
+    fn get_remaining_elements(
+        cx: Context,
+        function: StackRoot<ObjectValue>,
+    ) -> StackRoot<NumberObject> {
         function
             .private_element_find(cx, cx.well_known_symbols.remaining_elements().cast())
             .unwrap()

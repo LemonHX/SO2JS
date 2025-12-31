@@ -13,7 +13,7 @@ use super::{
 pub struct GcObject;
 
 impl GcObject {
-    fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
+    pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
         let mut object = ObjectValue::new(
             cx,
             Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
@@ -41,7 +41,11 @@ impl GcObject {
         })
     }
 
-    pub fn run(cx: Context, _: StackRoot<Value>, _: &[StackRoot<Value>]) -> EvalResult<StackRoot<Value>> {
+    pub fn run(
+        cx: Context,
+        _: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         Heap::run_gc(cx);
         Ok(cx.undefined())
     }

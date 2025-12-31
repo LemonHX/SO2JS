@@ -7,7 +7,7 @@ use crate::{
         alloc_error::AllocResult,
         error::type_error,
         eval_result::EvalResult,
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         get,
         heap_item_descriptor::HeapItemKind,
         intrinsics::regexp_prototype::{advance_u64_string_index, regexp_exec},
@@ -19,7 +19,7 @@ use crate::{
         string_value::StringValue,
         to_string,
         type_utilities::to_length,
-        Context, StackRoot, HeapPtr, PropertyKey, Value,
+        Context, HeapPtr, PropertyKey, StackRoot, Value,
     },
     set_uninit,
 };
@@ -139,7 +139,7 @@ impl RegExpStringIteratorPrototype {
 
             let next_index =
                 advance_u64_string_index(target_string, last_index, regexp_iterator.is_unicode)?;
-            let next_index_value = Value::from(next_index).to_stack();
+            let next_index_value = Value::from(next_index).to_stack_with(cx);
             set(
                 cx,
                 regexp_object,

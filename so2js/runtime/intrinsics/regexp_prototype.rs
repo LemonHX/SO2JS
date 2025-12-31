@@ -29,7 +29,7 @@ use crate::{
             is_callable, same_object_value, same_value, to_boolean, to_integer_or_infinity,
             to_length, to_object, to_uint32,
         },
-        Context, StackRoot, PropertyKey, Value,
+        Context, PropertyKey, StackRoot, Value,
     },
 };
 use alloc::string::String;
@@ -278,7 +278,7 @@ impl RegExpPrototype {
                 let last_index = to_length(cx, last_index)?;
 
                 let next_index = advance_u64_string_index(string_value, last_index, is_unicode)?;
-                let next_index_value = Value::from(next_index).to_stack();
+                let next_index_value = Value::from(next_index).to_stack_with(cx);
                 set(
                     cx,
                     regexp_object,
@@ -321,7 +321,7 @@ impl RegExpPrototype {
 
         let last_index = get(cx, regexp_object, cx.names.last_index())?;
         let last_index = to_length(cx, last_index)?;
-        let last_index_value = Value::from(last_index).to_stack();
+        let last_index_value = Value::from(last_index).to_stack_with(cx);
 
         set(cx, matcher, cx.names.last_index(), last_index_value, true)?;
 
@@ -414,7 +414,7 @@ impl RegExpPrototype {
                 let this_index = to_length(cx, this_index)?;
 
                 let next_index = advance_u64_string_index(target_string, this_index, is_unicode)?;
-                let next_index_value = Value::from(next_index).to_stack();
+                let next_index_value = Value::from(next_index).to_stack_with(cx);
                 set(
                     cx,
                     regexp_object,
@@ -473,7 +473,7 @@ impl RegExpPrototype {
                             cx.undefined()
                         }
                     }));
-                    replacer_args.push(Value::from(matched_position).to_stack());
+                    replacer_args.push(Value::from(matched_position).to_stack_with(cx));
                     replacer_args.push(target_string.into());
 
                     if !named_captures.is_undefined() {
@@ -682,7 +682,7 @@ impl RegExpPrototype {
         // Keep executing RegExp until there are no more matches or the entire string has been
         // searched.
         while q < size {
-            let q_value = Value::from(q).to_stack();
+            let q_value = Value::from(q).to_stack_with(cx);
             set(cx, splitter, cx.names.last_index(), q_value, true)?;
 
             // Execute RegExp at current index, advancing to next index if there is no match
@@ -975,7 +975,7 @@ fn regexp_builtin_exec(
 
     // Update last index to point past end of capture
     if is_global || is_sticky {
-        let last_index_value = Value::from(full_capture.end).to_stack();
+        let last_index_value = Value::from(full_capture.end).to_stack_with(cx);
         set(
             cx,
             regexp_object.into(),
@@ -989,7 +989,7 @@ fn regexp_builtin_exec(
     let result_array = must!(array_create(cx, capture_groups.len() as u64, None)).as_object();
 
     // Mark the start of the full match
-    let index_value = Value::from(full_capture.start).to_stack();
+    let index_value = Value::from(full_capture.start).to_stack_with(cx);
     must!(create_data_property_or_throw(
         cx,
         result_array,
@@ -1072,8 +1072,8 @@ fn regexp_builtin_exec(
         // Add capture indices to indices array if present
         let match_index_pair = if let Some((indices_array, indices_groups)) = indices_result {
             let match_index_pair = if let Some(capture) = capture {
-                let start_index = Value::from(capture.start).to_stack();
-                let end_index = Value::from(capture.end).to_stack();
+                let start_index = Value::from(capture.start).to_stack_with(cx);
+                let end_index = Value::from(capture.end).to_stack_with(cx);
                 create_array_from_list(cx, &[start_index, end_index])?.into()
             } else {
                 cx.undefined()

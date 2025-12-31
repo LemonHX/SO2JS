@@ -142,7 +142,11 @@ impl DateConstructor {
     }
 
     /// Date.now (https://tc39.es/ecma262/#sec-date.now)
-    pub fn now(cx: Context, _: StackRoot<Value>, _: &[StackRoot<Value>]) -> EvalResult<StackRoot<Value>> {
+    pub fn now(
+        cx: Context,
+        _: StackRoot<Value>,
+        _: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
         Ok(Value::from(get_current_unix_time(&cx)).to_stack())
     }
 
@@ -156,7 +160,7 @@ impl DateConstructor {
         let string = to_string(cx, string_arg)?;
 
         if let Some(date_value) = parse_string_to_date(string)? {
-            Ok(Value::from(date_value).to_stack())
+            Ok(Value::from(date_value).to_stack_with(cx))
         } else {
             Ok(cx.nan())
         }

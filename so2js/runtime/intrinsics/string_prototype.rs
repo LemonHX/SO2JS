@@ -34,7 +34,7 @@ use crate::{
             to_number, to_uint32,
         },
         value::Value,
-        Context, StackRoot, HeapPtr, PropertyKey,
+        Context, HeapPtr, PropertyKey, StackRoot,
     },
 };
 use alloc::string::ToString;
@@ -382,7 +382,7 @@ impl StringPrototype {
 
         match string.find(search_string, pos)? {
             None => Ok(cx.negative_one()),
-            Some(index) => Ok(Value::from(index).to_stack()),
+            Some(index) => Ok(Value::from(index).to_stack_with(cx)),
         }
     }
 
@@ -423,7 +423,7 @@ impl StringPrototype {
 
         match string.rfind(search_string, string_end)? {
             None => Ok(cx.negative_one()),
-            Some(index) => Ok(Value::from(index).to_stack()),
+            Some(index) => Ok(Value::from(index).to_stack_with(cx)),
         }
     }
 
@@ -729,7 +729,7 @@ impl StringPrototype {
         let replacement_string = match replace_value {
             // If replace argument is a function, replacement is the result of calling that function
             ReplaceValue::Function(replace_function) => {
-                let matched_position_value = Value::from(matched_position).to_stack();
+                let matched_position_value = Value::from(matched_position).to_stack_with(cx);
                 let replacement = call_object(
                     cx,
                     replace_function,
@@ -847,7 +847,7 @@ impl StringPrototype {
             let replacement_string = match replace_value {
                 // If replace argument is a function, replacement is the result of calling that function
                 ReplaceValue::Function(replace_function) => {
-                    let matched_position_value = Value::from(matched_position).to_stack();
+                    let matched_position_value = Value::from(matched_position).to_stack_with(cx);
                     let replacement = call_object(
                         cx,
                         replace_function,

@@ -62,8 +62,12 @@ pub fn build_function_name(
 }
 
 /// SetFunctionLength (https://tc39.es/ecma262/#sec-setfunctionlength)
-pub fn set_function_length(cx: Context, func: StackRoot<ObjectValue>, length: u32) -> AllocResult<()> {
-    let length_value = Value::from(length).to_stack();
+pub fn set_function_length(
+    cx: Context,
+    func: StackRoot<ObjectValue>,
+    length: u32,
+) -> AllocResult<()> {
+    let length_value = Value::from(length).to_stack_with(cx);
     let desc = PropertyDescriptor::data(length_value, false, false, true);
     must_a!(define_property_or_throw(cx, func, cx.names.length(), desc));
 
@@ -77,7 +81,7 @@ pub fn set_function_length_maybe_infinity(
     length: Option<usize>,
 ) -> EvalResult<()> {
     let length = if let Some(length) = length {
-        Value::from(length).to_stack()
+        Value::from(length).to_stack_with(cx)
     } else {
         cx.number(f64::INFINITY)
     };

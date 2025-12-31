@@ -517,7 +517,23 @@ impl StackRoot<Value> {
 impl Value {
     #[inline]
     pub fn to_stack(self) -> StackRoot<Value> {
-        let handle_context = todo!();
+        assert!(
+            self.is_pointer(),
+            "to_stack() called on non-pointer Value; use to_stack_with(cx) instead"
+        );
+
+        // Get Context from the GcHeader stored with each object
+        let self_ptr = self.as_pointer();
+        let gc_header = unsafe { GcHeader::from_object_ptr(self_ptr.as_ptr()) };
+        let context_ptr = gc_header.context_ptr() as *mut ContextCell;
+        let context_cell = unsafe { &mut *context_ptr };
+        let handle_context = &mut context_cell.handle_context;
+        StackRoot::new(handle_context, Value::to_handle_contents(self))
+    }
+
+    #[inline]
+    pub fn to_stack_with(self, mut cx: Context) -> StackRoot<Value> {
+        let handle_context = &mut cx.handle_context;
         StackRoot::new(handle_context, Value::to_handle_contents(self))
     }
 }
@@ -525,6 +541,11 @@ impl Value {
 impl<T: IsHeapItem> HeapPtr<T> {
     #[inline]
     pub fn to_stack(self) -> StackRoot<T> {
+        assert!(
+            !self.is_dangling(),
+            "to_stack() called on dangling/uninitialized HeapPtr!"
+        );
+
         // Get Context from the GcHeader stored with each object
         let self_ptr = self.as_ptr();
         let gc_header = unsafe { GcHeader::from_object_ptr(self_ptr) };
@@ -540,6 +561,12 @@ impl<T: IsHeapItem> HeapPtr<T> {
 
         let context_cell = unsafe { &mut *context_ptr };
         let handle_context = &mut context_cell.handle_context;
+        StackRoot::new(handle_context, T::to_handle_contents(self))
+    }
+
+    #[inline]
+    pub fn to_stack_with(self, mut cx: Context) -> StackRoot<T> {
+        let handle_context = &mut cx.handle_context;
         StackRoot::new(handle_context, T::to_handle_contents(self))
     }
 }
@@ -593,13 +620,15 @@ impl<T> Escapable for HeapPtr<T> {
 impl Escapable for StackRoot<Value> {
     #[inline]
     fn escape(&self, cx: Context) -> Self {
-        (**self).to_stack()
+        (**self).to_stack_with(cx)
     }
 }
 
 impl<T: IsHeapItem> Escapable for StackRoot<T> {
     #[inline]
     fn escape(&self, _: Context) -> Self {
+        // NOTE: We cannot recover Context from dangling pointers; this is only called for
+        // initialized heap items during scope escape, so use header-based to_stack.
         (**self).to_stack()
     }
 }

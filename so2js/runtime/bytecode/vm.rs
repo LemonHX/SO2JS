@@ -1426,7 +1426,7 @@ impl VM {
 
     #[inline]
     fn read_register_to_handle<W: Width>(&mut self, reg: Register<W>) -> StackRoot<Value> {
-        self.read_register(reg).to_stack()
+        self.read_register(reg).to_stack_with(self.cx())
     }
 
     #[inline]
@@ -1594,7 +1594,7 @@ impl VM {
             // Call rust runtime function directly in its own handle scope
             let cx = self.cx();
             handle_scope!(cx, {
-                let receiver = receiver.to_stack();
+                let receiver = receiver.to_stack_with(cx);
                 self.call_rust_runtime(closure_ptr, function_id, receiver, arguments, None)
             })
         } else {
@@ -1621,7 +1621,7 @@ impl VM {
             // dispatch loop when the marked return address is encountered.
             self.dispatch_loop()?;
 
-            Ok(return_value.to_stack())
+            Ok(return_value.to_stack_with(self.cx()))
         }
     }
 
@@ -1735,7 +1735,9 @@ impl VM {
             CallableObject::Proxy(proxy) => {
                 return handle_scope!(self.cx(), {
                     // Can default to undefined receiver, which will be eventually coerced by callee
-                    let receiver = receiver.unwrap_or(Value::undefined()).to_stack();
+                    let receiver = receiver
+                        .unwrap_or(Value::undefined())
+                        .to_stack_with(self.cx());
                     let arguments = self.prepare_rust_runtime_args(args);
                     let return_value = proxy.to_stack().call(self.cx(), receiver, &arguments)?;
                     unsafe { *return_value_address = *return_value };
@@ -4305,7 +4307,7 @@ impl VM {
 
         // StackRoots are shared between iterations
         let mut array_key = PropertyKey::uninit().to_stack();
-        let mut value_handle = Value::uninit().to_stack();
+        let mut value_handle = Value::uninit().to_stack_with(self.cx());
 
         // The arguments between the number of formal parameters and the actual argc supplied will
         // all be added to the rest array.

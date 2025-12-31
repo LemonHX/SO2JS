@@ -117,8 +117,8 @@ impl RustRuntimeFunctionRegistry {
     }
 
     pub fn get_id(&mut self, function: RustRuntimeFunction) -> Option<RustRuntimeFunctionId> {
-        let cx_cell = unsafe { self.cx_ptr.as_mut() };
-        let sorted_functions = &mut cx_cell?.runtime_functions_sorted_by_pointer;
+        let cx_cell = unsafe { self.cx_ptr.as_mut().unwrap() };
+        let sorted_functions = &mut cx_cell.runtime_functions_sorted_by_pointer;
         if self.should_rebuild_sorted_functions {
             *sorted_functions = self.build_sorted_functions();
         }

@@ -3,7 +3,7 @@ use super::{
     bytecode::function::Closure,
     collections::{BsHashMap, BsHashMapField, InlineArray},
     error::{err_assign_constant, syntax_error},
-    gc::{StackRoot, HeapItem, HeapPtr, GcVisitorExt},
+    gc::{GcVisitorExt, HeapItem, HeapPtr, StackRoot},
     global_names::has_restricted_global_property,
     heap_item_descriptor::{HeapItemDescriptor, HeapItemKind},
     interned_strings::InternedStrings,

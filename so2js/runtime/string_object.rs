@@ -1,15 +1,15 @@
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
-use so2js_macros::wrap_ordinary_object;
 use core::mem::size_of;
+use so2js_macros::wrap_ordinary_object;
 
 use crate::{
     extend_object,
     runtime::{
         alloc_error::AllocResult,
         eval_result::EvalResult,
-        gc::{StackRoot, HeapPtr},
+        gc::{HeapPtr, StackRoot},
         heap_item_descriptor::HeapItemKind,
         intrinsics::intrinsics::Intrinsic,
         object_value::{ObjectValue, VirtualObject},
@@ -29,7 +29,7 @@ use crate::{
 };
 
 use super::{
-    gc::{HeapItem, GcVisitorExt},
+    gc::{GcVisitorExt, HeapItem},
     property::Property,
     rust_vtables::extract_virtual_object_vtable,
     string_value::FlatString,
@@ -118,7 +118,7 @@ impl StringObject {
         length: u32,
     ) -> AllocResult<()> {
         // String objects have an immutable length property
-        let length_value = Value::from(length).to_stack();
+        let length_value = Value::from(length).to_stack_with(cx);
         string.as_object().set_property(
             cx,
             cx.names.length(),

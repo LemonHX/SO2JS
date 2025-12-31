@@ -17,7 +17,7 @@ use crate::{
         ordinary_object::get_prototype_from_constructor,
         property_key::PropertyKey,
         type_utilities::{is_array, is_callable, is_constructor_value, to_object, to_uint32},
-        Context, EvalResult, StackRoot, Realm, Value,
+        Context, EvalResult, Realm, StackRoot, Value,
     },
 };
 
@@ -90,7 +90,7 @@ impl ArrayConstructor {
                 1
             };
 
-            let int_len_value = Value::from(int_len).to_stack();
+            let int_len_value = Value::from(int_len).to_stack_with(cx);
             must!(set(
                 cx,
                 array.into(),
@@ -187,7 +187,7 @@ impl ArrayConstructor {
                 None
             })?;
 
-            let length_value = Value::from(i).to_stack();
+            let length_value = Value::from(i).to_stack_with(cx);
             set(cx, array, cx.names.length(), length_value, true)?;
 
             return Ok(array.as_value());
@@ -196,7 +196,7 @@ impl ArrayConstructor {
         // Otherwise assume items arg is array like and copy elements from it
         let array_like = must!(to_object(cx, items_arg));
         let length = length_of_array_like(cx, array_like)?;
-        let length_value = Value::from(length).to_stack();
+        let length_value = Value::from(length).to_stack_with(cx);
 
         let array = if is_constructor_value(this_value) {
             construct(cx, this_value.as_object(), &[length_value], None)?
@@ -246,7 +246,7 @@ impl ArrayConstructor {
         arguments: &[StackRoot<Value>],
     ) -> EvalResult<StackRoot<Value>> {
         let length = arguments.len();
-        let length_value = Value::from(length).to_stack();
+        let length_value = Value::from(length).to_stack_with(cx);
 
         let array = if is_constructor_value(this_value) {
             construct(cx, this_value.as_object(), &[length_value], None)?

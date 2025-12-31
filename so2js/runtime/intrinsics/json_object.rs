@@ -20,12 +20,12 @@ use crate::{
         type_utilities::{
             is_array, is_callable, number_to_string, to_integer_or_infinity, to_number,
         },
-        Context, EvalResult, StackRoot, PropertyKey, Realm, Value,
+        Context, EvalResult, PropertyKey, Realm, StackRoot, Value,
     },
 };
+use alloc::format;
 use alloc::vec;
 use alloc::vec::Vec;
-use alloc::format;
 use hashbrown::HashSet;
 
 use super::intrinsics::Intrinsic;
@@ -485,7 +485,7 @@ impl JSONValue {
         let value = match self {
             Self::Null => cx.null(),
             Self::Boolean(b) => cx.bool(*b),
-            Self::Number(n) => Value::from(*n).to_stack(),
+            Self::Number(n) => Value::from(*n).to_stack_with(cx),
             Self::String(s) => cx.alloc_wtf8_string(s)?.into(),
             Self::Array(values) => {
                 let array = must_a!(array_create(cx, 0, None));
@@ -761,7 +761,11 @@ impl JSONSerializer {
     }
 
     /// SerializeJSONArray (https://tc39.es/ecma262/#sec-serializejsonarray)
-    fn serialize_json_array(&mut self, cx: Context, array: StackRoot<ObjectValue>) -> EvalResult<()> {
+    fn serialize_json_array(
+        &mut self,
+        cx: Context,
+        array: StackRoot<ObjectValue>,
+    ) -> EvalResult<()> {
         self.check_for_cycle(cx, array)?;
 
         self.builder.push_char('[');

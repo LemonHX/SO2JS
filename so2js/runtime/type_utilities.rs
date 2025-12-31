@@ -161,7 +161,9 @@ pub fn to_number(cx: Context, value_handle: StackRoot<Value>) -> EvalResult<Stac
         } else {
             match value.as_pointer().descriptor().kind() {
                 // May allocate
-                HeapItemKind::String => Ok(string_to_number(value_handle.as_string())?.to_stack()),
+                HeapItemKind::String => {
+                    Ok(string_to_number(value_handle.as_string())?.to_stack_with(cx))
+                }
                 HeapItemKind::Symbol => type_error(cx, "symbol cannot be converted to number"),
                 HeapItemKind::BigInt => type_error(cx, "BigInt cannot be converted to number"),
                 _ => unreachable!(),

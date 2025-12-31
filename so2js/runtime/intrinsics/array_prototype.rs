@@ -163,7 +163,7 @@ impl ArrayPrototype {
             Self::apply_concat_to_element(cx, *element, array, &mut n)?;
         }
 
-        let new_length_value = Value::from(n).to_stack();
+        let new_length_value = Value::from(n).to_stack_with(cx);
         set(cx, array, cx.names.length(), new_length_value, true)?;
 
         Ok(array.as_value())
@@ -641,7 +641,7 @@ impl ArrayPrototype {
                 let mut element = get(cx, source, source_key)?;
 
                 if let Some(mapper_function) = mapper_function {
-                    let index_value = Value::from(i).to_stack();
+                    let index_value = Value::from(i).to_stack_with(cx);
                     let arguments = [element, index_value, source.into()];
                     element = call(cx, mapper_function, this_arg, &arguments)?;
                 }
@@ -837,7 +837,7 @@ impl ArrayPrototype {
             if has_property(cx, object, key)? {
                 let element = get(cx, object, key)?;
                 if is_strictly_equal(search_element, element)? {
-                    return Ok(Value::from(i).to_stack());
+                    return Ok(Value::from(i).to_stack_with(cx));
                 }
             }
         }
@@ -938,7 +938,7 @@ impl ArrayPrototype {
             if has_property(cx, object, key)? {
                 let element = get(cx, object, key)?;
                 if is_strictly_equal(search_element, element)? {
-                    return Ok(Value::from(i).to_stack());
+                    return Ok(Value::from(i).to_stack_with(cx));
                 }
             }
         }
@@ -1006,7 +1006,7 @@ impl ArrayPrototype {
         let element = get(cx, object, index_key)?;
         delete_property_or_throw(cx, object, index_key)?;
 
-        let new_length_value = Value::from(new_length).to_stack();
+        let new_length_value = Value::from(new_length).to_stack_with(cx);
         set(cx, object, cx.names.length(), new_length_value, true)?;
 
         Ok(element)
@@ -1034,7 +1034,7 @@ impl ArrayPrototype {
             set(cx, object, key, *argument, true)?;
         }
 
-        let new_length_value = Value::from(new_length).to_stack();
+        let new_length_value = Value::from(new_length).to_stack_with(cx);
         set(cx, object, cx.names.length(), new_length_value, true)?;
 
         Ok(new_length_value)
@@ -1251,7 +1251,7 @@ impl ArrayPrototype {
         let last_key = PropertyKey::from_u64_handle(cx, length - 1)?;
         delete_property_or_throw(cx, object, last_key)?;
 
-        let new_length_value = Value::from(length - 1).to_stack();
+        let new_length_value = Value::from(length - 1).to_stack_with(cx);
         set(cx, object, cx.names.length(), new_length_value, true)?;
 
         Ok(first)
@@ -1318,7 +1318,7 @@ impl ArrayPrototype {
             to_index += 1;
         }
 
-        let to_index_value = Value::from(to_index).to_stack();
+        let to_index_value = Value::from(to_index).to_stack_with(cx);
         set(cx, array, cx.names.length(), to_index_value, true)?;
 
         Ok(array.as_value())
@@ -1456,7 +1456,7 @@ impl ArrayPrototype {
             }
         }
 
-        let actual_delete_count_value = Value::from(actual_delete_count).to_stack();
+        let actual_delete_count_value = Value::from(actual_delete_count).to_stack_with(cx);
         set(
             cx,
             array,
@@ -1503,7 +1503,7 @@ impl ArrayPrototype {
             set(cx, object, to_key, *item, true)?;
         }
 
-        let new_length_value = Value::from(new_length).to_stack();
+        let new_length_value = Value::from(new_length).to_stack_with(cx);
         set(cx, object, cx.names.length(), new_length_value, true)?;
 
         Ok(array.as_value())
@@ -1755,7 +1755,7 @@ impl ArrayPrototype {
             }
         }
 
-        let new_length = Value::from(length + num_arguments).to_stack();
+        let new_length = Value::from(length + num_arguments).to_stack_with(cx);
         set(cx, object, cx.names.length(), new_length, true)?;
 
         Ok(new_length)
@@ -2054,7 +2054,11 @@ fn compare_array_elements(
 /// Naive merge sort where comparator function may have an abrupt completion.
 ///
 /// Much room for optimization.
-fn merge_sort<F>(cx: Context, items: &[StackRoot<Value>], f: &mut F) -> EvalResult<Vec<StackRoot<Value>>>
+fn merge_sort<F>(
+    cx: Context,
+    items: &[StackRoot<Value>],
+    f: &mut F,
+) -> EvalResult<Vec<StackRoot<Value>>>
 where
     F: FnMut(Context, StackRoot<Value>, StackRoot<Value>) -> EvalResult<Ordering>,
 {

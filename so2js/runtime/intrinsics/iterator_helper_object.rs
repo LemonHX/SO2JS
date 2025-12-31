@@ -5,7 +5,7 @@ use crate::{
     runtime::{
         abstract_operations::call_object,
         alloc_error::AllocResult,
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         generator_object::GeneratorState,
         heap_item_descriptor::HeapItemKind,
         iterator::{
@@ -15,7 +15,7 @@ use crate::{
         object_value::ObjectValue,
         ordinary_object::object_create_with_proto,
         type_utilities::to_boolean,
-        Context, EvalResult, StackRoot, HeapPtr, Value,
+        Context, EvalResult, HeapPtr, StackRoot, Value,
     },
     set_uninit,
 };
@@ -188,7 +188,11 @@ impl StackRoot<IteratorHelperObject> {
     /// closure or from after a yield point.
     ///
     /// Return None if the generator is done, or Some of the next iterator result object.
-    pub fn next(&mut self, cx: Context, is_start: bool) -> EvalResult<Option<StackRoot<ObjectValue>>> {
+    pub fn next(
+        &mut self,
+        cx: Context,
+        is_start: bool,
+    ) -> EvalResult<Option<StackRoot<ObjectValue>>> {
         match self.state() {
             IteratorHelperState::Drop(_) => self.next_drop(cx, is_start),
             IteratorHelperState::Take(_) => self.next_take(cx),
@@ -363,7 +367,11 @@ impl StackRoot<IteratorHelperObject> {
         }
     }
 
-    fn next_map(&mut self, cx: Context, is_start: bool) -> EvalResult<Option<StackRoot<ObjectValue>>> {
+    fn next_map(
+        &mut self,
+        cx: Context,
+        is_start: bool,
+    ) -> EvalResult<Option<StackRoot<ObjectValue>>> {
         let (mapper, counter) =
             if let IteratorHelperState::Map { mapper, counter } = self.state_mut() {
                 (mapper.to_stack(), counter)
@@ -376,7 +384,7 @@ impl StackRoot<IteratorHelperObject> {
             *counter += 1;
         }
 
-        let counter_value = Value::from(*counter).to_stack();
+        let counter_value = Value::from(*counter).to_stack_with(cx);
 
         // Get the next value from the underlying iterator
         let value = match self.iterator_step_value(cx, &mut self.iterator(cx))? {

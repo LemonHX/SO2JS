@@ -27,7 +27,7 @@ use crate::{
         scope::Scope,
         source_file::SourceFile,
         string_value::StringValue,
-        Context, StackRoot, HeapPtr, PropertyDescriptor, PropertyKey, Realm,
+        Context, HeapPtr, PropertyDescriptor, PropertyKey, Realm, StackRoot,
     },
     set_uninit,
 };

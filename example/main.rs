@@ -122,10 +122,13 @@ impl OptionsBuilder {
 
 use so2js::{
     common::{constants::DEFAULT_HEAP_SIZE, options::Options, wtf_8::Wtf8String},
+    handle_scope, must_a,
     parser::source::Source,
     runtime::{
-        alloc_error::AllocResult, gc_object::GcObject, test_262_object::Test262Object, BsResult,
-        Context, ContextBuilder,
+        abstract_operations::define_property_or_throw, alloc_error::AllocResult,
+        gc_object::GcObject, intrinsics::intrinsics::Intrinsic, object_value::ObjectValue,
+        test_262_object::Test262Object, BsResult, Context, ContextBuilder, EvalResult,
+        PropertyDescriptor, PropertyKey, Realm, StackRoot, Value,
     },
 };
 
@@ -156,31 +159,6 @@ fn create_context(args: &Args) -> AllocResult<Context> {
     Ok(cx)
 }
 
-fn evaluate(mut cx: Context, args: &Args) -> BsResult<()> {
-    for file in &args.files {
-        let file_contents = std::fs::read_to_string(file).unwrap();
-        let source =
-            Rc::new(Source::new_for_string(file, Wtf8String::from_string(file_contents)).unwrap());
-
-        if args.module {
-            cx.evaluate_module(source)?;
-        } else {
-            cx.evaluate_script(source)?;
-        }
-    }
-
-    Ok(())
-}
-
-fn unwrap_error_or_exit<T>(cx: Context, result: BsResult<T>) -> T {
-    match result {
-        Ok(value) => value,
-        Err(err) => {
-            print_error_message_and_exit(&err.format(cx));
-        }
-    }
-}
-
 // Wrapper to pretty print errors
 // fn main() {
 //     let args = Args::parse();
@@ -196,23 +174,80 @@ fn unwrap_error_or_exit<T>(cx: Context, result: BsResult<T>) -> T {
 //     })
 // }
 
+pub struct ConsoleObject;
+
+impl ConsoleObject {
+    fn new(mut cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
+        let mut object = ObjectValue::new(
+            cx,
+            Some(realm.get_intrinsic(Intrinsic::ObjectPrototype)),
+            true,
+        )?;
+        let log = cx.alloc_string("log").unwrap().as_string();
+        object.intrinsic_func(
+            cx,
+            PropertyKey::string(cx, log).unwrap().to_stack(),
+            Self::log,
+            1,
+            realm,
+        )?;
+
+        Ok(object.to_stack())
+    }
+
+    /// Install the GC object on the realm's global object.
+    pub fn install(cx: Context, realm: StackRoot<Realm>) -> AllocResult<()> {
+        handle_scope!(cx, {
+            let gc_object = GcObject::new(cx, realm)?;
+            let desc = PropertyDescriptor::data(gc_object.as_value(), true, false, true);
+            must_a!(define_property_or_throw(
+                cx,
+                realm.global_object(),
+                cx.names.gc(),
+                desc
+            ));
+
+            Ok(())
+        })
+    }
+
+    pub fn log(
+        cx: Context,
+        _: StackRoot<Value>,
+        arguments: &[StackRoot<Value>],
+    ) -> EvalResult<StackRoot<Value>> {
+        let mut formatted = vec![];
+        use so2js::runtime::to_console_string;
+        for argument in arguments.iter() {
+            formatted.push(to_console_string(cx, *argument)?);
+        }
+
+        println!("{}", formatted.join(" "));
+
+        Ok(cx.undefined())
+    }
+}
+
 fn main() {
-    let cx = ContextBuilder::new()
+    let mut cx = ContextBuilder::new()
         .set_options(Rc::new(Options::default()))
         .build()
         .unwrap();
+    GcObject::install(cx, cx.initial_realm()).unwrap();
 
-    cx.execute_then_drop(|mut cx| {
-        loop {
+    ConsoleObject::install(cx, cx.initial_realm()).unwrap();
+    loop {
+        handle_scope!(cx, {
             // take one line of input from stdin
             let mut input = String::new();
             std::io::stdin().read_line(&mut input).unwrap();
-            let handle = cx
-                .evaluate_module(Rc::new(
-                    Source::new_for_string("<repl>", Wtf8String::from_string(input)).unwrap(),
-                ))
-                .unwrap();
+            let handle = cx.evaluate_script(Rc::new(
+                Source::new_for_string("<repl>", Wtf8String::from_string(input)).unwrap(),
+            ));
             println!("{:?}", handle);
-        }
-    });
+            if let Err(err) = handle {
+                println!("Error: {}", err.format(cx));
+            }
+        })
+    }
 }

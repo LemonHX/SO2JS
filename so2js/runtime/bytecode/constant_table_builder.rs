@@ -308,7 +308,10 @@ impl ConstantTableBuilder {
         self.insert_if_missing(ConstantTableEntry::String(string))
     }
 
-    pub fn add_heap_item(&mut self, item: StackRoot<AnyHeapItem>) -> EmitResult<ConstantTableIndex> {
+    pub fn add_heap_item(
+        &mut self,
+        item: StackRoot<AnyHeapItem>,
+    ) -> EmitResult<ConstantTableIndex> {
         let key = self.num_heap_items;
         self.num_heap_items += 1;
         self.insert_if_missing(ConstantTableEntry::HeapItem { item, key })
@@ -358,7 +361,9 @@ impl ConstantTableBuilder {
                         // handle.
                         ToValueResult::Raw(raw_value) => {
                             raw_values[*index as usize] = raw_value;
-                            StackRoot::<Value>::from_fixed_non_heap_ptr(&raw_values[*index as usize])
+                            StackRoot::<Value>::from_fixed_non_heap_ptr(
+                                &raw_values[*index as usize],
+                            )
                         }
                     };
 
@@ -375,7 +380,7 @@ impl ConstantTableBuilder {
         // patched later. Fill them in with undefined.
         for constant in &mut constants {
             if constant.is_dangling() {
-                *constant = Value::undefined().to_stack();
+                *constant = Value::undefined().to_stack_with(cx);
             }
         }
 

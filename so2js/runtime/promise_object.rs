@@ -523,7 +523,10 @@ pub struct PromiseCapability {
 
 impl PromiseCapability {
     /// NewPromiseCapability (https://tc39.es/ecma262/#sec-newpromisecapability)
-    pub fn new(cx: Context, constructor: StackRoot<Value>) -> EvalResult<StackRoot<PromiseCapability>> {
+    pub fn new(
+        cx: Context,
+        constructor: StackRoot<Value>,
+    ) -> EvalResult<StackRoot<PromiseCapability>> {
         if !is_constructor_value(constructor) {
             return type_error(cx, "expected constructor");
         }
@@ -562,9 +565,9 @@ impl PromiseCapability {
         // reject fields of the capability.
         let promise = construct(cx, constructor, &[executor.into()], None)?;
 
-        if !is_callable(capability.resolve.to_stack()) {
+        if !is_callable(capability.resolve.to_stack_with(cx)) {
             return type_error(cx, "resolve must be callable");
-        } else if !is_callable(capability.reject.to_stack()) {
+        } else if !is_callable(capability.reject.to_stack_with(cx)) {
             return type_error(cx, "reject must be callable");
         }
 
@@ -594,11 +597,10 @@ impl PromiseCapability {
         // Get the capability object that was attached to the executor function
         let current_function = cx.current_function();
         let name = cx.well_known_symbols.capability().cast();
-        let mut capability = current_function
-            .private_element_find(cx, name)
-            .unwrap()
-            .value()
-            .cast::<PromiseCapability>();
+        let mut capability = match current_function.private_element_find(cx, name) {
+            Some(element) => element.value().cast::<PromiseCapability>(),
+            None => return type_error(cx, "promise executor missing capability"),
+        };
 
         // Check if the resolve and reject fields have already been set
         if !capability.resolve.is_undefined() {

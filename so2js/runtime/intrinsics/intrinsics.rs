@@ -5,6 +5,7 @@ use crate::{
         alloc_error::AllocResult,
         builtin_function::BuiltinFunction,
         collections::InlineArray,
+        context::ContextCell,
         error::type_error,
         eval_result::EvalResult,
         gc::GcVisitorExt,
@@ -95,10 +96,11 @@ use crate::{
         ordinary_object::object_create_with_proto,
         property_descriptor::PropertyDescriptor,
         realm::Realm,
-        Context, StackRoot, HeapPtr, Value,
+        Context, HeapPtr, StackRoot, Value,
     },
 };
 
+#[derive(Clone, Copy, Debug)]
 #[repr(u8)]
 pub enum Intrinsic {
     ArrayBufferConstructor = 0,
@@ -223,12 +225,17 @@ impl Intrinsic {
 
 #[repr(C)]
 pub struct Intrinsics {
+    /// Pointer to the runtime ContextCell; used to root intrinsics without reading GcHeader.
+    context_ptr: *mut ContextCell,
     intrinsics: InlineArray<HeapPtr<ObjectValue>>,
 }
 
 impl Intrinsics {
     /// CreateIntrinsics (https://tc39.es/ecma262/#sec-createintrinsics)
     pub fn initialize(cx: Context, mut realm: StackRoot<Realm>) -> AllocResult<()> {
+        // Record context pointer so Intrinsics::get can root without dereferencing object headers
+        realm.intrinsics.context_ptr = cx.as_ptr();
+
         // Initialize all pointers to valid pointer outside heap in case a GC is triggered before
         // they are set to real intrinsic object.
         realm
@@ -496,7 +503,15 @@ impl Intrinsics {
 
     pub fn get(&self, intrinsic: Intrinsic) -> StackRoot<ObjectValue> {
         let ptr: HeapPtr<ObjectValue> = self.get_ptr(intrinsic);
-        ptr.to_stack()
+
+        // Guard against uninitialized/dangling intrinsic pointers
+        let uninit = HeapPtr::<ObjectValue>::uninit();
+        if ptr.as_ptr() == uninit.as_ptr() {
+            panic!("intrinsic {:?} not initialized", intrinsic);
+        }
+
+        // Root using the stored context pointer to avoid dereferencing object headers
+        ptr.to_stack_with(unsafe { Context::from_context_cell_ptr(self.context_ptr) })
     }
 
     // Intrinsic prototypes are created before their corresponding constructors, so we must add a

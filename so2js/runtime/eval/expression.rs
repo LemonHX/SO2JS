@@ -25,7 +25,7 @@ use crate::{
             to_property_key, to_string, to_uint32, ToPrimitivePreferredType,
         },
         value::{BigIntValue, Value, BOOL_TAG, NULL_TAG, UNDEFINED_TAG},
-        Context, StackRoot, Realm,
+        Context, Realm, StackRoot,
     },
 };
 
@@ -101,7 +101,10 @@ pub fn eval_delete_property(
     Ok(delete_status)
 }
 
-pub fn eval_typeof(mut cx: Context, value: StackRoot<Value>) -> AllocResult<StackRoot<StringValue>> {
+pub fn eval_typeof(
+    mut cx: Context,
+    value: StackRoot<Value>,
+) -> AllocResult<StackRoot<StringValue>> {
     let type_string = if value.is_pointer() {
         let kind = value.as_pointer().descriptor().kind();
         match kind {
@@ -568,7 +571,7 @@ pub fn eval_shift_right_logical(
     // Shift modulus 32
     let shift = right_u32 & 0x1F;
 
-    Ok(Value::from(left_smi >> shift).to_stack())
+    Ok(Value::from(left_smi >> shift).to_stack_with(cx))
 }
 
 /// InstanceofOperator (https://tc39.es/ecma262/#sec-instanceofoperator)

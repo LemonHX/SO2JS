@@ -110,7 +110,7 @@ impl DataViewPrototype {
 
         let byte_length = get_view_byte_length(&data_view_record);
 
-        Ok(Value::from(byte_length).to_stack())
+        Ok(Value::from(byte_length).to_stack_with(cx))
     }
 
     /// get DataView.prototype.byteOffset (https://tc39.es/ecma262/#sec-get-dataview.prototype.byteoffset)
@@ -464,7 +464,10 @@ impl DataViewPrototype {
 }
 
 #[inline]
-fn require_is_data_view(cx: Context, value: StackRoot<Value>) -> EvalResult<StackRoot<DataViewObject>> {
+fn require_is_data_view(
+    cx: Context,
+    value: StackRoot<Value>,
+) -> EvalResult<StackRoot<DataViewObject>> {
     if !value.is_object() {
         return type_error(cx, "expected data view");
     }

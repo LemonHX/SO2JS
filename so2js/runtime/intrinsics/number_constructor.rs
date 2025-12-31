@@ -9,7 +9,7 @@ use crate::{
         builtin_function::BuiltinFunction,
         eval_result::EvalResult,
         function::get_argument,
-        gc::{StackRoot, HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem, StackRoot},
         heap_item_descriptor::HeapItemKind,
         numeric_constants::{
             MAX_SAFE_INTEGER_F64, MIN_POSITIVE_SUBNORMAL_F64, MIN_SAFE_INTEGER_F64,
@@ -172,7 +172,7 @@ impl NumberConstructor {
         };
 
         match cx.current_new_target() {
-            None => Ok(Value::from(number_value).to_stack()),
+            None => Ok(Value::from(number_value).to_stack_with(cx)),
             Some(new_target) => {
                 Ok(NumberObject::new_from_constructor(cx, new_target, number_value)?.as_value())
             }

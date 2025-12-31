@@ -8,7 +8,7 @@ use crate::{
         array_object::create_array_from_list,
         error::type_error,
         eval_result::EvalResult,
-        gc::{HeapItem, GcVisitorExt},
+        gc::{GcVisitorExt, HeapItem},
         heap_item_descriptor::HeapItemKind,
         iterator::create_iter_result_object,
         object_value::ObjectValue,
@@ -17,7 +17,7 @@ use crate::{
         property_key::PropertyKey,
         realm::Realm,
         value::Value,
-        Context, StackRoot, HeapPtr,
+        Context, HeapPtr, StackRoot,
     },
     set_uninit,
 };
@@ -148,7 +148,7 @@ impl ArrayIteratorPrototype {
 
         match array_iterator.kind {
             ArrayIteratorKind::Key => {
-                let key = Value::from(current_index).to_stack();
+                let key = Value::from(current_index).to_stack_with(cx);
                 Ok(create_iter_result_object(cx, key, false)?)
             }
             ArrayIteratorKind::Value => {
@@ -157,7 +157,7 @@ impl ArrayIteratorPrototype {
                 Ok(create_iter_result_object(cx, value, false)?)
             }
             ArrayIteratorKind::KeyAndValue => {
-                let key = Value::from(current_index).to_stack();
+                let key = Value::from(current_index).to_stack_with(cx);
                 let property_key = PropertyKey::from_u64_handle(cx, current_index)?;
                 let value = array.get(cx, property_key, array.into())?;
 

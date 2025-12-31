@@ -27,7 +27,7 @@ use crate::{
             is_callable, is_strictly_equal, same_object_value, same_value_zero, to_bigint,
             to_boolean, to_integer_or_infinity, to_number, to_object,
         },
-        Context, EvalResult, StackRoot, PropertyKey, Realm, Value,
+        Context, EvalResult, PropertyKey, Realm, StackRoot, Value,
     },
 };
 
@@ -181,7 +181,7 @@ impl TypedArrayPrototype {
 
         let byte_length = typed_array_byte_length(&typed_array_record);
 
-        Ok(Value::from(byte_length).to_stack())
+        Ok(Value::from(byte_length).to_stack_with(cx))
     }
 
     /// get %TypedArray%.prototype.byteOffset (https://tc39.es/ecma262/#sec-get-%typedarray%.prototype.byteoffset)
@@ -492,7 +492,7 @@ impl TypedArrayPrototype {
 
         // Then create a new array that contains the kept values
         let num_kept_values = kept_values.len();
-        let num_kept_values_value = Value::from(num_kept_values).to_stack();
+        let num_kept_values_value = Value::from(num_kept_values).to_stack_with(cx);
         let array = typed_array_species_create_object(cx, typed_array, &[num_kept_values_value])?;
 
         // Shared between iterations
@@ -744,7 +744,7 @@ impl TypedArrayPrototype {
             if must!(has_property(cx, object, key)) {
                 let element = must!(get(cx, object, key));
                 if is_strictly_equal(search_element, element)? {
-                    return Ok(Value::from(i).to_stack());
+                    return Ok(Value::from(i).to_stack_with(cx));
                 }
             }
         }
@@ -853,7 +853,7 @@ impl TypedArrayPrototype {
             if must!(has_property(cx, object, key)) {
                 let element = must!(get(cx, object, key));
                 if is_strictly_equal(search_element, element)? {
-                    return Ok(Value::from(i).to_stack());
+                    return Ok(Value::from(i).to_stack_with(cx));
                 }
             }
         }
@@ -876,7 +876,7 @@ impl TypedArrayPrototype {
 
         let length = typed_array_length(&typed_array_record);
 
-        Ok(Value::from(length).to_stack())
+        Ok(Value::from(length).to_stack_with(cx))
     }
 
     /// %TypedArray%.prototype.map (https://tc39.es/ecma262/#sec-%typedarray%.prototype.map)
@@ -899,7 +899,7 @@ impl TypedArrayPrototype {
         let callback_function = callback_function.as_object();
         let this_arg = get_argument(cx, arguments, 1);
 
-        let length_value = Value::from(length).to_stack();
+        let length_value = Value::from(length).to_stack_with(cx);
         let array = typed_array_species_create_object(cx, typed_array, &[length_value])?;
 
         // Shared between iterations
@@ -1243,7 +1243,7 @@ impl TypedArrayPrototype {
         };
 
         let count = end_index.saturating_sub(start_index);
-        let count_value = Value::from(count).to_stack();
+        let count_value = Value::from(count).to_stack_with(cx);
         let new_typed_array = typed_array_species_create(cx, typed_array, &[count_value])?;
         let array = new_typed_array.into_object_value();
 
@@ -1428,7 +1428,7 @@ impl TypedArrayPrototype {
         let element_size = typed_array.element_size();
         let source_byte_offset = typed_array.byte_offset();
         let begin_byte_offset = source_byte_offset + (start_index as usize) * element_size;
-        let begin_byte_offset_value = Value::from(begin_byte_offset).to_stack();
+        let begin_byte_offset_value = Value::from(begin_byte_offset).to_stack_with(cx);
 
         let subarray = if typed_array.array_length().is_none() && end_argument.is_undefined() {
             typed_array_species_create_object(
@@ -1437,7 +1437,7 @@ impl TypedArrayPrototype {
                 &[buffer.into(), begin_byte_offset_value],
             )?
         } else {
-            let new_length_value = Value::from(new_length).to_stack();
+            let new_length_value = Value::from(new_length).to_stack_with(cx);
             typed_array_species_create_object(
                 cx,
                 typed_array,
@@ -1659,7 +1659,10 @@ macro_rules! create_typed_array_prototype {
 
         impl $prototype {
             /// Properties of the TypedArray Prototype Objects (https://tc39.es/ecma262/#sec-properties-of-typedarray-prototype-objects)
-            pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
+            pub fn new(
+                cx: Context,
+                realm: StackRoot<Realm>,
+            ) -> AllocResult<StackRoot<ObjectValue>> {
                 let mut object = ObjectValue::new(
                     cx,
                     Some(realm.get_intrinsic(Intrinsic::TypedArrayPrototype)),
@@ -1794,7 +1797,7 @@ fn typed_array_create_same_type(
     };
 
     let constructor = cx.get_intrinsic(constructor_instrinsic);
-    let length_value = Value::from(length).to_stack();
+    let length_value = Value::from(length).to_stack_with(cx);
 
     typed_array_create_from_constructor_object(cx, constructor, &[length_value])
 }

@@ -25,7 +25,7 @@ use crate::{
             is_callable, is_constructor_value, is_integral_number, to_number, to_object,
         },
         value::Value,
-        Context, StackRoot, PropertyKey, Realm,
+        Context, PropertyKey, Realm, StackRoot,
     },
 };
 use alloc::vec;
@@ -112,7 +112,7 @@ impl TypedArrayConstructor {
 
             let length = values.len();
 
-            let length_value = Value::from(length).to_stack();
+            let length_value = Value::from(length).to_stack_with(cx);
             let target_object =
                 typed_array_create_from_constructor_object(cx, this_constructor, &[length_value])?;
 
@@ -140,7 +140,7 @@ impl TypedArrayConstructor {
         let array_like = must!(to_object(cx, source));
         let length = length_of_array_like(cx, array_like)? as usize;
 
-        let length_value = Value::from(length).to_stack();
+        let length_value = Value::from(length).to_stack_with(cx);
         let target_object =
             typed_array_create_from_constructor_object(cx, this_constructor, &[length_value])?;
 
@@ -178,7 +178,7 @@ impl TypedArrayConstructor {
 
         let this_constructor = this_value.as_object();
         let length = arguments.len();
-        let length_value = Value::from(length).to_stack();
+        let length_value = Value::from(length).to_stack_with(cx);
 
         let typed_array =
             typed_array_create_from_constructor(cx, this_constructor, &[length_value])?;
@@ -589,7 +589,10 @@ macro_rules! create_typed_array_constructor {
 
         impl $constructor {
             /// Properties of the TypedArray Constructors (https://tc39.es/ecma262/#sec-properties-of-the-typedarray-constructors)
-            pub fn new(cx: Context, realm: StackRoot<Realm>) -> AllocResult<StackRoot<ObjectValue>> {
+            pub fn new(
+                cx: Context,
+                realm: StackRoot<Realm>,
+            ) -> AllocResult<StackRoot<ObjectValue>> {
                 let mut func = BuiltinFunction::intrinsic_constructor(
                     cx,
                     Self::construct,
